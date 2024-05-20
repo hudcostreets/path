@@ -78,9 +78,7 @@ See:
 - outputs in [`data/*.pqt`](data/)
 
 ```bash
-y=2024
-m=3
-papermill -p year $y -p last_month $m -p template 2023-PATH-Monthly-Ridership-Report.tabula-template.json monthly.ipynb out/monthly-$y.ipynb
+y=2024 papermill -p year $y monthly.ipynb out/monthly-$y.ipynb
 ```
 
 #### 3. Combine all years' data <a id="combine-data"></a>
