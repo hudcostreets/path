@@ -1,11 +1,11 @@
-fastparquet
+fastparquet==2023.4.0
 iRe.py
 jupyter
 kaleido
+openpyxl
 pandas
 papermill
 plotly
-openpyxl
 tabula-py
 tornado<=6.1
 utz
