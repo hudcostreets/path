@@ -63,7 +63,10 @@ From [www.panynj.gov/path/en/about/stats.html](https://www.panynj.gov/path/en/ab
 ```bash
 y=2024
 name=$y-PATH-Monthly-Ridership-Report.pdf
-wget -O $name https://www.panynj.gov/content/dam/path/about/statistics/$name
+wget -O data/$name https://www.panynj.gov/content/dam/path/about/statistics/$name
+
+name=$y-PATH-Hourly-Ridership-Report.pdf
+wget -O data/$name https://www.panynj.gov/content/dam/path/about/statistics/$name
 ```
 
 #### 1b. Use [Tabula] to extract tables <a id="use-tabula"></a>
