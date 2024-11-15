@@ -6,6 +6,7 @@ openpyxl
 pandas
 papermill
 plotly
+PyPDF2
 tabula-py
 tornado<=6.1
 utz
