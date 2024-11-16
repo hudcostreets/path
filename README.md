@@ -79,7 +79,7 @@ See:
 - outputs in [`data/*.pqt`](data/)
 
 ```bash
-y=2024 papermill -p year $y monthly.ipynb out/monthly-$y.ipynb
+y=2024; juq papermill run -p year=$y monthly.ipynb out/monthly-$y.ipynb
 ```
 
 #### 3. Combine all years' data <a id="combine-data"></a>
