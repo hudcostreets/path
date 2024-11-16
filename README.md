@@ -47,11 +47,9 @@ Cleaned + Plotted Port Authority data from https://www.panynj.gov/path/en/about/
 ### Weekdays vs. Weekends, compared to 2019 <a id="week_end_cmp_pct"></a>
 ![](img/vs_2019.png)
 
-As of October 2023:
-- weekday ridership was 62% of 2019
-- weekend ridership was 90% of 2019
-
-Service remains down in both cases, so it's not apples to apples.
+As of September 2024:
+- weekday ridership was 69.2% of Sept '19 (pre-COVID)
+- weekend ridership was 99.5% of Sept '19 (pre-COVID)
 
 ## Methods <a id="methods"></a>
 
