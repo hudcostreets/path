@@ -28,7 +28,7 @@ const margin = {
 const config: Partial<Plotly.Config> = {
   autosizable: true,
   responsive: true,
-  displayModeBar: false
+  displayModeBar: false,
 }
 
 export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
@@ -95,6 +95,8 @@ export default function LinePlots() {
   // const db = useMemo(() => new Db(), [])
   const { data: table, isError, error } = useQuery({
     queryKey: [ 'lines', url, dbConn === null ],
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
     queryFn: async () => {
       if (!dbConn) return null
       const { conn } = dbConn
@@ -202,7 +204,6 @@ export default function LinePlots() {
           dtick: "M3",
           tickformat: "%b '%y",
           tickangle: 45,
-          range: [null, month[n - 1]],
         },
         yaxis: {
           dtick: 0.1,
