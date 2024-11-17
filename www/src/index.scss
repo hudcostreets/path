@@ -33,10 +33,36 @@ h1 {
   line-height: 1.1;
 }
 
+.heading {
+  a {
+    color: black;
+  }
+  a:hover {
+    color: #555;
+  }
+}
+
 hr {
   border: 0;
   border-top: 1px solid #aaa;
   margin: 1.5em 0;
+}
+
+.loading {
+  background-color: #eee;
+  text-align: center;
+  place-content: center;
+}
+.error {
+  background-color: #fcc;
+}
+.socials {
+  text-align: center;
+  padding-bottom: 3em;
+}
+.icon {
+  width: 2em;
+  margin-right: 0.6em;
 }
 
 button {
