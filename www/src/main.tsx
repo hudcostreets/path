@@ -6,6 +6,8 @@ import { createRoot } from 'react-dom/client'
 import './index.scss'
 import './plot.scss'
 import Body from './Body.mdx'
+import { createTheme, ThemeProvider } from "@mui/material";
+import { Theme } from "@rdub/icons/Tooltip";
 
 const components = {
   a: A,
@@ -13,12 +15,16 @@ const components = {
 
 const queryClient = new QueryClient()
 
+const theme = createTheme(Theme)
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <MDXProvider components={components}>
-        <Body />
-      </MDXProvider>
-    </QueryClientProvider>
+    <ThemeProvider theme={theme}>
+      <QueryClientProvider client={queryClient}>
+        <MDXProvider components={components}>
+          <Body />
+        </MDXProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

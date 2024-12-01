@@ -236,12 +236,12 @@ export default function LinePlots() {
       {isError ? <div className={"error"}>Error: {error?.toString()}</div> : null}
       <Plot
         id={"rides"}
-        title={"Avg rides per day"}
+        title={"Avg PATH rides per day"}
         {...dailyPlot}
       />
       <Plot
         id={"vs-2019"}
-        title={"Avg rides per day (vs. 2019)"}
+        title={"Avg PATH rides per day (vs. 2019)"}
         {...vs2019Plot}
       />
       <p>Weekend ridership has recovered to pre-COVID levels, though service remains degraded.</p>
