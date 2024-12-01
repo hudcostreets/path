@@ -28,13 +28,13 @@
     "react-plotly.js": "^2.6.0"
   },
   "devDependencies": {
-    "@rdub/eslint-config": "0.0.1",
+    "@rdub/eslint-config": "0.0.2",
     "@types/plotly.js": "^2.35.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/react-plotly.js": "^2.6.3",
     "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^9.9.0",
+    "eslint": "^9",
     "sass-embedded": "^1.81.0",
     "typescript": "^5.5.3",
     "vite": "^5.4.11"
