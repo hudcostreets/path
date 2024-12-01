@@ -2,12 +2,12 @@ import ReactJsonView from '@microlink/react-json-view'
 import { Arr } from "@rdub/base/arr"
 import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
+import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
 import { Int32 } from 'apache-arrow'
 import { Annotations } from "plotly.js"
 import * as Plotly from "plotly.js"
 import Plot0, { PlotParams } from 'react-plotly.js'
-import { useDb } from "@rdub/duckdb-wasm/duckdb"
 
 export type Row = {
   month: Int32

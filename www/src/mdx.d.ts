@@ -1,6 +1,6 @@
 declare module '*.mdx' {
-  import type { ComponentProps, ReactNode } from 'react'
   import { MDXProps } from 'mdx/types'
+  import type { ReactNode } from 'react'
 
   export * from 'mdx/types'
 
