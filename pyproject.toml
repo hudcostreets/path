@@ -1,0 +1,31 @@
+[project]
+name = "path-data"
+version = "0.0.1"
+description = "PATH ridership data analysis and visualization"
+dependencies = [
+    "fastparquet==2024.11.0",
+    "iRe.py",
+    "jupyter",
+    "juq.py>=0.3.1",
+    "kaleido",
+    "numpy>=2",
+    "openpyxl==3.1.5",
+    "pandas",
+    "papermill",
+    "plotly",
+    "PyPDF2",
+    "tabula-py",
+    "tornado<=6.1",
+    "utz",
+]
+requires-python = ">=3.9"
+
+[project.scripts]
+path-data = "path_data.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["path_data"]

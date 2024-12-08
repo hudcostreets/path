@@ -1,6 +1,12 @@
 # PATH ridership stats
-Cleaned + Plotted Port Authority data from https://www.panynj.gov/path/en/about/stats.html
+Cleaned + Plotted PATH ridership data ([source][PA data])
 
+Interactive versions of the plots below:
+- [ire.runsascoded.com/#gl=hudcostreets/path-data/-/main/months.ipynb](https://ire.runsascoded.com/#gl=hudcostreets/path-data/-/main/months.ipynb)
+- [path.hudcostreets.org](https://path.hudcostreets.org/)
+
+Contents:
+<!-- toc -->
 - [Cleaned data](#data)
     - [Jan 2012 – Oct 2023](#weekdays)
     - [Closer look at 2020-Present](#weekdays_2020)
@@ -10,18 +16,17 @@ Cleaned + Plotted Port Authority data from https://www.panynj.gov/path/en/about/
     - [Weekends, Grouped by Month](#weekend_month_grouped)
     - [Weekdays vs. Weekends](#week_end_cmp)
     - [Weekdays vs. Weekends, compared to 2019](#week_end_cmp_pct)
-- [Methods](#methods)
-    - [PATH Monthly Data](#path-data)
-        - [1. Download "PATH Ridership Reports (By Month)"](#download-data)
-        - [2. Use Tabula to extract tables](#use-tabula)
-        - [3. Process each year's data, output `.pqt`s](#process-data)
-        - [4. Combine all years' data](#combine-data)
-    - [Bridge & Tunnel Data](#bridge_tunnel)
+- [Usage](#usage)
+    - [Update PATH Monthly Data PDFs](#path-data)
+        - [0. Install](#install)
+        - [1. Download PATH Ridership Reports](#download-data)
+        - [2. Process each year's data, output `.pqt`s](#process-data)
+        - [3. Combine all years' data](#combine-data)
+    - [Bridge & Tunnel Data (WIP)](#bridge_tunnel)
+<!-- /toc -->
 
 ## Cleaned data <a id="data"></a>
 - [`data/all.pqt`]
-- [`data/all.xlsx`]
-- [Google Sheet](https://docs.google.com/spreadsheets/d/1u84kVHEjvqByCu8Jb78D9f7TXbahoOe0/edit)
 
 ### Jan 2012 – Oct 2023 <a id="weekdays"></a>
 ![PATH weekday ridership over time, stacked by station](img/weekdays.png)
@@ -51,42 +56,54 @@ As of September 2024:
 - weekday ridership was 69.2% of Sept '19 (pre-COVID)
 - weekend ridership was 99.5% of Sept '19 (pre-COVID)
 
-## Methods <a id="methods"></a>
+## Usage <a id="usage"></a>
 
-### PATH Monthly Data <a id="path-data"></a>
+### Update PATH Monthly Data PDFs <a id="path-data"></a>
 
-#### 1. Download "PATH Ridership Reports (By Month)" <a id="download-data"></a>
-From [www.panynj.gov/path/en/about/stats.html](https://www.panynj.gov/path/en/about/stats.html), to [`data/`](data/):
-
+#### 0. Install <a id="install"></a>
 ```bash
-y=2024
-name=$y-PATH-Monthly-Ridership-Report.pdf
-wget -O data/$name https://www.panynj.gov/content/dam/path/about/statistics/$name
-
-name=$y-PATH-Hourly-Ridership-Report.pdf
-wget -O data/$name https://www.panynj.gov/content/dam/path/about/statistics/$name
+git clone https://github.com/hudcostreets/path
+cd path
+pip install -e .
 ```
 
-#### 1b. Use [Tabula] to extract tables <a id="use-tabula"></a>
+#### 1. Download PATH Ridership Reports <a id="download-data"></a>
 
-This only has to be done once, the resulting templates are saved in [`templates/`](templates).
+```bash
+path-data refresh
+```
+
+- [`refresh.py`](path_data/cli/refresh.py)
+- Updates local copies of [PANYNJ PDFs][PA data], e.g.:
+  - [2024-PATH-Monthly-Ridership-Report.pdf]
+  - [2024-PATH-Hourly-Ridership-Report.pdf]
+
+##### 1b. Create [Tabula] templates
+
+This is already done, the resulting templates are saved in [`templates/`](templates).
 
 ![Selecting tables from a "PATH Ridership Report"](img/tabula-screenshot.png)
 
 #### 2. Process each year's data, output `.pqt`s <a id="process-data"></a>
-See:
-- [`monthly.ipynb`](monthly.ipynb)
-- outputs in [`data/*.pqt`](data/)
-
 ```bash
-y=2024; juq papermill run -p year=$y monthly.ipynb out/monthly-$y.ipynb
+path-data update
 ```
 
-#### 3. Combine all years' data <a id="combine-data"></a>
-- See [`months.ipynb`](months.ipynb)
-- Output [`data/all.pqt`], [`data/all.xlsx`], [`img/weekdays.png`](img/weekdays.png)
+- [`update.py`](path_data/cli/update.py)
+- [`monthly.ipynb`](monthly.ipynb)
+- Outputs[`data/20*.pqt`](data/)
 
-### Bridge & Tunnel Data <a id="bridge_tunnel"></a>
+
+#### 3. Combine all years' data <a id="combine-data"></a>
+
+```bash
+path-data combine
+```
+- [`combine.py`](path_data/cli/combine.py)
+- [`months.ipynb`](months.ipynb)
+- Outputs: [`data/all.pqt`], [`img/weekdays.png`](img/weekdays.png), etc.
+
+### Bridge & Tunnel Data (WIP) <a id="bridge_tunnel"></a>
 
 Merge per-year PDFs into one:
 ```bash
@@ -102,5 +119,7 @@ cf. [SO](https://stackoverflow.com/a/28455147/544236).
 
 
 [`data/all.pqt`]: data/all.pqt
-[`data/all.xlsx`]: data/all.xlsx
 [Tabula]: https://tabula.technology/
+[PA data]: https://www.panynj.gov/path/en/about/stats.html
+[2024-PATH-Monthly-Ridership-Report.pdf]: data/2024-PATH-Monthly-Ridership-Report.pdf
+[2024-PATH-Hourly-Ridership-Report.pdf]: data/2024-PATH-Hourly-Ridership-Report.pdf
