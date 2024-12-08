@@ -52,9 +52,9 @@ Contents:
 ### Weekdays vs. Weekends, compared to 2019 <a id="week_end_cmp_pct"></a>
 ![](img/vs_2019.png)
 
-As of September 2024:
-- weekday ridership was 69.2% of Sept '19 (pre-COVID)
-- weekend ridership was 99.5% of Sept '19 (pre-COVID)
+As of October 2024:
+- weekday ridership was 71.2% of October '19 (pre-COVID)
+- weekend ridership was 113.5% of October '19 (pre-COVID)
 
 ## Usage <a id="usage"></a>
 
