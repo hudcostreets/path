@@ -31,7 +31,8 @@ const config: Partial<Plotly.Config> = {
   displayModeBar: false,
 }
 
-export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
+// export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
+export const url = 'https://hudcostreets.s3.amazonaws.com/path/all-202411.pqt'
 // const [ collapseLevel, setCollapseLevel] = useLocalStorageState<number | null>(CollapseLevelKey, { defaultValue: 2 })
 
 export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x: number | Date, ax: number | Date }>): Partial<Annotations> {
@@ -100,21 +101,25 @@ export default function LinePlots() {
     queryFn: async () => {
       if (!dbConn) return null
       const { conn } = dbConn
-      console.log("running query:", conn)
+      const offset = new Date().getTimezoneOffset() * 60000
       const query = `
           SELECT
               month,
-              cast(sum("avg weekday") as int32) as avg_weekday,
-              cast(sum("avg weekend") as int32) as avg_weekend
+              sum("avg weekday") as avg_weekday,
+              sum("avg weekend") as avg_weekend
           FROM parquet_scan('${url}')
           group by month
           order by month
       `
+      console.log("running query:", query)
       const table = await conn.query<Row>(query)
-      const offset = new Date().getTimezoneOffset() * 60000
-      const month: Date[] = Arr(table.getChild("month")!.toArray()).map(m => new Date(m + offset))
-      // console.log("result:", table, table.getChild("month"))
-      // console.log("months:", month)//month?.map(m => new Date(m)))
+      console.log("table:", table)
+      const month: Date[] = Arr(table.getChild("month")!.toArray()).map(m => {
+        console.log("m:", m, "offset:", offset)
+        return new Date(Number(m) / 1000 + offset)
+      })
+      console.log("result:", table, table.getChild("month"))
+      console.log("months:", month) //month?.map(m => new Date(m)))
       const avg_weekday = Arr(table.getChild("avg_weekday")!.toArray())
       const avg_weekend = Arr(table.getChild("avg_weekend")!.toArray())
       conn.close()
