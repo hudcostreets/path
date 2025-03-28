@@ -10,6 +10,10 @@ from utz import YM, check
 from path_data.paths import DATA
 
 
+def mo_str(dt: datetime) -> str:
+    return f'{YM(dt).str("-")}'
+
+
 def last_month() -> YM:
     last_pdf = max(glob(f'{DATA}/*-PATH-Monthly-Ridership-Report.pdf'))
     year = int(basename(last_pdf)[:4])

@@ -4,13 +4,13 @@ import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { Int32 } from 'apache-arrow'
+import { Int32, Utf8 } from 'apache-arrow'
 import { Annotations } from "plotly.js"
 import * as Plotly from "plotly.js"
 import Plot0, { PlotParams } from 'react-plotly.js'
 
 export type Row = {
-  month: Int32
+  month: Utf8
   avg_weekday: Int32
   avg_weekend: Int32
 }
@@ -32,7 +32,9 @@ const config: Partial<Plotly.Config> = {
 }
 
 // export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
-export const url = 'https://hudcostreets.s3.amazonaws.com/path/all-202411.pqt'
+// export const url = 'https://hudcostreets.s3.amazonaws.com/path/all-202411.pqt'
+export const url = 'http://localhost:5173/all.pqt'
+
 // const [ collapseLevel, setCollapseLevel] = useLocalStorageState<number | null>(CollapseLevelKey, { defaultValue: 2 })
 
 export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x: number | Date, ax: number | Date }>): Partial<Annotations> {
@@ -101,7 +103,7 @@ export default function LinePlots() {
     queryFn: async () => {
       if (!dbConn) return null
       const { conn } = dbConn
-      const offset = new Date().getTimezoneOffset() * 60000
+      console.log("running query:", conn)
       const query = `
           SELECT
               month,
@@ -114,12 +116,12 @@ export default function LinePlots() {
       console.log("running query:", query)
       const table = await conn.query<Row>(query)
       console.log("table:", table)
-      const month: Date[] = Arr(table.getChild("month")!.toArray()).map(m => {
-        console.log("m:", m, "offset:", offset)
-        return new Date(Number(m) / 1000 + offset)
+      const month: Date[] = Arr(table.getChild("month")!.toArray()).map((m: any) => {
+        const [ yr, mo ] = /^(\d{4})-(\d{2})$/.exec(m)!.slice(1, 3).map(i => parseInt(i))
+        return new Date(yr, mo - 1, 1)
       })
-      console.log("result:", table, table.getChild("month"))
-      console.log("months:", month) //month?.map(m => new Date(m)))
+      // console.log("result:", table, table.getChild("month"))
+      // console.log("months:", month)//month?.map(m => new Date(m)))
       const avg_weekday = Arr(table.getChild("avg_weekday")!.toArray())
       const avg_weekend = Arr(table.getChild("avg_weekend")!.toArray())
       conn.close()
