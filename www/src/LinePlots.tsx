@@ -32,8 +32,8 @@ const config: Partial<Plotly.Config> = {
 }
 
 // export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
-// export const url = 'https://hudcostreets.s3.amazonaws.com/path/all-202411.pqt'
-export const url = 'http://localhost:5173/all.pqt'
+export const url = 'https://hudcostreets.s3.amazonaws.com/path/all-202501.pqt'
+// export const url = 'http://localhost:5173/all.pqt'
 
 // const [ collapseLevel, setCollapseLevel] = useLocalStorageState<number | null>(CollapseLevelKey, { defaultValue: 2 })
 
@@ -42,6 +42,7 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
   if (ax instanceof Date) ax = ax.getTime()
   return {
     axref: "x",
+    ayref: "y",
     arrowcolor: "#2a3f5f",
     arrowhead: 0,
     arrowwidth: 1,
@@ -154,6 +155,8 @@ export default function LinePlots() {
       year: '2-digit'
     })
     lastMoStr = `${lastMoStr.substring(0, lastMoStr.length - 2)}'${lastMoStr.substring(lastMoStr.length - 2)}`
+    console.log("round(avg_weekday[n - 1]):", round(avg_weekday[n - 1]))
+    let axo = 13, ayo = 50_000
     dailyPlot = {
       data: [
         {
@@ -177,20 +180,21 @@ export default function LinePlots() {
         },
         annotations: [
           ann({
-            ax: month[n - 10],
-            text: `${lastMoStr}: ${avg_weekday[n - 1].toLocaleString()}`,
+            ax: month[n - axo], ay: avg_weekday[n - 1] + ayo,
+            text: `${lastMoStr}: ${round(avg_weekday[n - 1]).toLocaleString()}`,
             x: month[n - 1],
             y: avg_weekday[n - 1],
           }),
           ann({
-            ax: month[n - 10],
-            text: `${lastMoStr}: ${avg_weekend[n - 1].toLocaleString()}`,
+            ax: month[n - axo], ay: avg_weekend[n - 1] - ayo,
+            text: `${lastMoStr}: ${round(avg_weekend[n - 1]).toLocaleString()}`,
             x: month[n - 1],
             y: avg_weekend[n - 1],
           }),
         ]
       }
     }
+    axo = 5; ayo = .15
     vs2019Plot = {
       data: [
         {
@@ -222,17 +226,31 @@ export default function LinePlots() {
         },
         annotations: [
           ann({
-            ax: month[n - 3],
+            ax: month[n - axo], ay: lastPcts.week - ayo,
             text: `${lastMoStr}: ${round(lastPcts.week * 1000) / 10}%`,
             x: month[n - 1],
             y: lastPcts.week,
           }),
           ann({
-            ax: month[n - 3],
+            ax: month[n - axo], ay: lastPcts.wknd + ayo,
             text: `${lastMoStr}: ${round(lastPcts.wknd * 1000) / 10}%`,
             x: month[n - 1],
             y: lastPcts.wknd,
           }),
+        ],
+        shapes: [
+          {
+            type: 'line',
+            xref: 'paper',
+            x0: 0,
+            y0: 1,
+            x1: 1,
+            y1: 1,
+            line:{
+              color: '#777',
+              width: 1,
+            }
+          }
         ]
       }
     }
