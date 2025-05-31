@@ -29,7 +29,11 @@ Contents:
 - [`data/all.pqt`]
 - [`data/all.xlsx`]
 
-### Jan 2012 – Apr 2025 <a id="weekdays"></a>
+<!-- `scripts/h3.py` -->
+<h3>
+Jan 2012 – Apr 2025 <a id="weekdays"></a>
+</h3>
+
 ![PATH weekday ridership over time, stacked by station](img/weekdays.png)
 
 ### Closer look at 2020-Present <a id="weekdays_2020"></a>
@@ -53,9 +57,13 @@ Contents:
 ### Weekdays vs. Weekends, compared to 2019 <a id="week_end_cmp_pct"></a>
 ![](img/vs_2019.png)
 
+<!-- `scripts/vs_2019.py` -->
+<div>
+
 As of April 2025:
-- weekday ridership was 71.2% of April '19 (pre-COVID)
-- weekend ridership was 99.6% of April '19 (pre-COVID)
+- Weekday ridership was 71.2% of April '19 (pre-COVID)
+- Weekend ridership was 99.6% of April '19 (pre-COVID)
+</div>
 
 ## Usage <a id="usage"></a>
 
@@ -76,8 +84,8 @@ path-data refresh
 
 - [`refresh.py`](path_data/cli/refresh.py)
 - Updates local copies of [PANYNJ PDFs][PA data], e.g.:
-  - [2024-PATH-Monthly-Ridership-Report.pdf]
-  - [2024-PATH-Hourly-Ridership-Report.pdf]
+  - [2025-PATH-Monthly-Ridership-Report.pdf]
+  - [2025-PATH-Hourly-Ridership-Report.pdf]
 
 ##### 1b. Create [Tabula] templates
 
@@ -123,5 +131,5 @@ cf. [SO](https://stackoverflow.com/a/28455147/544236).
 [`data/all.xlsx`]: data/all.xlsx
 [Tabula]: https://tabula.technology/
 [PA data]: https://www.panynj.gov/path/en/about/stats.html
-[2024-PATH-Monthly-Ridership-Report.pdf]: data/2024-PATH-Monthly-Ridership-Report.pdf
-[2024-PATH-Hourly-Ridership-Report.pdf]: data/2024-PATH-Hourly-Ridership-Report.pdf
+[2025-PATH-Monthly-Ridership-Report.pdf]: data/2025-PATH-Monthly-Ridership-Report.pdf
+[2025-PATH-Hourly-Ridership-Report.pdf]: data/2025-PATH-Hourly-Ridership-Report.pdf
