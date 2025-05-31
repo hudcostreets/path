@@ -8,6 +8,7 @@ MONTHS_NB = join(ROOT, "months.ipynb")
 
 DATA = join(ROOT, 'data')
 ALL_PQT = join(DATA, 'all.pqt')
+ALL_XLSX = join(DATA, 'all.xlsx')
 
 IMG = join(ROOT, 'img')
 OUT = join(ROOT, 'out')

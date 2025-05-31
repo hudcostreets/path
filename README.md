@@ -27,6 +27,7 @@ Contents:
 
 ## Cleaned data <a id="data"></a>
 - [`data/all.pqt`]
+- [`data/all.xlsx`]
 
 ### Jan 2012 – Apr 2025 <a id="weekdays"></a>
 ![PATH weekday ridership over time, stacked by station](img/weekdays.png)
@@ -119,6 +120,7 @@ cf. [SO](https://stackoverflow.com/a/28455147/544236).
 
 
 [`data/all.pqt`]: data/all.pqt
+[`data/all.xlsx`]: data/all.xlsx
 [Tabula]: https://tabula.technology/
 [PA data]: https://www.panynj.gov/path/en/about/stats.html
 [2024-PATH-Monthly-Ridership-Report.pdf]: data/2024-PATH-Monthly-Ridership-Report.pdf
