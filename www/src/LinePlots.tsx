@@ -1,4 +1,5 @@
 import ReactJsonView from '@microlink/react-json-view'
+import { A } from '@rdub/base'
 import { Arr } from "@rdub/base/arr"
 import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
@@ -31,8 +32,7 @@ const config: Partial<Plotly.Config> = {
   displayModeBar: false,
 }
 
-// export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
-export const url = 'https://hudcostreets.s3.amazonaws.com/path/all-202501.pqt'
+export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
 // export const url = 'http://localhost:5173/all.pqt'
 
 // const [ collapseLevel, setCollapseLevel] = useLocalStorageState<number | null>(CollapseLevelKey, { defaultValue: 2 })
@@ -94,7 +94,6 @@ export function Plot(
 }
 
 export default function LinePlots() {
-  // const url = "/all.pqt"
   const dbConn = useDb()
   // const db = useMemo(() => new Db(), [])
   const { data: table, isError, error } = useQuery({
@@ -269,7 +268,7 @@ export default function LinePlots() {
         title={"Avg PATH rides per day (vs. 2019)"}
         {...vs2019Plot}
       />
-      <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded.</p>
+      <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded. <A href={"https://hudcostreets.org/panynj"}>Get involved</A>!</p>
       <hr/>
       <div>
         {
