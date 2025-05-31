@@ -8,7 +8,7 @@ Interactive versions of the plots below:
 Contents:
 <!-- toc -->
 - [Cleaned data](#data)
-    - [Jan 2012 – Oct 2023](#weekdays)
+    - [Jan 2012 – Apr 2025](#weekdays)
     - [Closer look at 2020-Present](#weekdays_2020)
     - [Weekends only](#weekends)
     - [Weekends (2020-Present)](#weekdays_2020)
@@ -28,7 +28,7 @@ Contents:
 ## Cleaned data <a id="data"></a>
 - [`data/all.pqt`]
 
-### Jan 2012 – Oct 2023 <a id="weekdays"></a>
+### Jan 2012 – Apr 2025 <a id="weekdays"></a>
 ![PATH weekday ridership over time, stacked by station](img/weekdays.png)
 
 ### Closer look at 2020-Present <a id="weekdays_2020"></a>
@@ -52,9 +52,9 @@ Contents:
 ### Weekdays vs. Weekends, compared to 2019 <a id="week_end_cmp_pct"></a>
 ![](img/vs_2019.png)
 
-As of October 2024:
-- weekday ridership was 71.2% of October '19 (pre-COVID)
-- weekend ridership was 113.5% of October '19 (pre-COVID)
+As of April 2025:
+- weekday ridership was 71.2% of April '19 (pre-COVID)
+- weekend ridership was 99.6% of April '19 (pre-COVID)
 
 ## Usage <a id="usage"></a>
 
