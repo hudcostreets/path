@@ -28,6 +28,7 @@ Contents:
 ## Cleaned data <a id="data"></a>
 - [`data/all.pqt`]
 - [`data/all.xlsx`]
+- [Google Sheet]
 
 <!-- `scripts/h3.py` -->
 <h3>
@@ -133,3 +134,4 @@ cf. [SO](https://stackoverflow.com/a/28455147/544236).
 [PA data]: https://www.panynj.gov/path/en/about/stats.html
 [2025-PATH-Monthly-Ridership-Report.pdf]: data/2025-PATH-Monthly-Ridership-Report.pdf
 [2025-PATH-Hourly-Ridership-Report.pdf]: data/2025-PATH-Hourly-Ridership-Report.pdf
+[Google Sheet]: https://docs.google.com/spreadsheets/d/1HMrVNcRzYryUtI5mnPc5K5hrt2UT1w78MwzexXinqys/edit

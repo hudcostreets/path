@@ -268,7 +268,8 @@ export default function LinePlots() {
         title={"Avg PATH rides per day (vs. 2019)"}
         {...vs2019Plot}
       />
-      <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded. <A href={"https://hudcostreets.org/panynj"}>Get involved</A>!</p>
+      <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded.</p>
+      <p><A href={"https://hudcostreets.org/panynj"}>Get involved</A>!</p>
       <hr/>
       <div>
         {
