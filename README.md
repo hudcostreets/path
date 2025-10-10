@@ -68,6 +68,19 @@ As of April 2025:
 
 ## Usage <a id="usage"></a>
 
+### Automated Updates <a id="automation"></a>
+
+**Quick Update (Manual):**
+```bash
+./scripts/update-all.sh
+```
+Runs all three steps (refresh → update → combine) in sequence.
+
+**GitHub Actions (Automated):**
+- Runs automatically on the 10th of each month
+- Creates a PR when new data is available
+- Can be triggered manually from the Actions tab
+
 ### Update PATH Monthly Data PDFs <a id="path-data"></a>
 
 #### 0. Install <a id="install"></a>
@@ -111,7 +124,7 @@ path-data combine
 ```
 - [`combine.py`](path_data/cli/combine.py)
 - [`months.ipynb`](months.ipynb)
-- Outputs: [`data/all.pqt`], [`img/weekdays.png`](img/weekdays.png), etc.
+- Outputs: [`data/all.pqt`], [`data/all.xlsx`], plots (when kaleido is working)
 
 ### Bridge & Tunnel Data (WIP) <a id="bridge_tunnel"></a>
 
