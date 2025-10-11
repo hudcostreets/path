@@ -1,7 +1,7 @@
 from os.path import basename, splitext, relpath
 
 from click import option
-from juq.cli import papermill_run_cmd
+from juq.papermill.run import papermill_run_cmd
 from utz import run, err
 
 from path_data.cli.base import path_data, commit_opt
@@ -23,9 +23,10 @@ def update(commit: int, year: int | None):
     nb_name = splitext(basename(MONTHLY_NB))[0]
     out_path = f'{OUT}/{nb_name}-{year}.ipynb'
     papermill_run_cmd.callback(
-        (MONTHLY_NB,),
+        nb_path=MONTHLY_NB,
         out_path=out_path,
         parameter_strs=(f"year={year}",),
+        keep_tags=False,
     )
     paths = [
         out_path,
