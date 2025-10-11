@@ -32,8 +32,9 @@ const config: Partial<Plotly.Config> = {
   displayModeBar: false,
 }
 
-export const url = 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
-// export const url = 'http://localhost:5173/all.pqt'
+export const url = import.meta.env.VITE_LOCAL_DATA
+  ? `${window.location.origin}/all.pqt`
+  : 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
 
 // const [ collapseLevel, setCollapseLevel] = useLocalStorageState<number | null>(CollapseLevelKey, { defaultValue: 2 })
 

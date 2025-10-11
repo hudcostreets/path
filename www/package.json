@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "VITE_LOCAL_DATA=1 vite",
+    "dev-s3": "vite",
+    "ds": "vite",
     "build": "tsc -b && vite build",
     "clean": "rm -rf dist node_modules/.vite",
     "lint": "eslint .",
