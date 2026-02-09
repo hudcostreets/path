@@ -5,6 +5,7 @@ import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
+import { useEffect } from 'react'
 import { Int32, Utf8 } from 'apache-arrow'
 import { Annotations } from "plotly.js"
 import * as Plotly from "plotly.js"
@@ -22,14 +23,16 @@ const DefaultHeight = height
 export const gridcolor = "#ddd"
 export const hovertemplate = "%{y:,.0f}"
 export const hovertemplatePct = "%{y:.1%}"
+const narrow = window.innerWidth < 600
 const margin = {
-  l: 40, r: 0,
+  l: narrow ? 30 : 40, r: 0,
   t: 0, b: 40,
 }
 const config: Partial<Plotly.Config> = {
   autosizable: true,
   responsive: true,
   displayModeBar: false,
+  scrollZoom: false,
 }
 
 export const url = import.meta.env.VITE_LOCAL_DATA
@@ -47,6 +50,7 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
     arrowcolor: "#2a3f5f",
     arrowhead: 0,
     arrowwidth: 1,
+    xanchor: "right",
     ...a,
     x, ax,
   }
@@ -75,7 +79,7 @@ export function Plot(
     </>
   }
   let { data, layout: { xaxis = {}, yaxis = {}, ...layout } } = props
-  xaxis = { gridcolor, ...xaxis }
+  xaxis = { gridcolor, fixedrange: true, ...xaxis }
   yaxis = { gridcolor, fixedrange: true, ...yaxis }
   return <>
     {h2}
@@ -86,6 +90,7 @@ export function Plot(
         height,
         margin,
         hovermode: "x",
+        dragmode: false,
         xaxis, yaxis,
         ...layout,
       }}
@@ -95,6 +100,18 @@ export function Plot(
 }
 
 export default function LinePlots() {
+  useEffect(() => {
+    const handler = (e: Event) => {
+      document.querySelectorAll<HTMLElement>('.js-plotly-plot').forEach(el => {
+        if (!el.contains(e.target as Node)) {
+          const drag = el.querySelector('.nsewdrag')
+          if (drag) drag.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
+        }
+      })
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [])
   const dbConn = useDb()
   // const db = useMemo(() => new Db(), [])
   const { data: table, isError, error } = useQuery({
@@ -173,21 +190,23 @@ export default function LinePlots() {
         },
       ],
       layout: {
-        xaxis: { dtick: "M12", },
+        xaxis: { dtick: "M12", tickangle: -45, },
         legend: {
           yanchor:   "top", y: 0.99,
           xanchor: "right", x: 0.99,
         },
         annotations: [
           ann({
-            ax: month[n - axo], ay: avg_weekday[n - 1] + ayo,
-            text: `${lastMoStr}: ${round(avg_weekday[n - 1]).toLocaleString()}`,
+            ax: month[n - axo], ay: avg_weekday[n - 1] + ayo / 2,
+            yanchor: "bottom",
+            text: `${lastMoStr}<br>${round(avg_weekday[n - 1]).toLocaleString()}`,
             x: month[n - 1],
             y: avg_weekday[n - 1],
           }),
           ann({
             ax: month[n - axo], ay: avg_weekend[n - 1] - ayo,
-            text: `${lastMoStr}: ${round(avg_weekend[n - 1]).toLocaleString()}`,
+            yanchor: "top",
+            text: `${lastMoStr}<br>${round(avg_weekend[n - 1]).toLocaleString()}`,
             x: month[n - 1],
             y: avg_weekend[n - 1],
           }),
@@ -212,9 +231,10 @@ export default function LinePlots() {
       ],
       layout: {
         xaxis: {
-          dtick: "M3",
+          dtick: window.innerWidth < 600 ? "M6" : "M3",
           tickformat: "%b '%y",
-          tickangle: 45,
+          tickangle: -45,
+          range: [monthsFrom2020[0], monthsFrom2020[monthsFrom2020.length - 1]],
         },
         yaxis: {
           dtick: 0.1,
@@ -227,13 +247,15 @@ export default function LinePlots() {
         annotations: [
           ann({
             ax: month[n - axo], ay: lastPcts.week - ayo,
-            text: `${lastMoStr}: ${round(lastPcts.week * 1000) / 10}%`,
+            yanchor: "top",
+            text: `${lastMoStr}<br>${round(lastPcts.week * 1000) / 10}%`,
             x: month[n - 1],
             y: lastPcts.week,
           }),
           ann({
-            ax: month[n - axo], ay: lastPcts.wknd + ayo,
-            text: `${lastMoStr}: ${round(lastPcts.wknd * 1000) / 10}%`,
+            ax: month[n - axo], ay: lastPcts.wknd + ayo / 2,
+            yanchor: "bottom",
+            text: `${lastMoStr}<br>${round(lastPcts.wknd * 1000) / 10}%`,
             x: month[n - 1],
             y: lastPcts.wknd,
           }),
