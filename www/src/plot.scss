@@ -4,3 +4,9 @@
 .plot {
   width: 100%;
 }
+.plot-toggles {
+  display: flex;
+  gap: 0.5em;
+  flex-wrap: wrap;
+  margin: 0.5em 0;
+}

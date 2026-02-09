@@ -23,13 +23,7 @@ const DefaultHeight = height
 export const gridcolor = "#ddd"
 export const hovertemplate = "%{y:,.0f}"
 export const hovertemplatePct = "%{y:.1%}"
-const narrow = window.innerWidth < 600
-const margin = {
-  l: narrow ? 30 : 40, r: 0,
-  t: 0, b: 40,
-}
 const config: Partial<Plotly.Config> = {
-  autosizable: true,
   responsive: true,
   displayModeBar: false,
   scrollZoom: false,
@@ -72,26 +66,34 @@ export function Plot(
   } | {})
 ) {
   const h2 = <H2 id={id}>{title}</H2>
+  const narrow = window.innerWidth < 600
+  const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
   if (!('data' in props)) {
     return <>
       {h2}
       <Loading/>
     </>
   }
-  let { data, layout: { xaxis = {}, yaxis = {}, ...layout } } = props
+  let { data, layout: { xaxis = {}, yaxis = {}, legend = {}, ...layout } } = props
   xaxis = { gridcolor, fixedrange: true, ...xaxis }
   yaxis = { gridcolor, fixedrange: true, ...yaxis }
+  if (narrow) {
+    legend = { ...legend, orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
+  }
   return <>
     {h2}
     <Plot0
       className={'plot'}
+      style={{ width: '100%', height: `${height}px` }}
+      useResizeHandler={true}
       data={data}
       layout={{
-        height,
+        autosize: true,
         margin,
         hovermode: "x",
         dragmode: false,
         xaxis, yaxis,
+        legend,
         ...layout,
       }}
       config={config}
