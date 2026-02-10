@@ -3,7 +3,10 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ 'www/**' ]
+    paths:
+      - 'www/**'
+      - 'www/public/**/*.dvc'
+      - '.dvc/config'
 jobs:
   deploy:
     name: Deploy to GitHub Pages

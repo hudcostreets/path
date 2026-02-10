@@ -1,0 +1,5 @@
+outs:
+- md5: 8e93e0488732368a8a2cac6ffb748e8b
+  size: 78854
+  hash: md5
+  path: 2022-hourly.pqt

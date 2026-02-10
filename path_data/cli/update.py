@@ -28,11 +28,11 @@ def update(commit: int, year: int | None):
         parameter_strs=(f"year={year}",),
         keep_tags=False,
     )
-    paths = [
-        out_path,
-        year_pqt(year),
-        year_day_types_pqt(year)
-    ]
+    pqt = year_pqt(year)
+    day_types_pqt = year_day_types_pqt(year)
+    run('dvx', 'add', pqt, day_types_pqt)
+    dvc_files = [f'{pqt}.dvc', f'{day_types_pqt}.dvc']
+    paths = [out_path, *dvc_files]
     run('git', 'add', *paths)
     if commit > 0 and git_has_staged_changes():
         ym_str = f'{last_ym if year == last_ym.year else year}'

@@ -1,0 +1,5 @@
+outs:
+- md5: 61bb0de348ed11b9537f439d25273cc9
+  size: 4259
+  hash: md5
+  path: 2016-day-types.pqt

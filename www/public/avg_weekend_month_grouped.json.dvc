@@ -1,0 +1,5 @@
+outs:
+- md5: e0aa6ce61dc8a65be44c983621f7f2f1
+  size: 15706
+  hash: md5
+  path: avg_weekend_month_grouped.json

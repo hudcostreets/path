@@ -1,0 +1,5 @@
+outs:
+- md5: 99ebb8d0f0f225ca22e887453a888e2e
+  size: 4259
+  hash: md5
+  path: 2023-day-types.pqt

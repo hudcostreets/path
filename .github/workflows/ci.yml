@@ -24,4 +24,4 @@ jobs:
       - run: path-data refresh -cc
       - run: path-data update -cc
       - run: path-data combine -cc
-      - run: aws s3 sync data/all.pqt s3://hudcostreets/path/
+      - run: dvx push

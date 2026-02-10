@@ -1,0 +1,5 @@
+outs:
+- md5: b15c1b668a578be93693efd740090658
+  size: 9682
+  hash: md5
+  path: 2017-hourly-total.pqt

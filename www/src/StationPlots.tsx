@@ -2,6 +2,7 @@ import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useEffect, useState } from "react"
 import * as Plotly from "plotly.js"
 import { gridcolor, Plot } from "./LinePlots"
+import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 type PlotSpec = { data: Plotly.Data[], layout: Partial<Plotly.Layout> }
 
@@ -15,8 +16,8 @@ export default function StationPlots() {
   const [timeRange, setTimeRange] = useState<"all" | "recent">("all")
 
   useEffect(() => {
-    fetch("/weekdays.json").then(r => r.json()).then(setWeekdays)
-    fetch("/weekends.json").then(r => r.json()).then(setWeekends)
+    fetch(dvcResolve('weekdays.json')).then(r => r.json()).then(setWeekdays)
+    fetch(dvcResolve('weekends.json')).then(r => r.json()).then(setWeekends)
   }, [])
 
   const spec = dayType === "weekday" ? weekdays : weekends

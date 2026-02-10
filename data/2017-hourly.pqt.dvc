@@ -1,0 +1,5 @@
+outs:
+- md5: a1263a3f3218f8760139ce4b9f2c7014
+  size: 96627
+  hash: md5
+  path: 2017-hourly.pqt

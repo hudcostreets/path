@@ -3,6 +3,7 @@ name = "path-data"
 version = "0.0.1"
 description = "PATH ridership data analysis and visualization"
 dependencies = [
+    "dvx[s3]",
     "fastparquet==2024.11.0",
     "iRe.py",
     "jupyter",
@@ -18,7 +19,7 @@ dependencies = [
     "tornado<=6.1",
     "utz",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 [project.scripts]
 path-data = "path_data.cli.main:main"

@@ -2,6 +2,7 @@ import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useEffect, useState } from "react"
 import * as Plotly from "plotly.js"
 import { gridcolor, Plot } from "./LinePlots"
+import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 type PlotSpec = { data: Plotly.Data[], layout: Partial<Plotly.Layout> }
 
@@ -11,8 +12,8 @@ export default function MonthlyPlots() {
   const [dayType, setDayType] = useState<"weekday" | "weekend">("weekday")
 
   useEffect(() => {
-    fetch("/avg_weekday_month_grouped.json").then(r => r.json()).then(setWeekday)
-    fetch("/avg_weekend_month_grouped.json").then(r => r.json()).then(setWeekend)
+    fetch(dvcResolve('avg_weekday_month_grouped.json')).then(r => r.json()).then(setWeekday)
+    fetch(dvcResolve('avg_weekend_month_grouped.json')).then(r => r.json()).then(setWeekend)
   }, [])
 
   const spec = dayType === "weekday" ? weekday : weekend

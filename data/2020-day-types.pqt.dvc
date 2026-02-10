@@ -1,0 +1,5 @@
+outs:
+- md5: 7daf33dd1ebee778e47e88476e802305
+  size: 4259
+  hash: md5
+  path: 2020-day-types.pqt

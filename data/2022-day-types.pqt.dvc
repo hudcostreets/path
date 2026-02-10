@@ -1,0 +1,5 @@
+outs:
+- md5: 2a48b74bfa56c2bbe6c5cff51eaff500
+  size: 4248
+  hash: md5
+  path: 2022-day-types.pqt

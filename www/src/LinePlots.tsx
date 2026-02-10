@@ -10,6 +10,7 @@ import { Int32, Utf8 } from 'apache-arrow'
 import { Annotations } from "plotly.js"
 import * as Plotly from "plotly.js"
 import Plot0, { PlotParams } from 'react-plotly.js'
+import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 export type Row = {
   month: Utf8
@@ -29,9 +30,8 @@ const config: Partial<Plotly.Config> = {
   scrollZoom: false,
 }
 
-export const url = import.meta.env.VITE_LOCAL_DATA
-  ? `${window.location.origin}/all.pqt`
-  : 'https://hudcostreets.s3.amazonaws.com/path/all.pqt'
+const resolved = dvcResolve('all.pqt')
+export const url = resolved.startsWith('/') ? `${window.location.origin}${resolved}` : resolved
 
 // const [ collapseLevel, setCollapseLevel] = useLocalStorageState<number | null>(CollapseLevelKey, { defaultValue: 2 })
 

@@ -1,0 +1,5 @@
+outs:
+- md5: 40a43ac574b6080c828a5471fcf73bad
+  size: 4259
+  hash: md5
+  path: 2013-day-types.pqt

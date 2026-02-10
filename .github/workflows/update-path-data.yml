@@ -54,6 +54,14 @@ jobs:
           # Combine all years (may fail on PNG generation, but data files will be created)
           path-data combine || echo "Warning: PNG generation failed, but data files updated"
 
+      - name: Push data to S3
+        if: steps.check.outputs.changes == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: dvx push
+
       - name: Create Pull Request
         if: steps.check.outputs.changes == 'true'
         uses: peter-evans/create-pull-request@v6

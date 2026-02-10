@@ -11,7 +11,12 @@ ALL_PQT = join(DATA, 'all.pqt')
 ALL_XLSX = join(DATA, 'all.xlsx')
 
 IMG = join(ROOT, 'img')
+IRE = join(ROOT, '.ire')
 OUT = join(ROOT, 'out')
+
+WWW = join(ROOT, 'www')
+WWW_PUBLIC = join(WWW, 'public')
+WWW_ALL_PQT = join(WWW_PUBLIC, 'all.pqt')
 TEMPLATES = join(ROOT, 'templates')
 TEMPLATE_2023 = join(TEMPLATES, '2023-PATH-Monthly-Ridership-Report.tabula-template.json')
 TEMPLATE_2022 = join(TEMPLATES, '2022-PATH-Monthly-Ridership-Report.tabula-template.json')

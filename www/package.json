@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "VITE_LOCAL_DATA=1 vite",
-    "dev-s3": "vite",
-    "ds": "vite",
+    "dev": "vite",
+    "dev-s3": "VITE_PLUGIN_DVC_DEV=s3 vite",
+    "ds": "VITE_PLUGIN_DVC_DEV=s3 vite",
     "build": "tsc -b && vite build",
     "clean": "rm -rf dist node_modules/.vite",
     "lint": "eslint .",
@@ -27,7 +27,8 @@
     "plotly.js": "^2.35.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-plotly.js": "^2.6.0"
+    "react-plotly.js": "^2.6.0",
+    "vite-plugin-dvc": "github:runsascoded/vite-plugin-dvc#f0a2601"
   },
   "devDependencies": {
     "@rdub/eslint-config": "0.0.2",

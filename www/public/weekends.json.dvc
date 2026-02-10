@@ -1,0 +1,5 @@
+outs:
+- md5: 908f8062432af4139c52b8abea5c18fb
+  size: 103190
+  hash: md5
+  path: weekends.json

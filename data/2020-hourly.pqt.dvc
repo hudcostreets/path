@@ -1,0 +1,5 @@
+outs:
+- md5: b892967122d5642a6e9500471c19b339
+  size: 83975
+  hash: md5
+  path: 2020-hourly.pqt
