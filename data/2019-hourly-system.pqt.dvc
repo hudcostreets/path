@@ -3,3 +3,9 @@ outs:
   size: 13198
   hash: md5
   path: 2019-hourly-system.pqt
+meta:
+  computation:
+    cmd: papermill analyze-hourly.ipynb out/analyze-hourly-2019.ipynb -p year 2019
+    deps:
+      data/2019-PATH-Hourly-Ridership-Report.pdf: a8d65d2e38809406a3af71aeae1eefb2
+      analyze-hourly.ipynb: 9fc08256c3149e06396e7f34f4c21361

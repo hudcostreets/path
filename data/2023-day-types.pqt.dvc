@@ -3,3 +3,9 @@ outs:
   size: 4259
   hash: md5
   path: 2023-day-types.pqt
+meta:
+  computation:
+    cmd: papermill monthly.ipynb out/monthly-2023.ipynb -p year 2023
+    deps:
+      data/2023-PATH-Monthly-Ridership-Report.pdf: 5683bf19f70b5c7c66ae3d23885e5fcd
+      monthly.ipynb: 48c56466c13cd724fe771ab7631fff57

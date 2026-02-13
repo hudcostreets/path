@@ -3,3 +3,9 @@ outs:
   size: 20031
   hash: md5
   path: 2020.pqt
+meta:
+  computation:
+    cmd: papermill monthly.ipynb out/monthly-2020.ipynb -p year 2020
+    deps:
+      data/2020-PATH-Monthly-Ridership-Report.pdf: 51bd13f4eb9e3d94ba03949785ca362a
+      monthly.ipynb: 48c56466c13cd724fe771ab7631fff57

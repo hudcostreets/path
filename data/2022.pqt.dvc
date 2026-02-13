@@ -3,3 +3,9 @@ outs:
   size: 20360
   hash: md5
   path: 2022.pqt
+meta:
+  computation:
+    cmd: papermill monthly.ipynb out/monthly-2022.ipynb -p year 2022
+    deps:
+      data/2022-PATH-Monthly-Ridership-Report.pdf: 1dbbd04f1475875df610fe51c7183ab7
+      monthly.ipynb: 48c56466c13cd724fe771ab7631fff57

@@ -3,3 +3,9 @@ outs:
   size: 20382
   hash: md5
   path: 2017.pqt
+meta:
+  computation:
+    cmd: papermill monthly.ipynb out/monthly-2017.ipynb -p year 2017
+    deps:
+      data/2017-PATH-Monthly-Ridership-Report.pdf: ea3aa06974e1d7ad0ea7e4623fe5f1f5
+      monthly.ipynb: 48c56466c13cd724fe771ab7631fff57
