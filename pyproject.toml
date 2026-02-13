@@ -5,7 +5,6 @@ description = "PATH ridership data analysis and visualization"
 dependencies = [
     "dvx[s3]",
     "fastparquet==2024.11.0",
-    "iRe.py",
     "jupyter",
     "juq.py>=0.5.1",
     "kaleido",

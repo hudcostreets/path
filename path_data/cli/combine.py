@@ -7,7 +7,7 @@ from utz import run, err
 from path_data.cli.base import path_data, commit_opt
 from path_data.paths import (
     MONTHS_NB, IMG, ALL_PQT, ALL_XLSX,
-    IRE, WWW_PUBLIC, WWW_ALL_PQT,
+    WWW_PUBLIC, WWW_ALL_PQT,
 )
 from path_data.utils import git_has_staged_changes, last_month
 
@@ -30,7 +30,7 @@ def combine(commit: int):
     # Copy outputs to www/public/ for DVX tracking
     copy2(ALL_PQT, WWW_ALL_PQT)
     for name in WWW_JSONS:
-        src = join(IRE, name)
+        src = join(IMG, name)
         copy2(src, join(WWW_PUBLIC, name))
 
     # DVX-track data and www/public files

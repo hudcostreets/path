@@ -11,7 +11,6 @@ ALL_PQT = join(DATA, 'all.pqt')
 ALL_XLSX = join(DATA, 'all.xlsx')
 
 IMG = join(ROOT, 'img')
-IRE = join(ROOT, '.ire')
 OUT = join(ROOT, 'out')
 
 WWW = join(ROOT, 'www')
