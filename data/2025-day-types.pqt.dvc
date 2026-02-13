@@ -6,6 +6,6 @@ outs:
 meta:
   computation:
     cmd: papermill monthly.ipynb out/monthly-2025.ipynb -p year 2025
-    deps:
-      data/2025-PATH-Monthly-Ridership-Report.pdf: 22c8cb757209390928b525c6fc5b37f5
-      monthly.ipynb: 48c56466c13cd724fe771ab7631fff57
+    git_deps:
+      data/2025-PATH-Monthly-Ridership-Report.pdf: b105fce9cc12c6d8102b78979edcf36daacaf77d
+      monthly.ipynb: 9762d56544fd608da8a7ca271f80463f4582a2f3

@@ -7,7 +7,6 @@ meta:
   computation:
     cmd: papermill months.ipynb months.ipynb && cp data/all.pqt www/public/all.pqt
     deps:
-      months.ipynb: b5146a428ab2f46fb5047f277dfdbc58
       data/2012.pqt: 278da34972b360e3a54aade6cdaf0384
       data/2013.pqt: 61c7a757c64774da301fd3b67e2e44a6
       data/2014.pqt: 63f7856b269d231fd72c9e61f8fe690e
@@ -22,3 +21,5 @@ meta:
       data/2023.pqt: 6ead2a17be3fdc17d1c71e369a674e91
       data/2024.pqt: c76b7f1ec915e5ba53d7bef5a6b46c49
       data/2025.pqt: d737c7241deec4b2fd7c98fdf368ae65
+    git_deps:
+      months.ipynb: 17a15b8b48fc46bdf78bce81f9feb444d0672879
