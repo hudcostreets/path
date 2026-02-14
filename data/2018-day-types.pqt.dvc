@@ -1,6 +1,6 @@
 outs:
-- md5: 8e7df9d33be28ce9f8e811515de5c661
-  size: 4259
+- md5: 6504aee45aa841c9e099a8a98e51bfd8
+  size: 1725
   hash: md5
   path: 2018-day-types.pqt
 meta:
