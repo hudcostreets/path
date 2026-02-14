@@ -32,12 +32,11 @@ def update(commit: int, year: int | None):
     day_types_pqt = year_day_types_pqt(year)
     run('dvx', 'add', pqt, day_types_pqt)
     dvc_files = [f'{pqt}.dvc', f'{day_types_pqt}.dvc']
-    paths = [out_path, *dvc_files]
-    run('git', 'add', *paths)
+    run('git', 'add', *dvc_files)
     if commit > 0 and git_has_staged_changes():
         ym_str = f'{last_ym if year == last_ym.year else year}'
         run('git', 'commit', '-m', f'{nb_name} ({ym_str})')
         if commit > 1:
             run('git', 'push')
     else:
-        err(f"No changes found: {', '.join(map(relpath, paths))}")
+        err(f"No changes found: {', '.join(map(relpath, dvc_files))}")
