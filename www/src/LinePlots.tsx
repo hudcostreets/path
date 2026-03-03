@@ -1,5 +1,4 @@
 import ReactJsonView from '@microlink/react-json-view'
-import { A } from '@rdub/base'
 import { Arr } from "@rdub/base/arr"
 import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
@@ -294,7 +293,6 @@ export default function LinePlots() {
         {...vs2019Plot}
       />
       <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded.</p>
-      <p><A href={"https://hudcostreets.org/panynj"}>Get involved</A>!</p>
       <hr/>
       <div>
         {

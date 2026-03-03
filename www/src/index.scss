@@ -61,9 +61,31 @@ hr {
 .error {
   background-color: #fcc;
 }
-.socials {
+.abp-header {
+  display: block;
   text-align: center;
-  padding-bottom: 3em;
+  margin: 1em 0 0.5em;
+}
+.abp-banner {
+  max-width: min(100%, 600px);
+  height: auto;
+}
+.abp-footer {
+  text-align: center;
+  padding: 2em 0 3em;
+  border-top: 1px solid #aaa;
+  margin-top: 2em;
+  p {
+    margin: 1em 0 0.5em;
+    color: #555;
+  }
+}
+.abp-partnership {
+  max-width: min(100%, 360px);
+  height: auto;
+}
+.footer-icons {
+  margin-top: 0.5em;
 }
 .icon {
   width: 2em;
