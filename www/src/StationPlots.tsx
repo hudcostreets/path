@@ -6,8 +6,8 @@ import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 type PlotSpec = { data: Plotly.Data[], layout: Partial<Plotly.Layout> }
 
-const allTimeRange = ['2011-12-17', '2025-11-16']
-const recentRange = ['2019-12-17', '2025-11-16']
+const allTimeRange = ['2011-12-17', '2025-12-17']
+const recentRange = ['2019-12-17', '2025-12-17']
 
 export default function StationPlots() {
   const [weekdays, setWeekdays] = useState<PlotSpec | null>(null)
@@ -32,6 +32,7 @@ export default function StationPlots() {
     range: isRecent ? recentRange : allTimeRange,
     dtick: isRecent ? "M3" : "M12",
     tickformat: isRecent ? "%b '%y" : "'%y",
+    hoverformat: "%b '%y",
     tickangle: -45,
     gridcolor,
     fixedrange: true,
@@ -50,6 +51,7 @@ export default function StationPlots() {
           yaxis: {
             gridcolor,
             fixedrange: true,
+            hoverformat: ",.0f",
           },
           legend: { ...spec.layout.legend, title: undefined, entrywidth: 100 } as Partial<Plotly.Legend>,
         }}
