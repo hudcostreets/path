@@ -192,7 +192,7 @@ export default function LinePlots() {
         },
       ],
       layout: {
-        xaxis: { dtick: "M12", tickangle: -45, },
+        xaxis: { dtick: "M12", tickformat: "'%y", hoverformat: "%b '%y", tickangle: -45, },
         legend: {
           yanchor:   "top", y: 0.99,
           xanchor: "right", x: 0.99,
