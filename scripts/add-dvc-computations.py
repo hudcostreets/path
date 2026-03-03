@@ -124,7 +124,14 @@ def main():
 
     git_dep = {"months.ipynb": shas["months.ipynb"]}
 
-    combine_cmd = "papermill months.ipynb months.ipynb && cp data/all.pqt www/public/all.pqt"
+    combine_cmd = (
+        "papermill months.ipynb months.ipynb"
+        " && cp data/all.pqt www/public/all.pqt"
+        " && cp img/weekdays.json www/public/weekdays.json"
+        " && cp img/weekends.json www/public/weekends.json"
+        " && cp img/avg_weekday_month_grouped.json www/public/avg_weekday_month_grouped.json"
+        " && cp img/avg_weekend_month_grouped.json www/public/avg_weekend_month_grouped.json"
+    )
 
     combine_outputs = [
         DATA / "all.pqt.dvc",

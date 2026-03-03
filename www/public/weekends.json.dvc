@@ -1,25 +1,28 @@
 outs:
-- md5: 908f8062432af4139c52b8abea5c18fb
-  size: 103190
+- md5: bdb87413ec645acc3b623436355adc0f
+  size: 81875
   hash: md5
   path: weekends.json
 meta:
   computation:
     cmd: papermill months.ipynb months.ipynb && cp data/all.pqt www/public/all.pqt
+      && cp img/weekdays.json www/public/weekdays.json && cp img/weekends.json www/public/weekends.json
+      && cp img/avg_weekday_month_grouped.json www/public/avg_weekday_month_grouped.json
+      && cp img/avg_weekend_month_grouped.json www/public/avg_weekend_month_grouped.json
     deps:
-      data/2012.pqt: 278da34972b360e3a54aade6cdaf0384
-      data/2013.pqt: 61c7a757c64774da301fd3b67e2e44a6
-      data/2014.pqt: 63f7856b269d231fd72c9e61f8fe690e
-      data/2015.pqt: bc35ef6aa53ae88dd1718cc596968804
-      data/2016.pqt: a300a9a4490d118eecf08cb815e4eb6c
-      data/2017.pqt: 73336cc0ea9747ed50a242e850f6e27c
-      data/2018.pqt: b9080be69b2d5c70af439ac6c18fb648
-      data/2019.pqt: 453e22bca430935b599eb2847e698f80
-      data/2020.pqt: ee05664d6fc079f8ee03d42d48685a0a
-      data/2021.pqt: 087c4632ad2f1774fbd92136cf175048
-      data/2022.pqt: 45e79b7bcd0d79598476e173131c8d9c
-      data/2023.pqt: 6ead2a17be3fdc17d1c71e369a674e91
-      data/2024.pqt: c76b7f1ec915e5ba53d7bef5a6b46c49
-      data/2025.pqt: d737c7241deec4b2fd7c98fdf368ae65
+      data/2012.pqt: ee659c5767e40adcf02d2ee18914fd10
+      data/2013.pqt: 722a5ed4c1f1abe79a73dc1a46e546c7
+      data/2014.pqt: d42b26707c07c2310479390322f60cdc
+      data/2015.pqt: 95e01640c4903430e58e0034017540fa
+      data/2016.pqt: 549cb919b23b5ce7f6501379236c9c09
+      data/2017.pqt: ad8e022e91c7213ad66cdc2ee7657b06
+      data/2018.pqt: 9f91a506ac6aad562c116273bcb519b8
+      data/2019.pqt: 77c14431260253a67302953d07be4458
+      data/2020.pqt: 90f5888f6a5638f577e4aff44243f68f
+      data/2021.pqt: 6e756c9108ac56eec4920f356053b2b6
+      data/2022.pqt: 7aa6a8a04ed812eb5b2ee2aa495b1f9f
+      data/2023.pqt: f5f03974c6ebdfb8394649e510568cd0
+      data/2024.pqt: 5cf774d5cb9c7bd4bd24435cd7b5376a
+      data/2025.pqt: 7f134c2dfdb069b80dff5036cc4ac7f8
     git_deps:
       months.ipynb: 17a15b8b48fc46bdf78bce81f9feb444d0672879
