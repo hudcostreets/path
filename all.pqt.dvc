@@ -1,0 +1,28 @@
+outs:
+- md5: 8de5e9c748a6445e80aa39a4f97db6ca
+  size: 103573
+  hash: md5
+  path: all.pqt
+meta:
+  computation:
+    cmd: papermill months.ipynb months.ipynb && cp data/all.pqt www/public/all.pqt
+      && cp img/weekdays.json www/public/weekdays.json && cp img/weekends.json www/public/weekends.json
+      && cp img/avg_weekday_month_grouped.json www/public/avg_weekday_month_grouped.json
+      && cp img/avg_weekend_month_grouped.json www/public/avg_weekend_month_grouped.json
+    deps:
+      data/2012.pqt: ee659c5767e40adcf02d2ee18914fd10
+      data/2013.pqt: 722a5ed4c1f1abe79a73dc1a46e546c7
+      data/2014.pqt: d42b26707c07c2310479390322f60cdc
+      data/2015.pqt: 95e01640c4903430e58e0034017540fa
+      data/2016.pqt: 549cb919b23b5ce7f6501379236c9c09
+      data/2017.pqt: ad8e022e91c7213ad66cdc2ee7657b06
+      data/2018.pqt: 9f91a506ac6aad562c116273bcb519b8
+      data/2019.pqt: 77c14431260253a67302953d07be4458
+      data/2020.pqt: 90f5888f6a5638f577e4aff44243f68f
+      data/2021.pqt: 6e756c9108ac56eec4920f356053b2b6
+      data/2022.pqt: 7aa6a8a04ed812eb5b2ee2aa495b1f9f
+      data/2023.pqt: f5f03974c6ebdfb8394649e510568cd0
+      data/2024.pqt: 5cf774d5cb9c7bd4bd24435cd7b5376a
+      data/2025.pqt: 7f134c2dfdb069b80dff5036cc4ac7f8
+    git_deps:
+      months.ipynb: 17a15b8b48fc46bdf78bce81f9feb444d0672879
