@@ -57,3 +57,14 @@ jobs:
           git add -u
           git commit -m "Update PATH ridership data"
           git push
+
+      - name: Notify Slack
+        if: steps.check.outputs.changes == 'true'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+        run: >-
+          path-data slack
+          ":train: *New PATH ridership data* published and deployed
+          <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>
+          · <https://path.hudcostreets.org|View site>"
