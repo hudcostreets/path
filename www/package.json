@@ -27,8 +27,7 @@
     "plotly.js": "^2.35.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-plotly.js": "^2.6.0",
-    "vite-plugin-dvc": "github:runsascoded/vite-plugin-dvc#f0a2601"
+    "react-plotly.js": "^2.6.0"
   },
   "devDependencies": {
     "@rdub/eslint-config": "0.0.2",
@@ -40,6 +39,7 @@
     "eslint": "^9",
     "sass-embedded": "^1.81.0",
     "typescript": "^5.5.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vite-plugin-dvc": "https://github.com/runsascoded/vite-plugin-dvc#f2e511db003444748913609583e8c3404ceb67fc"
   }
 }
