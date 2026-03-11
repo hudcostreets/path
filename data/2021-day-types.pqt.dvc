@@ -5,7 +5,7 @@ outs:
   path: 2021-day-types.pqt
 meta:
   computation:
-    cmd: papermill monthly.ipynb out/monthly-2021.ipynb -p year 2021
+    cmd: juq papermill run monthly.ipynb -o out/monthly-2021.ipynb -p year=2021
     git_deps:
       data/2021-PATH-Monthly-Ridership-Report.pdf: 7dbcefa18398000ae1421a56e9c3cbdbcd9e662a
       monthly.ipynb: 9762d56544fd608da8a7ca271f80463f4582a2f3

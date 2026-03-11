@@ -5,7 +5,7 @@ outs:
   path: 2020.pqt
 meta:
   computation:
-    cmd: papermill monthly.ipynb out/monthly-2020.ipynb -p year 2020
+    cmd: juq papermill run monthly.ipynb -o out/monthly-2020.ipynb -p year=2020
     git_deps:
       data/2020-PATH-Monthly-Ridership-Report.pdf: d0a1664c559904c7c358b842e1731269ec5fd92c
       monthly.ipynb: 9762d56544fd608da8a7ca271f80463f4582a2f3

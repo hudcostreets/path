@@ -5,7 +5,7 @@ outs:
   path: 2020-hourly.pqt
 meta:
   computation:
-    cmd: papermill analyze-hourly.ipynb out/analyze-hourly-2020.ipynb -p year 2020
+    cmd: juq papermill run analyze-hourly.ipynb -o out/analyze-hourly-2020.ipynb -p year=2020
     deps:
       data/2020-PATH-Hourly-Ridership-Report.pdf: 7c349ec0ee3de2760f47ea05fbf6f206
       analyze-hourly.ipynb: 9fc08256c3149e06396e7f34f4c21361
