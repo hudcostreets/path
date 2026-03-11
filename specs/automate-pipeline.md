@@ -184,12 +184,12 @@ def refresh():
 
 ## Migration checklist
 
-- [ ] `dvx import-url -G` all existing PDFs (14 monthly + 6 hourly = 20 files)
+- [x] `dvx import-url -G` all existing PDFs (20 files with live URLs)
+- [x] Update `refresh` to use `dvx update` + `dvx import-url -G`
 - [ ] Re-run `dvx run` to update `.dvc` metadata (git_deps → deps for PDFs)
-- [ ] Update `refresh` to use `dvx update` + `dvx import-url`
-- [ ] Update GHA workflow
+- [ ] Update GHA workflow to use `dvx update && dvx run`
 - [ ] Verify `dvx run --dry-run` shows correct DAG
-- [ ] Test end-to-end: `dvx update && dvx run && dvx push`
+- [ ] Test end-to-end: `path-data refresh && dvx run && dvx push`
 - [ ] Delete `ci.yml` (disabled, superseded)
 
 ## Benefits
