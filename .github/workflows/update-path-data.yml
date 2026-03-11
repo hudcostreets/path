@@ -58,7 +58,7 @@ jobs:
           git commit -m "Update PATH ridership data"
           git push
 
-      - name: Notify Slack
+      - name: Notify Slack (new data)
         if: steps.check.outputs.changes == 'true'
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -68,3 +68,13 @@ jobs:
           ":train: *New PATH ridership data* published and deployed
           <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>
           · <https://path.hudcostreets.org|View site>"
+
+      - name: Notify Slack (no changes)
+        if: steps.check.outputs.changes == 'false' && github.event_name == 'workflow_dispatch'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+        run: >-
+          path-data slack
+          ":white_check_mark: PATH data check: no new data found
+          <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>"
