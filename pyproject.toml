@@ -3,7 +3,7 @@ name = "path-data"
 version = "0.0.1"
 description = "PATH ridership data analysis and visualization"
 dependencies = [
-    "dvx[s3]",
+    "dvx[s3] @ git+https://github.com/runsascoded/dvx@28c6b9aad",
     "fastparquet==2024.11.0",
     "jupyter",
     "juq.py>=0.5.1",
