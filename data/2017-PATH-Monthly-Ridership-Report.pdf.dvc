@@ -1,0 +1,14 @@
+deps:
+- path: https://www.panynj.gov/content/dam/path/about/statistics/2017-PATH-Monthly-Ridership-Report.pdf
+  checksum: W/"2f5d9-593df07899340-gzip"
+  size: 194009
+  mtime: '2019-10-01T20:16:37+00:00'
+outs:
+- md5: ea3aa06974e1d7ad0ea7e4623fe5f1f5
+  size: 194009
+  hash: md5
+  path: 2017-PATH-Monthly-Ridership-Report.pdf
+meta:
+  git_tracked: true
+  import:
+    fetched: '2026-03-10'

@@ -1,9 +1,7 @@
 from os.path import basename, exists, getsize
-from os.path import join
 
-import requests
 from click import option
-from utz import err, run
+from utz import err, check, run
 
 from path_data.cli.base import path_data, commit_opt
 from path_data.paths import hourly_pdf, monthly_pdf
@@ -12,25 +10,25 @@ from path_data.utils import last_month, git_has_staged_changes, pdf_pages, verif
 BASE_URL = 'https://www.panynj.gov/content/dam/path/about/statistics'
 
 
-def download_pdf(name: str) -> bool:
-    """Download a PDF from PANYNJ, return True if content changed."""
-    dst = join('data', name)
-    src = f'{BASE_URL}/{name}'
+def update_pdf(name: str) -> bool:
+    """Update or import a PDF via DVX, return True if content changed."""
+    dvc_path = f'data/{name}.dvc'
+    url = f'{BASE_URL}/{name}'
     err(f'\tchecking {name}')
-    response = requests.get(src)
-    if response.status_code == 404:
-        err(f'\t  not found (404)')
-        return False
-    response.raise_for_status()
-    new_content = response.content
-    if exists(dst) and open(dst, 'rb').read() == new_content:
-        err(f'\t  unchanged')
-        return False
-    err(f'\t  updated ({len(new_content)} bytes)')
-    with open(dst, 'wb') as f:
-        f.write(new_content)
-    run('git', 'add', dst)
-    return True
+    if exists(dvc_path):
+        # Existing import — check for updates
+        run('dvx', 'update', dvc_path)
+        run('git', 'add', f'data/{name}', dvc_path)
+        return True
+    else:
+        # New PDF — try to import (404 = doesn't exist yet)
+        if check('dvx', 'import-url', '-G', url, '-o', f'data/{name}'):
+            err(f'\t  imported (new)')
+            run('git', 'add', f'data/{name}', dvc_path)
+            return True
+        else:
+            err(f'\t  not found')
+            return False
 
 
 @path_data.command
@@ -51,10 +49,10 @@ def refresh(commit: int, year: int | None):
 
     for year in years:
         monthly_name = basename(monthly_pdf(year))
-        changed = download_pdf(monthly_name)
+        update_pdf(monthly_name)
         if year >= 2017:
             hourly_name = basename(hourly_pdf(year))
-            download_pdf(hourly_name)
+            update_pdf(hourly_name)
 
     if git_has_staged_changes():
         # Determine the latest month from the most recent monthly PDF

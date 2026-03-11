@@ -1,0 +1,14 @@
+deps:
+- path: https://www.panynj.gov/content/dam/path/about/statistics/2025-PATH-Hourly-Ridership-Report.pdf
+  checksum: W/"246959-64a8d92dc01c0-gzip"
+  size: 2386265
+  mtime: '2026-02-11T14:56:15+00:00'
+outs:
+- md5: a2d7356ea82e887297f3c38c09142890
+  size: 2386265
+  hash: md5
+  path: 2025-PATH-Hourly-Ridership-Report.pdf
+meta:
+  git_tracked: true
+  import:
+    fetched: '2026-03-10'
