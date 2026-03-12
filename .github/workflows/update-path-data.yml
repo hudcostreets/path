@@ -58,6 +58,14 @@ jobs:
           git commit -m "Update PATH ridership data"
           git push
 
+      - name: Get job URL
+        id: job
+        run: |
+          job_id=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" --jq '.jobs[0].id')
+          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/$job_id" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Notify Slack (new data)
         if: steps.check.outputs.changes == 'true'
         env:
@@ -66,7 +74,7 @@ jobs:
         run: >-
           path-data slack
           ":train: *New PATH ridership data* published and deployed
-          <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>
+          <${{ steps.job.outputs.url }}|View GHA run>
           · <https://path.hudcostreets.org|View site>"
 
       - name: Notify Slack (no changes)
@@ -77,4 +85,4 @@ jobs:
         run: >-
           path-data slack
           ":white_check_mark: PATH data check: no new data found
-          <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>"
+          <${{ steps.job.outputs.url }}|View GHA run>"
