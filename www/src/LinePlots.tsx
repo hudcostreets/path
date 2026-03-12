@@ -1,9 +1,11 @@
+import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import ReactJsonView from '@microlink/react-json-view'
 import { Arr } from "@rdub/base/arr"
 import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
 import { Int32, Utf8 } from 'apache-arrow'
 import { Annotations, Data, Layout } from "plotly.js"
 import Plotly from 'plotly.js-dist-min'
@@ -92,7 +94,10 @@ export function Plot(
   </>
 }
 
+type Mode = "rides" | "vs2019"
+
 export default function LinePlots() {
+  const [mode, setMode] = useState<Mode>("rides")
   const dbConn = useDb()
   // const db = useMemo(() => new Db(), [])
   const { data: table, isError, error } = useQuery({
@@ -258,21 +263,29 @@ export default function LinePlots() {
       }
     }
   }
+  const activePlot = mode === "rides" ? dailyPlot : vs2019Plot
+  const title = mode === "rides" ? "Avg PATH rides per day" : "Avg PATH rides per day (vs. 2019)"
   // console.log("data:", data)
   return (
     <div className={"plot-container"}>
       {isError ? <div className={"error"}>Error: {error?.toString()}</div> : null}
       <Plot
         id={"rides"}
-        title={"Avg PATH rides per day"}
-        {...dailyPlot}
+        title={title}
+        {...activePlot}
       />
-      <Plot
-        id={"vs-2019"}
-        title={"Avg PATH rides per day (vs. 2019)"}
-        {...vs2019Plot}
-      />
-      <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded.</p>
+      <div className="plot-toggles">
+        <ToggleButtonGroup
+          value={mode}
+          exclusive
+          size="small"
+          onChange={(_, v) => { if (v) setMode(v) }}
+        >
+          <ToggleButton value="rides">Rides</ToggleButton>
+          <ToggleButton value="vs2019">vs. 2019</ToggleButton>
+        </ToggleButtonGroup>
+      </div>
+      {mode === "vs2019" && <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded.</p>}
       <hr/>
       <div>
         {
