@@ -8,7 +8,10 @@ export const Icons = icons({ TooltipC: Tooltip })
 export const { GitHub, HudCoStreets } = Icons
 
 <a href="https://hudcostreets.org/panynj" className="abp-header">
-  <img src="/abp-banner.png" alt="A Better PATH – A Hudson County Complete Streets Campaign" className="abp-banner" />
+  <picture>
+    <source srcSet="/abp-banner-dark.svg" media="(prefers-color-scheme: dark)" />
+    <img src="/abp-banner.svg" alt="A Better PATH – A Hudson County Complete Streets Campaign" className="abp-banner" />
+  </picture>
 </a>
 
 # PATH Ridership Data
@@ -19,7 +22,10 @@ export const { GitHub, HudCoStreets } = Icons
 
 <div className="abp-footer">
   <a href="https://hudcostreets.org/panynj">
-    <img src="/abp-partnership.png" alt="Hudson County Complete Streets × A Better PATH" className="abp-partnership" />
+    <picture>
+      <source srcSet="/abp-partnership-dark.svg" media="(prefers-color-scheme: dark)" />
+      <img src="/abp-partnership.svg" alt="Hudson County Complete Streets × A Better PATH" className="abp-partnership" />
+    </picture>
   </a>
   <p>
     Data [from PANYNJ](https://www.panynj.gov/path/en/about/stats.html) ·
