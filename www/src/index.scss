@@ -7,6 +7,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  color-scheme: light dark;
 }
 
 a {
@@ -38,12 +40,10 @@ h1 {
   line-height: 1.1;
 }
 
-.heading {
-  a {
-    color: black;
-  }
-  a:hover {
-    color: #555;
+.heading a {
+  color: inherit;
+  &:hover {
+    opacity: 0.7;
   }
 }
 
@@ -77,7 +77,7 @@ hr {
   margin-top: 2em;
   p {
     margin: 1em 0 0.5em;
-    color: #555;
+    color: #888;
   }
 }
 .abp-partnership {
@@ -99,7 +99,6 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -121,5 +120,45 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+  }
+  .loading {
+    background-color: #eee;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #e4e4e4;
+    background-color: #1a1a2e;
+  }
+  a {
+    color: #818cf8;
+  }
+  a:hover {
+    color: #a5b4fc;
+  }
+  button {
+    background-color: #2a2a3e;
+    color: #e4e4e4;
+  }
+  hr {
+    border-top-color: #444;
+  }
+  .loading {
+    background-color: #2a2a3e;
+  }
+  .error {
+    background-color: #4a1c1c;
+  }
+  .abp-footer {
+    border-top-color: #444;
+  }
+  .MuiToggleButtonGroup-root .MuiToggleButton-root {
+    color: #aaa;
+    border-color: #555;
+    &.Mui-selected {
+      color: #e4e4e4;
+      background-color: #3a3a5a;
+    }
   }
 }

@@ -1,10 +1,10 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useEffect, useState } from "react"
-import * as Plotly from "plotly.js"
-import { gridcolor, Plot } from "./LinePlots"
+import { Data, Layout, Legend } from "plotly.js"
+import { Plot } from "./LinePlots"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
-type PlotSpec = { data: Plotly.Data[], layout: Partial<Plotly.Layout> }
+type PlotSpec = { data: Data[], layout: Partial<Layout> }
 
 export default function MonthlyPlots() {
   const [weekday, setWeekday] = useState<PlotSpec | null>(null)
@@ -33,14 +33,12 @@ export default function MonthlyPlots() {
           barmode: "group",
           xaxis: {
             ...spec.layout.xaxis,
-            gridcolor,
             fixedrange: true,
           },
           yaxis: {
-            gridcolor,
             fixedrange: true,
           },
-          legend: { ...spec.layout.legend, title: undefined, entrywidth: 60 } as Partial<Plotly.Legend>,
+          legend: { ...spec.layout.legend, title: undefined, entrywidth: 60 } as Partial<Legend>,
         }}
       />
       <div className="plot-toggles">

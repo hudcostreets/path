@@ -1,10 +1,10 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useEffect, useState } from "react"
-import * as Plotly from "plotly.js"
-import { gridcolor, Plot } from "./LinePlots"
+import { Data, Layout, LayoutAxis, Legend } from "plotly.js"
+import { Plot } from "./LinePlots"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
-type PlotSpec = { data: Plotly.Data[], layout: Partial<Plotly.Layout> }
+type PlotSpec = { data: Data[], layout: Partial<Layout> }
 
 const allTimeRange = ['2011-12-17', '2025-12-17']
 const recentRange = ['2019-12-17', '2025-12-17']
@@ -28,13 +28,12 @@ export default function StationPlots() {
   }
 
   const isRecent = timeRange === "recent"
-  const xaxis: Partial<Plotly.LayoutAxis> = {
+  const xaxis: Partial<LayoutAxis> = {
     range: isRecent ? recentRange : allTimeRange,
     dtick: isRecent ? "M3" : "M12",
     tickformat: isRecent ? "%b '%y" : "'%y",
     hoverformat: "%b '%y",
     tickangle: -45,
-    gridcolor,
     fixedrange: true,
   }
 
@@ -49,11 +48,10 @@ export default function StationPlots() {
           hovermode: "x",
           xaxis,
           yaxis: {
-            gridcolor,
             fixedrange: true,
             hoverformat: ",.0f",
           },
-          legend: { ...spec.layout.legend, title: undefined, entrywidth: 100 } as Partial<Plotly.Legend>,
+          legend: { ...spec.layout.legend, title: undefined, entrywidth: 100 } as Partial<Legend>,
         }}
       />
       <div className="plot-toggles">

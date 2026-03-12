@@ -4,11 +4,10 @@ import { Headings } from "@rdub/base/heading"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { useEffect } from 'react'
 import { Int32, Utf8 } from 'apache-arrow'
-import { Annotations } from "plotly.js"
-import * as Plotly from "plotly.js"
-import Plot0, { PlotParams } from 'react-plotly.js'
+import { Annotations, Data, Layout } from "plotly.js"
+import Plotly from 'plotly.js-dist-min'
+import { Plot as PltlyPlot } from 'pltly/react'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 export type Row = {
@@ -20,14 +19,8 @@ export type Pcts = { week: number, wknd: number }
 
 const height = 450
 const DefaultHeight = height
-export const gridcolor = "#ddd"
 export const hovertemplate = "%{y:,.0f}"
 export const hovertemplatePct = "%{y:.1%}"
-const config: Partial<Plotly.Config> = {
-  responsive: true,
-  displayModeBar: false,
-  scrollZoom: false,
-}
 
 const resolved = dvcResolve('all.pqt')
 export const url = resolved.startsWith('/') ? `${window.location.origin}${resolved}` : resolved
@@ -60,8 +53,8 @@ export function Plot(
     id: string
     title: string
   } & ({
-    data: Plotly.Data[]
-    layout: Partial<Plotly.Layout>
+    data: Data[]
+    layout: Partial<Layout>
   } | {})
 ) {
   const h2 = <H2 id={id}>{title}</H2>
@@ -74,45 +67,30 @@ export function Plot(
     </>
   }
   let { data, layout: { xaxis = {}, yaxis = {}, legend = {}, ...layout } } = props
-  xaxis = { gridcolor, fixedrange: true, ...xaxis }
-  yaxis = { gridcolor, fixedrange: true, ...yaxis }
+  xaxis = { fixedrange: true, ...xaxis }
+  yaxis = { fixedrange: true, ...yaxis }
   if (narrow) {
     legend = { ...legend, orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
   }
   return <>
     {h2}
-    <Plot0
-      className={'plot'}
-      style={{ width: '100%', height: `${height}px` }}
-      useResizeHandler={true}
+    <PltlyPlot
+      plotly={Plotly}
       data={data}
+      style={{ width: '100%', height: `${height}px` }}
       layout={{
         autosize: true,
         margin,
         hovermode: "x",
-        dragmode: false,
         xaxis, yaxis,
         legend,
         ...layout,
       }}
-      config={config}
     />
   </>
 }
 
 export default function LinePlots() {
-  useEffect(() => {
-    const handler = (e: Event) => {
-      document.querySelectorAll<HTMLElement>('.js-plotly-plot').forEach(el => {
-        if (!el.contains(e.target as Node)) {
-          const drag = el.querySelector('.nsewdrag')
-          if (drag) drag.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
-        }
-      })
-    }
-    document.addEventListener('pointerdown', handler)
-    return () => document.removeEventListener('pointerdown', handler)
-  }, [])
   const dbConn = useDb()
   // const db = useMemo(() => new Db(), [])
   const { data: table, isError, error } = useQuery({
@@ -159,8 +137,8 @@ export default function LinePlots() {
       return { month, avg_weekday, avg_weekend, pcts2019, idxs2019 }
     }
   })
-  let dailyPlot: Pick<PlotParams, 'data' | 'layout'> | {} = {}
-  let vs2019Plot: Pick<PlotParams, 'data' | 'layout'> | {} = {}
+  let dailyPlot: { data: Data[], layout: Partial<Layout> } | {} = {}
+  let vs2019Plot: { data: Data[], layout: Partial<Layout> } | {} = {}
   if (table) {
     const { month, avg_weekday, avg_weekend, pcts2019, idxs2019 } = table
     const idx2020 = idxs2019[11] + 1
