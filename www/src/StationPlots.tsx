@@ -42,6 +42,7 @@ export default function StationPlots() {
       <Plot
         id="station"
         title={`Average ${dayType} PATH ridership by station`}
+        soloMode="hide"
         data={spec.data}
         layout={{
           barmode: "relative",

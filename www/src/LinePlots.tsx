@@ -33,7 +33,7 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
   return {
     axref: "x",
     ayref: "y",
-    arrowcolor: "#2a3f5f",
+    arrowcolor: "#888",
     arrowhead: 0,
     arrowwidth: 1,
     xanchor: "right",
@@ -49,9 +49,10 @@ export function Loading({ height = DefaultHeight }: { height?: number }) {
 }
 
 export function Plot(
-  { id, title, ...props }: {
+  { id, title, soloMode, ...props }: {
     id: string
     title: string
+    soloMode?: 'fade' | 'hide'
   } & ({
     data: Data[]
     layout: Partial<Layout>
@@ -77,6 +78,7 @@ export function Plot(
     <PltlyPlot
       plotly={Plotly}
       data={data}
+      soloMode={soloMode}
       style={{ width: '100%', height: `${height}px` }}
       layout={{
         autosize: true,
@@ -158,13 +160,13 @@ export default function LinePlots() {
         {
           name: "Avg Weekday",
           x: month, y: avg_weekday,
-          marker: { color: 'red' },
+          line: { color: '#ef4444' },
           hovertemplate,
         },
         {
           name: "Avg Weekend",
           x: month, y: avg_weekend,
-          marker: { color: 'blue' },
+          line: { color: '#3b82f6' },
           hovertemplate,
         },
       ],

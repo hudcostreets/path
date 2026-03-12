@@ -28,6 +28,7 @@ export default function MonthlyPlots() {
       <Plot
         id="monthly"
         title={`Average ${dayType} rides, by month`}
+        soloMode="hide"
         data={spec.data}
         layout={{
           barmode: "group",
