@@ -200,13 +200,13 @@ export default function LinePlots() {
         {
           name: "Avg Weekday (% of 2019)",
           x: monthsFrom2020, y: pcts2019From2020.map(p => p.week),
-          marker: { color: 'red' },
+          line: { color: '#ef4444' },
           hovertemplate: hovertemplatePct,
         },
         {
           name: "Avg Weekend (% of 2019)",
           x: monthsFrom2020, y: pcts2019From2020.map(p => p.wknd),
-          marker: { color: 'blue' },
+          line: { color: '#3b82f6' },
           hovertemplate: hovertemplatePct,
         },
       ],
