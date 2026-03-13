@@ -69,7 +69,7 @@ export function Plot(
       layout={{
         autosize: true,
         margin,
-        hovermode: "x",
+        hovermode: "x unified",
         xaxis, yaxis,
         legend,
         ...layout,
