@@ -5,7 +5,7 @@ import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam } from "use-prms"
-import { H2, Loading } from "./plot-utils"
+import { H2, Loading, dark, hovertemplate } from "./plot-utils"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 type PlotSpec = { data: Data[], layout: Partial<Layout> }
@@ -25,7 +25,7 @@ function recolorTraces(data: Data[]): Data[] {
     if (!year) return d
     const t = (year - minYear) / range
     const color = getColorAt(INFERNO, t)
-    return { ...d, marker: { ...(d as any).marker, color } }
+    return { ...d, marker: { ...(d as any).marker, color }, hovertemplate }
   })
 }
 
@@ -96,14 +96,15 @@ export default function MonthlyPlots() {
       <PltlyPlot
         plotly={Plotly}
         data={styledData}
+        soloMode="hide"
         disableLegendHover
-        disableSoloTrace
         onAfterPlot={attachLegend}
         style={{ width: '100%', height: `${height}px` }}
         layout={{
           autosize: true,
           margin,
-          hovermode: "x",
+          hovermode: "x unified",
+          hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
           barmode: "group",
           xaxis: {
             ...spec.layout.xaxis,
