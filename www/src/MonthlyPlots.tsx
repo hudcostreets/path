@@ -23,7 +23,7 @@ function recolorTraces(data: Data[]): Data[] {
   return data.map(d => {
     const year = parseInt(d.name ?? '0')
     if (!year) return d
-    const t = (year - minYear) / range
+    const t = 0.15 + 0.85 * (year - minYear) / range
     const color = getColorAt(INFERNO, t)
     return { ...d, marker: { ...(d as any).marker, color }, hovertemplate }
   })
@@ -69,12 +69,14 @@ export default function MonthlyPlots() {
   )
   const containerRef = useRef<HTMLDivElement>(null)
   const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, traceNames)
-  const { activeTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
+  const { soloTrace, activeTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
   const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
   const coloredData = useMemo(() => spec ? recolorTraces(spec.data) : null, [spec])
+  // When a trace is pinned (solo), ignore hover — keep highlight sticky
+  const highlightTarget = soloTrace ?? hoverTrace
   const styledData = useMemo(
-    () => coloredData ? highlightTraces(coloredData, activeTrace) : null,
-    [coloredData, activeTrace],
+    () => coloredData ? highlightTraces(coloredData, highlightTarget) : null,
+    [coloredData, highlightTarget],
   )
 
   const narrow = typeof window !== 'undefined' && window.innerWidth < 600
@@ -98,8 +100,8 @@ export default function MonthlyPlots() {
         plotly={Plotly}
         data={styledData}
         disableLegendHover
-        onLegendClick={onLegendClick}
-        onLegendDoubleClick={onLegendDoubleClick}
+        onLegendClick={onLegendClick as () => boolean}
+        onLegendDoubleClick={onLegendDoubleClick as () => boolean}
         onAfterPlot={attachLegend}
         style={{ width: '100%', height: `${height}px` }}
         layout={{
