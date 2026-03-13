@@ -124,6 +124,19 @@ button:focus-visible {
   .loading {
     background-color: #eee;
   }
+  .station-dropdown summary {
+    border-color: #aaa;
+  }
+  .station-list {
+    background: #fff;
+    border-color: #ccc;
+    label:hover {
+      background: #f0f0f0;
+    }
+  }
+  .select-all {
+    border-bottom-color: #ccc;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -153,7 +166,7 @@ button:focus-visible {
   .abp-footer {
     border-top-color: #444;
   }
-  .footer-icons .icon svg path {
+  .footer-icons a:last-child .icon path {
     fill: #e4e4e4;
   }
   .MuiToggleButtonGroup-root .MuiToggleButton-root {
