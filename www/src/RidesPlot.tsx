@@ -4,9 +4,10 @@ import { Arr } from "@rdub/base/arr"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import { Float64, Utf8 } from 'apache-arrow'
 import { Data, Layout, Legend } from "plotly.js"
+import { useActions } from "use-kbd"
 import { useUrlState, codeParam, codesParam } from "use-prms"
 import { Plot, ann, hovertemplate, hovertemplatePct, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
@@ -50,13 +51,19 @@ const STATION_COLORS: Record<string, string> = {
   "Hoboken": "#00cc96",
 }
 
+// Station groups by state
+const NY_STATIONS = ["Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street", "WTC"] as const
+const NJ_STATIONS = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken"] as const
+
+// Station groups by line
+const NWK_WTC = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "WTC"] as const
+const JSQ_33 = ["Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
+const HOB_33 = ["Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
+const HOB_WTC = ["Hoboken", "Newport", "Exchange Place", "WTC"] as const
+
 type DayType = "weekday" | "weekend"
 type Mode = "rides" | "vs2019"
 type TimeRange = "all" | "recent"
-
-const DAY_TYPES = ["weekday", "weekend"] as const
-const MODES = ["rides", "vs2019"] as const
-const TIME_RANGES = ["all", "recent"] as const
 
 const modeParam = codeParam<Mode>("rides", { rides: "r", vs2019: "v" })
 const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
@@ -177,6 +184,104 @@ export default function RidesPlot() {
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
   const [selectedStations, setSelectedStations] = useUrlState<string[]>("s", stationsParam)
   const dbConn = useDb()
+
+  const selectGroup = useCallback((group: readonly string[]) => {
+    setSelectedStations([...group])
+    setMode("rides")
+  }, [setSelectedStations, setMode])
+
+  useActions({
+    'stations:all': {
+      label: 'All stations',
+      group: 'Stations',
+      defaultBindings: ['s a'],
+      handler: () => setSelectedStations([...STATIONS]),
+    },
+    'stations:none': {
+      label: 'No stations (aggregate)',
+      group: 'Stations',
+      defaultBindings: ['s 0'],
+      handler: () => setSelectedStations([]),
+    },
+    'stations:ny': {
+      label: 'New York stations',
+      group: 'Stations',
+      keywords: ['manhattan'],
+      defaultBindings: ['s y'],
+      handler: () => selectGroup(NY_STATIONS),
+    },
+    'stations:nj': {
+      label: 'New Jersey stations',
+      group: 'Stations',
+      keywords: ['jersey city', 'hoboken', 'newark'],
+      defaultBindings: ['s j'],
+      handler: () => selectGroup(NJ_STATIONS),
+    },
+    'stations:nwk-wtc': {
+      label: 'NWK–WTC line',
+      group: 'Stations',
+      keywords: ['newark', 'world trade center'],
+      defaultBindings: ['s n'],
+      handler: () => selectGroup(NWK_WTC),
+    },
+    'stations:jsq-33': {
+      label: 'JSQ–33 line',
+      group: 'Stations',
+      keywords: ['journal square', '33rd'],
+      defaultBindings: ['s q'],
+      handler: () => selectGroup(JSQ_33),
+    },
+    'stations:hob-33': {
+      label: 'HOB–33 line',
+      group: 'Stations',
+      keywords: ['hoboken', '33rd'],
+      defaultBindings: ['s h'],
+      handler: () => selectGroup(HOB_33),
+    },
+    'stations:hob-wtc': {
+      label: 'HOB–WTC line',
+      group: 'Stations',
+      keywords: ['hoboken', 'world trade center'],
+      defaultBindings: ['s w'],
+      handler: () => selectGroup(HOB_WTC),
+    },
+    'mode:weekday': {
+      label: 'Weekday',
+      group: 'Controls',
+      defaultBindings: ['d w'],
+      handler: () => setDayType("weekday"),
+    },
+    'mode:weekend': {
+      label: 'Weekend',
+      group: 'Controls',
+      defaultBindings: ['d e'],
+      handler: () => setDayType("weekend"),
+    },
+    'mode:rides': {
+      label: 'Rides mode',
+      group: 'Controls',
+      defaultBindings: ['m r'],
+      handler: () => setMode("rides"),
+    },
+    'mode:vs2019': {
+      label: 'vs. 2019 mode',
+      group: 'Controls',
+      defaultBindings: ['m v'],
+      handler: () => setMode("vs2019"),
+    },
+    'time:all': {
+      label: 'All time',
+      group: 'Controls',
+      defaultBindings: ['t a'],
+      handler: () => setTimeRange("all"),
+    },
+    'time:recent': {
+      label: '2020–Present',
+      group: 'Controls',
+      defaultBindings: ['t r'],
+      handler: () => setTimeRange("recent"),
+    },
+  })
 
   const { data: processed, isError, error } = useQuery({
     queryKey: ['rides', url, dbConn === null],

@@ -84,13 +84,6 @@ hr {
   max-width: min(100%, 360px);
   height: auto;
 }
-.footer-icons {
-  margin-top: 0.5em;
-}
-.icon {
-  width: 2em;
-  margin-right: 0.6em;
-}
 
 button {
   border-radius: 8px;
@@ -165,9 +158,6 @@ button:focus-visible {
   }
   .abp-footer {
     border-top-color: #444;
-  }
-  .footer-icons a:last-child .icon path {
-    fill: #e4e4e4;
   }
   .MuiToggleButtonGroup-root .MuiToggleButton-root {
     color: #aaa;
