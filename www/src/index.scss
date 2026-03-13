@@ -130,6 +130,9 @@ button:focus-visible {
   .select-all {
     border-bottom-color: #ccc;
   }
+  .group-section:not(:last-child) {
+    border-bottom-color: #ccc;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

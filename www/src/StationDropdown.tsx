@@ -1,4 +1,47 @@
 import { useEffect, useRef, useState } from "react"
+import type { StationGroup } from "./RidesPlot"
+
+function GroupCheckbox({
+  group,
+  selected,
+  onChange,
+}: {
+  group: StationGroup
+  selected: string[]
+  onChange: (stations: string[]) => void
+}) {
+  const count = group.stations.filter(s => selected.includes(s)).length
+  const all = count === group.stations.length
+  const some = count > 0 && !all
+  const checkboxRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (checkboxRef.current) checkboxRef.current.indeterminate = some
+  }, [some])
+
+  const toggle = () => {
+    if (all) {
+      // Remove this group's stations
+      onChange(selected.filter(s => !group.stations.includes(s)))
+    } else {
+      // Add all of this group's stations (dedup via Set)
+      onChange([...new Set([...selected, ...group.stations])])
+    }
+  }
+
+  return (
+    <label>
+      <input
+        ref={checkboxRef}
+        type="checkbox"
+        checked={all}
+        onChange={toggle}
+      />
+      <span className="color-swatch" style={{ backgroundColor: group.color }} />
+      {group.label}
+    </label>
+  )
+}
 
 export function StationDropdown({
   stations,
@@ -6,12 +49,16 @@ export function StationDropdown({
   selected,
   onChange,
   disabled,
+  lineGroups,
+  regionGroups,
 }: {
   stations: string[]
   colors: Record<string, string>
   selected: string[]
   onChange: (stations: string[]) => void
   disabled?: boolean
+  lineGroups?: StationGroup[]
+  regionGroups?: StationGroup[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const detailsRef = useRef<HTMLDetailsElement>(null)
@@ -74,17 +121,36 @@ export function StationDropdown({
           />
           {allSelected ? "Deselect All" : "Select All"}
         </label>
-        {stations.map(station => (
-          <label key={station}>
-            <input
-              type="checkbox"
-              checked={selected.includes(station)}
-              onChange={() => toggleStation(station)}
-            />
-            <span className="color-swatch" style={{ backgroundColor: colors[station] }} />
-            {station}
-          </label>
-        ))}
+        {lineGroups && lineGroups.length > 0 && (
+          <div className="group-section">
+            <div className="group-heading">Lines</div>
+            {lineGroups.map(g => (
+              <GroupCheckbox key={g.label} group={g} selected={selected} onChange={onChange} />
+            ))}
+          </div>
+        )}
+        {regionGroups && regionGroups.length > 0 && (
+          <div className="group-section">
+            <div className="group-heading">Regions</div>
+            {regionGroups.map(g => (
+              <GroupCheckbox key={g.label} group={g} selected={selected} onChange={onChange} />
+            ))}
+          </div>
+        )}
+        <div className="group-section">
+          <div className="group-heading">Stations</div>
+          {stations.map(station => (
+            <label key={station}>
+              <input
+                type="checkbox"
+                checked={selected.includes(station)}
+                onChange={() => toggleStation(station)}
+              />
+              <span className="color-swatch" style={{ backgroundColor: colors[station] }} />
+              {station}
+            </label>
+          ))}
+        </div>
       </div>
     </details>
   )

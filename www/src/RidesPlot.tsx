@@ -55,11 +55,25 @@ const STATION_COLORS: Record<string, string> = {
 const NY_STATIONS = ["Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street", "WTC"] as const
 const NJ_STATIONS = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken"] as const
 
-// Station groups by line
+// Station groups by line (canonical PATH map colors)
 const NWK_WTC = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "WTC"] as const
 const JSQ_33 = ["Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
 const HOB_33 = ["Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
 const HOB_WTC = ["Hoboken", "Newport", "Exchange Place", "WTC"] as const
+
+export type StationGroup = { label: string, color: string, stations: readonly string[] }
+
+const LINE_GROUPS: StationGroup[] = [
+  { label: "NWK–WTC", color: "#D93A30", stations: NWK_WTC },
+  { label: "JSQ–33", color: "#F0A81C", stations: JSQ_33 },
+  { label: "HOB–33", color: "#0082C6", stations: HOB_33 },
+  { label: "HOB–WTC", color: "#00A84F", stations: HOB_WTC },
+]
+
+const REGION_GROUPS: StationGroup[] = [
+  { label: "New York", color: "#aaa", stations: NY_STATIONS },
+  { label: "New Jersey", color: "#aaa", stations: NJ_STATIONS },
+]
 
 type DayType = "weekday" | "weekend"
 type Mode = "rides" | "vs2019"
@@ -530,6 +544,8 @@ export default function RidesPlot() {
           selected={selectedStations}
           onChange={setSelectedStations}
           disabled={isVs2019}
+          lineGroups={LINE_GROUPS}
+          regionGroups={REGION_GROUPS}
         />
       </div>
       {isVs2019 && <p>Weekend ridership has surpassed pre-COVID levels, though service remains degraded.</p>}

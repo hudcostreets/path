@@ -76,3 +76,17 @@
   border-radius: 2px;
   flex-shrink: 0;
 }
+.group-section {
+  &:not(:last-child) {
+    border-bottom: 1px solid #555;
+    padding-bottom: 0.2em;
+    margin-bottom: 0.2em;
+  }
+}
+.group-heading {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  padding: 0.2em 0.5em 0;
+}
