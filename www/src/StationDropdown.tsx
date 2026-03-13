@@ -21,25 +21,66 @@ function GroupCheckbox({
 
   const toggle = () => {
     if (all) {
-      // Remove this group's stations
       onChange(selected.filter(s => !group.stations.includes(s)))
     } else {
-      // Add all of this group's stations (dedup via Set)
       onChange([...new Set([...selected, ...group.stations])])
     }
   }
 
+  const solo = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onChange([...group.stations])
+  }
+
   return (
-    <label>
-      <input
-        ref={checkboxRef}
-        type="checkbox"
-        checked={all}
-        onChange={toggle}
-      />
-      <span className="color-swatch" style={{ backgroundColor: group.color }} />
-      {group.label}
-    </label>
+    <div className="dropdown-row">
+      <label>
+        <input
+          ref={checkboxRef}
+          type="checkbox"
+          checked={all}
+          onChange={toggle}
+        />
+        <span className="color-swatch solo-target" style={{ backgroundColor: group.color }} onClick={solo} />
+        {group.label}
+      </label>
+      <span className="solo-link" onClick={solo}>only</span>
+    </div>
+  )
+}
+
+function StationRow({
+  station,
+  color,
+  checked,
+  onToggle,
+  onSolo,
+}: {
+  station: string
+  color: string
+  checked: boolean
+  onToggle: () => void
+  onSolo: () => void
+}) {
+  const solo = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onSolo()
+  }
+  return (
+    <div className="dropdown-row">
+      <label>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+        />
+        <span className="color-swatch solo-target" style={{ backgroundColor: color }} onClick={solo} />
+        {station}
+      </label>
+      <span className="solo-link" onClick={solo}>only</span>
+    </div>
   )
 }
 
@@ -140,15 +181,14 @@ export function StationDropdown({
         <div className="group-section">
           <div className="group-heading">Stations</div>
           {stations.map(station => (
-            <label key={station}>
-              <input
-                type="checkbox"
-                checked={selected.includes(station)}
-                onChange={() => toggleStation(station)}
-              />
-              <span className="color-swatch" style={{ backgroundColor: colors[station] }} />
-              {station}
-            </label>
+            <StationRow
+              key={station}
+              station={station}
+              color={colors[station]}
+              checked={selected.includes(station)}
+              onToggle={() => toggleStation(station)}
+              onSolo={() => onChange([station])}
+            />
           ))}
         </div>
       </div>
