@@ -52,51 +52,39 @@ The 2025 PDF is partial (current year), with a footnote: "Traffic volumes are pr
 
 ## Plan
 
-### Phase 1: Update data (2023–2025)
+### Phase 1: Update data (2011–2025) ✅
 
-1. Download missing PDFs:
-   ```bash
-   for y in 2023 2024 2025; do
-     dvx import-url -G \
-       "https://www.panynj.gov/content/dam/bridges-tunnels/pdfs/traffic-e-zpass-usage-${y}.pdf" \
-       -o "data/traffic-e-zpass-usage-${y}.pdf"
-   done
-   ```
-2. Add DVX provenance to existing 2011–2022 PDFs (same `dvx import-url -G` pattern)
-3. Merge all years into updated `data/traffic-e-zpass-usage.pdf` (or switch to per-file parsing)
+All 15 PDFs imported via `dvx import-url -G`:
+```bash
+for y in $(seq 2011 2025); do
+  dvx import-url -G \
+    "https://www.panynj.gov/content/dam/bridges-tunnels/pdfs/traffic-e-zpass-usage-${y}.pdf" \
+    -o "data/traffic-e-zpass-usage-${y}.pdf"
+done
+```
+- 2022 PDF was re-downloaded with full-year data (previously had partial Q1-Q3 only)
+- Each PDF gets a `.dvc` sidecar with URL, ETag, Last-Modified
 
-### Phase 2: Modernize parsing
+### Phase 2: Modernize parsing ✅
 
-The current notebook uses `tabula-py` with a per-page template. Options:
+Chose **Option C** — `pdfplumber` via `parse_bt.py` script:
+- Per-file parsing (each year's single-page PDF independently)
+- `rejoin_split_numbers()` handles pdfplumber text extraction artifacts (split numbers like `2 4,325` → `24,325`, `9 89` → `989`)
+- Three-way cross-validation: Total Vehicles = A+B+T, All Crossings = sum of individual crossings, YTD = sum of months
+- All 15 years pass validation
 
-**Option A: Keep tabula, extend template** — Add extraction rects for pages 13–15 (2023–2025). Quick but fragile.
-
-**Option B: Switch to per-file parsing** — Parse each year's single-page PDF independently instead of a merged PDF. More robust for yearly updates, no template drift. Each year is one table on one page.
-
-**Option C: Use a different extractor** — `pdfplumber` or `camelot` may handle these tables more reliably without manual templates.
-
-Leaning toward **Option B** — per-file parsing with `tabula-py` or `pdfplumber`, extracting the single table from each year's PDF. Update the notebook or convert to a DVX-tracked script.
-
-### Phase 3: DVX pipeline
-
-Mirror the PATH pipeline structure:
+### Phase 3: DVX pipeline ✅
 
 ```
 data/traffic-e-zpass-usage-YYYY.pdf     # DVX import-url -G (git-tracked w/ URL provenance)
 data/traffic-e-zpass-usage-YYYY.pdf.dvc # DVX sidecar (URL, ETag, Last-Modified)
 data/bt/traffic.pqt                     # Combined parsed data (DVX-tracked)
+data/bt/traffic.pqt.dvc                 # DVX computation sidecar
 data/bt/ezpass.pqt                      # Combined E-ZPass percentages (DVX-tracked)
+data/bt/ezpass.pqt.dvc                  # DVX computation sidecar
 ```
 
-DVX `.dvc` files track the computation:
-```yaml
-deps:
-  - path: data/traffic-e-zpass-usage-2025.pdf
-outs:
-  - path: data/bt/traffic.pqt
-  - path: data/bt/ezpass.pqt
-cmd: python parse_bt.py
-```
+Pipeline cmd: `python parse_bt.py && cp data/bt/*.pqt www/public/`
 
 ### Phase 4: Visualization
 
