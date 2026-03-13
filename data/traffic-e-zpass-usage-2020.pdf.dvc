@@ -1,0 +1,14 @@
+deps:
+- path: https://www.panynj.gov/content/dam/bridges-tunnels/pdfs/traffic-e-zpass-usage-2020.pdf
+  checksum: W/"1dc68-5bb8e61f8d1c0-gzip"
+  size: 121960
+  mtime: '2021-02-17T20:51:27+00:00'
+outs:
+- md5: 578e1b859d3185e2af559d1e5c72fba6
+  size: 121960
+  hash: md5
+  path: traffic-e-zpass-usage-2020.pdf
+meta:
+  git_tracked: true
+  import:
+    fetched: '2026-03-13'
