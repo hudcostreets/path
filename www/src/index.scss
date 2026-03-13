@@ -131,8 +131,12 @@ button:focus-visible {
     background: #f0f0f0;
     label:hover { background: none; }
   }
-  .solo-link:hover {
-    color: #333;
+  .solo-link {
+    background: rgba(0, 0, 0, 0.06);
+    &:hover {
+      color: #333;
+      background: rgba(0, 0, 0, 0.12);
+    }
   }
   .select-all {
     border-bottom-color: #ccc;

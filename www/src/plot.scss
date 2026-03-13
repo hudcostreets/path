@@ -105,13 +105,17 @@
 }
 .solo-link {
   opacity: 0;
-  font-size: 0.7rem;
-  color: #888;
+  font-size: 0.65rem;
+  color: #999;
   cursor: pointer;
-  padding: 0 0.3em;
+  padding: 0.1em 0.4em;
   flex-shrink: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.03em;
   &:hover {
-    color: #ccc;
+    color: #eee;
+    background: rgba(255, 255, 255, 0.18);
   }
 }
 .group-section {
