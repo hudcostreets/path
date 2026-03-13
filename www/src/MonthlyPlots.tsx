@@ -2,7 +2,7 @@ import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Data, Layout, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
-import { Plot as PltlyPlot, useLegendHover } from "pltly/react"
+import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam } from "use-prms"
 import { H2, Loading, dark, hovertemplate } from "./plot-utils"
@@ -69,11 +69,12 @@ export default function MonthlyPlots() {
   )
   const containerRef = useRef<HTMLDivElement>(null)
   const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, traceNames)
+  const { activeTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
   const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
   const coloredData = useMemo(() => spec ? recolorTraces(spec.data) : null, [spec])
   const styledData = useMemo(
-    () => coloredData ? highlightTraces(coloredData, hoverTrace) : null,
-    [coloredData, hoverTrace],
+    () => coloredData ? highlightTraces(coloredData, activeTrace) : null,
+    [coloredData, activeTrace],
   )
 
   const narrow = typeof window !== 'undefined' && window.innerWidth < 600
@@ -96,8 +97,9 @@ export default function MonthlyPlots() {
       <PltlyPlot
         plotly={Plotly}
         data={styledData}
-        soloMode="hide"
         disableLegendHover
+        onLegendClick={onLegendClick}
+        onLegendDoubleClick={onLegendDoubleClick}
         onAfterPlot={attachLegend}
         style={{ width: '100%', height: `${height}px` }}
         layout={{
