@@ -4,11 +4,14 @@ import { Data, Layout, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
+import { useUrlState, codeParam } from "use-prms"
 import { H2, Loading } from "./plot-utils"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 type PlotSpec = { data: Data[], layout: Partial<Layout> }
+type DayType = "weekday" | "weekend"
 
+const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
 const height = 450
 
 function recolorTraces(data: Data[]): Data[] {
@@ -52,7 +55,7 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
 export default function MonthlyPlots() {
   const [weekday, setWeekday] = useState<PlotSpec | null>(null)
   const [weekend, setWeekend] = useState<PlotSpec | null>(null)
-  const [dayType, setDayType] = useState<"weekday" | "weekend">("weekday")
+  const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
 
   useEffect(() => {
     fetch(dvcResolve('avg_weekday_month_grouped.json')).then(r => r.json()).then(setWeekday)

@@ -27,7 +27,8 @@
     "plotly.js-dist-min": "^3.4.0",
     "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/8cafa05dec034d2315a0458dab129f121b441789/pltly-8cafa05dec034d2315a0458dab129f121b441789.tar.gz",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "use-prms": "^0.4.1"
   },
   "devDependencies": {
     "@rdub/eslint-config": "0.0.2",

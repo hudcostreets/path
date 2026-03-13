@@ -4,9 +4,10 @@ import { Arr } from "@rdub/base/arr"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { Float64, Utf8 } from 'apache-arrow'
 import { Data, Layout, Legend } from "plotly.js"
+import { useUrlState, codeParam, codesParam } from "use-prms"
 import { Plot, ann, hovertemplate, hovertemplatePct, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 
@@ -52,6 +53,32 @@ const STATION_COLORS: Record<string, string> = {
 type DayType = "weekday" | "weekend"
 type Mode = "rides" | "vs2019"
 type TimeRange = "all" | "recent"
+
+const DAY_TYPES = ["weekday", "weekend"] as const
+const MODES = ["rides", "vs2019"] as const
+const TIME_RANGES = ["all", "recent"] as const
+
+const modeParam = codeParam<Mode>("rides", { rides: "r", vs2019: "v" })
+const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
+const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "p" })
+const stationsParam = codesParam<string>(
+  [...STATIONS],
+  {
+    "Christopher Street": "c",
+    "9th Street": "9",
+    "14th Street": "1",
+    "23rd Street": "2",
+    "33rd Street": "3",
+    "WTC": "w",
+    "Newark": "n",
+    "Harrison": "h",
+    "Journal Square": "j",
+    "Grove Street": "g",
+    "Exchange Place": "x",
+    "Newport": "p",
+    "Hoboken": "o",
+  },
+)
 
 type StationData = {
   months: Date[]
@@ -145,10 +172,10 @@ function processData(rows: { month: string, station: string, avg_weekday: number
 }
 
 export default function RidesPlot() {
-  const [mode, setMode] = useState<Mode>("rides")
-  const [dayType, setDayType] = useState<DayType>("weekday")
-  const [timeRange, setTimeRange] = useState<TimeRange>("all")
-  const [selectedStations, setSelectedStations] = useState<string[]>([...STATIONS])
+  const [mode, setMode] = useUrlState<Mode>("m", modeParam)
+  const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
+  const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
+  const [selectedStations, setSelectedStations] = useUrlState<string[]>("s", stationsParam)
   const dbConn = useDb()
 
   const { data: processed, isError, error } = useQuery({
