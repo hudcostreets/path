@@ -92,6 +92,7 @@ export function StationDropdown({
   disabled,
   lineGroups,
   regionGroups,
+  label = "Stations",
 }: {
   stations: string[]
   colors: Record<string, string>
@@ -100,6 +101,7 @@ export function StationDropdown({
   disabled?: boolean
   lineGroups?: StationGroup[]
   regionGroups?: StationGroup[]
+  label?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const detailsRef = useRef<HTMLDetailsElement>(null)
@@ -107,12 +109,12 @@ export function StationDropdown({
   const allSelected = selected.length === stations.length
   const noneSelected = selected.length === 0
   const summaryText = allSelected
-    ? "All Stations"
+    ? `All ${label}`
     : noneSelected
-      ? "No Stations"
+      ? `No ${label}`
       : selected.length === 1
         ? selected[0]
-        : `${selected.length} Stations`
+        : `${selected.length} ${label}`
 
   const toggleAll = () => {
     onChange(allSelected ? [] : [...stations])
@@ -179,7 +181,7 @@ export function StationDropdown({
           </div>
         )}
         <div className="group-section">
-          <div className="group-heading">Stations</div>
+          <div className="group-heading">{label}</div>
           {stations.map(station => (
             <StationRow
               key={station}
