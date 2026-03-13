@@ -1,0 +1,25 @@
+outs:
+- md5: 22ce4c6793cd74b07fc8efd3485fbd10
+  size: 3861
+  hash: md5
+  path: ezpass.pqt
+meta:
+  computation:
+    cmd: python parse_bt.py && cp data/bt/ezpass.pqt www/public/bt-ezpass.pqt
+    git_deps:
+      parse_bt.py: 8fa434e7faa1eb6ab55faad5cf17221dee04508d
+      data/traffic-e-zpass-usage-2011.pdf: 071decc418b570c6ed1bdadb74def95b82ac80b1
+      data/traffic-e-zpass-usage-2012.pdf: 4c3fc0c4d328c2b4f1fa917b318fc5a8ae8e733e
+      data/traffic-e-zpass-usage-2013.pdf: 71267062ef025e14d4c1069e92b1663e384ab704
+      data/traffic-e-zpass-usage-2014.pdf: 5b3dd434c76df6c68810ecad45c7fe00affdc703
+      data/traffic-e-zpass-usage-2015.pdf: e4b0089391026857e63765cacfc550a72eef2937
+      data/traffic-e-zpass-usage-2016.pdf: e79c0e1768e5d0ebb276056de5b3982a028546a0
+      data/traffic-e-zpass-usage-2017.pdf: 58c8a9cf4c44a6404b9d044bdc9acce47b450288
+      data/traffic-e-zpass-usage-2018.pdf: bb723ad454327b8ae9b107a693483f6c29b8a156
+      data/traffic-e-zpass-usage-2019.pdf: ccccd72525b781c73e0b3306c73b69fd51738a45
+      data/traffic-e-zpass-usage-2020.pdf: 39edaa7146bed3bd1e53675727b15ed57ae86789
+      data/traffic-e-zpass-usage-2021.pdf: 9b7ca78d13129bcfdc8c25df8c80bf7fa4db5630
+      data/traffic-e-zpass-usage-2022.pdf: b1c6d4046bbcb293cbdae57c095938ebf59b32bc
+      data/traffic-e-zpass-usage-2023.pdf: ba0af336366aa75d20d4a870f7a7f18858352384
+      data/traffic-e-zpass-usage-2024.pdf: b0b498a1d96d887d57dde52d5038948fda3a7287
+      data/traffic-e-zpass-usage-2025.pdf: 2fc9715a304b1921f99257f0465af70315c567d1
