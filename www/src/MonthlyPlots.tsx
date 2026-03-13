@@ -4,7 +4,7 @@ import { Data, Layout, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
-import { H2, Loading } from "./LinePlots"
+import { H2, Loading } from "./plot-utils"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 type PlotSpec = { data: Data[], layout: Partial<Layout> }
@@ -31,14 +31,15 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   return data.map(trace => {
     const isActive = trace.name === activeTrace
     if (isActive) {
-      const y = Array.from((trace as any).y ?? []) as number[]
+      const yRaw = (trace as any).y
+      const y: number[] = Array.isArray(yRaw) ? yRaw : yRaw?._inputArray ? Array.from(yRaw._inputArray) : Object.values(yRaw).filter((v): v is number => typeof v === 'number')
       return {
         ...trace,
         width: 0.25,
         zorder: 100,
-        text: y.map(v => v > 0 ? `<b>${Math.round(v).toLocaleString()}</b>` : ''),
+        text: y.map(v => v > 0 ? `<b>${Math.round(v / 1000)}k</b>` : ''),
         textposition: 'outside',
-        textfont: { color: '#e4e4e4', size: 13 },
+        textfont: { color: '#e4e4e4', size: 11 },
         textangle: 0,
         constraintext: 'none',
         cliponaxis: false,
