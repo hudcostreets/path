@@ -190,7 +190,7 @@ def refresh():
 - [x] Verify full pipeline idempotency (`dvx run --force` → all 80 outputs byte-identical)
 - [x] Update GHA workflow to use `path-data refresh -c && dvx run`
 - [x] Delete `ci.yml` (disabled, superseded)
-- [ ] Test end-to-end GHA run: `workflow_dispatch` → verify commit + www deploy
+- [x] Test end-to-end GHA run: `workflow_dispatch` → verify commit + www deploy
 
 ## Benefits
 
