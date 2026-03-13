@@ -34,7 +34,7 @@ function GroupCheckbox({
   }
 
   return (
-    <div className="dropdown-row">
+    <div className={`dropdown-row${all ? ' group-active' : ''}`} style={all ? { borderLeftColor: group.color } as React.CSSProperties : undefined}>
       <label>
         <input
           ref={checkboxRef}

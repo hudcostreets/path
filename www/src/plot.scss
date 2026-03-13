@@ -87,6 +87,10 @@
   display: flex;
   align-items: center;
   padding: 0.2em 0.5em;
+  border-left: 3px solid transparent;
+  &.group-active {
+    background: rgba(255, 255, 255, 0.06);
+  }
   &:hover {
     background: #3a3a5a;
     .solo-link { opacity: 1; }

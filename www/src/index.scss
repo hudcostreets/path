@@ -127,9 +127,14 @@ button:focus-visible {
       background: #f0f0f0;
     }
   }
-  .dropdown-row:hover {
-    background: #f0f0f0;
-    label:hover { background: none; }
+  .dropdown-row {
+    &.group-active {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    &:hover {
+      background: #f0f0f0;
+      label:hover { background: none; }
+    }
   }
   .solo-link {
     background: rgba(0, 0, 0, 0.06);
