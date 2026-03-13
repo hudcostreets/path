@@ -6,6 +6,7 @@ import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 const height = 450
 const DefaultHeight = height
+const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
 
 export const hovertemplate = "%{y:,.0f}"
 export const hovertemplatePct = "%{y:.1%}"
@@ -70,6 +71,7 @@ export function Plot(
         autosize: true,
         margin,
         hovermode: "x unified",
+        hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
         xaxis, yaxis,
         legend,
         ...layout,
