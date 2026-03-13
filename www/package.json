@@ -28,6 +28,7 @@
     "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/8cafa05dec034d2315a0458dab129f121b441789/pltly-8cafa05dec034d2315a0458dab129f121b441789.tar.gz",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^7.13.1",
     "use-kbd": "^0.12.0",
     "use-prms": "^0.4.1"
   },

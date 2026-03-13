@@ -4,13 +4,16 @@ import A from "@rdub/base/a"
 import { Theme } from "@rdub/icons/Tooltip"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { HotkeysProvider, Omnibar, SequenceModal, SpeedDial, type SpeedDialAction } from "use-kbd"
+import { BrowserRouter, Routes, Route } from "react-router-dom"
 import "use-kbd/styles.css"
-import { StrictMode } from 'react'
+import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.scss'
 import './plot.scss'
 import Body from './Body.mdx'
 import { HccsIcon, GhIcon } from './speed-dial-icons'
+
+const BridgeTunnel = lazy(() => import('./BridgeTunnel'))
 
 const components = {
   a: A,
@@ -40,9 +43,20 @@ createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <HotkeysProvider>
-          <MDXProvider components={components}>
-            <Body />
-          </MDXProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/bt" element={
+                <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
+                  <BridgeTunnel />
+                </Suspense>
+              } />
+              <Route path="*" element={
+                <MDXProvider components={components}>
+                  <Body />
+                </MDXProvider>
+              } />
+            </Routes>
+          </BrowserRouter>
           <Omnibar />
           <SequenceModal />
           <SpeedDial actions={speedDialActions} chevronMode="badge" />
