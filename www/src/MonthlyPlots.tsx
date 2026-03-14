@@ -1,32 +1,28 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Data, Layout, Legend } from "plotly.js"
+import { Arr } from "@rdub/base/arr"
+import { useDb } from "@rdub/duckdb-wasm/duckdb"
+import { useQuery } from "@tanstack/react-query"
+import { useCallback, useMemo, useRef } from "react"
+import { Data, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam } from "use-prms"
-import { H2, Loading, dark, hovertemplate } from "./plot-utils"
-import { resolve as dvcResolve } from 'virtual:dvc-data'
+import { H2, Loading, dark, hovertemplate, url } from "./plot-utils"
 
-type PlotSpec = { data: Data[], layout: Partial<Layout> }
 type DayType = "weekday" | "weekend"
 
 const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
 const height = 450
 
-function recolorTraces(data: Data[]): Data[] {
-  const years = data.map(d => parseInt(d.name ?? '0')).filter(y => y > 0)
-  if (years.length === 0) return data
-  const minYear = Math.min(...years)
-  const maxYear = Math.max(...years)
-  const range = maxYear - minYear || 1
-  return data.map(d => {
-    const year = parseInt(d.name ?? '0')
-    if (!year) return d
-    const t = 0.15 + 0.85 * (year - minYear) / range
-    const color = getColorAt(INFERNO, t)
-    return { ...d, marker: { ...(d as any).marker, color }, hovertemplate }
-  })
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+type MonthlyRow = {
+  station: string
+  year: number
+  cal_month: number
+  avg_weekday: number
+  avg_weekend: number
 }
 
 function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
@@ -34,15 +30,14 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   return data.map(trace => {
     const isActive = trace.name === activeTrace
     if (isActive) {
-      const yRaw = (trace as any).y
-      const y: number[] = Array.isArray(yRaw) ? yRaw : yRaw?._inputArray ? Array.from(yRaw._inputArray) : Object.values(yRaw).filter((v): v is number => typeof v === 'number')
+      const y: number[] = Array.isArray((trace as any).y) ? (trace as any).y : []
       return {
         ...trace,
         width: 0.25,
         zorder: 100,
         text: y.map(v => v > 0 ? `<b>${Math.round(v / 1000)}k</b>` : ''),
         textposition: 'outside',
-        textfont: { color: '#e4e4e4', size: 11 },
+        textfont: { color: dark ? '#e4e4e4' : '#333', size: 11 },
         textangle: 0,
         constraintext: 'none',
         cliponaxis: false,
@@ -52,31 +47,100 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   })
 }
 
-export default function MonthlyPlots() {
-  const [weekday, setWeekday] = useState<PlotSpec | null>(null)
-  const [weekend, setWeekend] = useState<PlotSpec | null>(null)
+export default function MonthlyPlots({ stations, subtitle }: { stations: string[], subtitle: string }) {
   const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
+  const dbConn = useDb()
 
-  useEffect(() => {
-    fetch(dvcResolve('avg_weekday_month_grouped.json')).then(r => r.json()).then(setWeekday)
-    fetch(dvcResolve('avg_weekend_month_grouped.json')).then(r => r.json()).then(setWeekend)
-  }, [])
+  const { data: allRows } = useQuery({
+    queryKey: ['monthly-by-station', url, dbConn === null],
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
+    queryFn: async () => {
+      if (!dbConn) return null
+      const { conn } = dbConn
+      const query = `
+        SELECT
+          station,
+          CAST(SUBSTR(month, 1, 4) AS INTEGER) as year,
+          CAST(SUBSTR(month, 6, 2) AS INTEGER) as cal_month,
+          "avg weekday" as avg_weekday,
+          "avg weekend" as avg_weekend
+        FROM parquet_scan('${url}')
+        ORDER BY year, cal_month, station
+      `
+      const table = await conn.query(query)
+      const n = table.numRows
+      const stationCol: string[] = Arr(table.getChild("station")!.toArray()) as any
+      const yearCol = Arr(table.getChild("year")!.toArray())
+      const calMonthCol = Arr(table.getChild("cal_month")!.toArray())
+      const weekdayCol = Arr(table.getChild("avg_weekday")!.toArray())
+      const weekendCol = Arr(table.getChild("avg_weekend")!.toArray())
+      const rows: MonthlyRow[] = []
+      for (let i = 0; i < n; i++) {
+        rows.push({
+          station: stationCol[i],
+          year: Number(yearCol[i]),
+          cal_month: Number(calMonthCol[i]),
+          avg_weekday: weekdayCol[i] as number,
+          avg_weekend: weekendCol[i] as number,
+        })
+      }
+      conn.close()
+      return rows
+    },
+  })
 
-  const spec = dayType === "weekday" ? weekday : weekend
+  const col = dayType === "weekday" ? "avg_weekday" as const : "avg_weekend" as const
+
+  const plotData = useMemo(() => {
+    if (!allRows) return null
+    const allStations = [...new Set(allRows.map(r => r.station))]
+    const activeStations = stations.length > 0 ? stations : allStations
+    const filtered = allRows.filter(r => activeStations.includes(r.station))
+
+    // Group by (year, cal_month) → sum
+    const sums = new Map<string, number>()
+    for (const r of filtered) {
+      const key = `${r.year}-${r.cal_month}`
+      sums.set(key, (sums.get(key) ?? 0) + r[col])
+    }
+
+    const years = [...new Set(filtered.map(r => r.year))].sort()
+    const minYear = Math.min(...years)
+    const maxYear = Math.max(...years)
+    const range = maxYear - minYear || 1
+
+    const data: Data[] = years.map(year => {
+      const ys = Array.from({ length: 12 }, (_, i) => sums.get(`${year}-${i + 1}`) ?? 0)
+      if (ys.every(v => v === 0)) return null
+      const t = 0.15 + 0.85 * (year - minYear) / range
+      const color = getColorAt(INFERNO, t)
+      return {
+        name: String(year),
+        type: "bar",
+        x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        y: ys,
+        marker: { color },
+        hovertemplate,
+      } as Data
+    }).filter((d): d is Data => d !== null)
+
+    return data
+  }, [allRows, stations, col])
+
   const traceNames = useMemo(
-    () => spec?.data.map(d => d.name).filter((n): n is string => !!n) ?? [],
-    [spec],
+    () => plotData?.map(d => d.name).filter((n): n is string => !!n) ?? [],
+    [plotData],
   )
   const containerRef = useRef<HTMLDivElement>(null)
   const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, traceNames)
-  const { soloTrace, activeTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
+  const { soloTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
   const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
-  const coloredData = useMemo(() => spec ? recolorTraces(spec.data) : null, [spec])
-  // When a trace is pinned (solo), ignore hover — keep highlight sticky
+
   const highlightTarget = soloTrace ?? hoverTrace
   const styledData = useMemo(
-    () => coloredData ? highlightTraces(coloredData, highlightTarget) : null,
-    [coloredData, highlightTarget],
+    () => plotData ? highlightTraces(plotData, highlightTarget) : null,
+    [plotData, highlightTarget],
   )
 
   const narrow = typeof window !== 'undefined' && window.innerWidth < 600
@@ -85,16 +149,20 @@ export default function MonthlyPlots() {
     ? { orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
     : {}
 
-  if (!spec || !styledData) {
+  const titleText = `Average ${dayType} rides, by month`
+
+  if (!styledData) {
     return <div className="plot-container">
-      <H2 id="monthly">Average rides, by month</H2>
+      <H2 id="monthly">{titleText}</H2>
+      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
       <Loading />
     </div>
   }
 
   return (
     <div className="plot-container">
-      <H2 id="monthly">{`Average ${dayType} rides, by month`}</H2>
+      <H2 id="monthly">{titleText}</H2>
+      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
       <div ref={containerRef}>
       <PltlyPlot
         plotly={Plotly}
@@ -111,13 +179,13 @@ export default function MonthlyPlots() {
           hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
           barmode: "group",
           xaxis: {
-            ...spec.layout.xaxis,
             fixedrange: true,
+            tickmode: "array" as const,
+            tickvals: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            ticktext: MONTH_LABELS,
           },
-          yaxis: {
-            fixedrange: true,
-          },
-          legend: { ...spec.layout.legend, ...legendBase, title: undefined, entrywidth: 60 } as Partial<Legend>,
+          yaxis: { fixedrange: true },
+          legend: { ...legendBase, entrywidth: 60 } as Partial<Legend>,
         }}
       />
       </div>
