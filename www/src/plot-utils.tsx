@@ -70,7 +70,7 @@ export function Plot(
   { id, title, subtitle, soloMode, ...props }: {
     id: string
     title: string
-    subtitle?: string
+    subtitle?: React.ReactNode
     soloMode?: 'fade' | 'hide'
   } & PlotExtraProps & ({
     data: Data[]

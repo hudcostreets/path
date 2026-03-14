@@ -93,6 +93,7 @@ export function StationDropdown({
   lineGroups,
   regionGroups,
   label = "Stations",
+  nameMap,
 }: {
   stations: string[]
   colors: Record<string, string>
@@ -102,7 +103,9 @@ export function StationDropdown({
   lineGroups?: StationGroup[]
   regionGroups?: StationGroup[]
   label?: string
+  nameMap?: Record<string, string>
 }) {
+  const displayName = (s: string) => nameMap?.[s] ?? s
   const [isOpen, setIsOpen] = useState(false)
   const detailsRef = useRef<HTMLDetailsElement>(null)
 
@@ -113,7 +116,7 @@ export function StationDropdown({
     : noneSelected
       ? `No ${label}`
       : selected.length === 1
-        ? selected[0]
+        ? displayName(selected[0])
         : `${selected.length} ${label}`
 
   const toggleAll = () => {
@@ -185,7 +188,7 @@ export function StationDropdown({
           {stations.map(station => (
             <StationRow
               key={station}
-              station={station}
+              station={displayName(station)}
               color={colors[station]}
               checked={selected.includes(station)}
               onToggle={() => toggleStation(station)}

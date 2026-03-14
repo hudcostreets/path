@@ -1,4 +1,3 @@
-import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { Arr } from "@rdub/base/arr"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
@@ -7,12 +6,8 @@ import { Data, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
-import { useUrlState, codeParam } from "use-prms"
 import { H2, Loading, dark, hovertemplate, url } from "./plot-utils"
 
-type DayType = "weekday" | "weekend"
-
-const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
 const height = 450
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -23,6 +18,10 @@ type MonthlyRow = {
   cal_month: number
   avg_weekday: number
   avg_weekend: number
+  avg_holiday: number
+  total_weekday: number
+  total_weekend: number
+  total_holiday: number
 }
 
 function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
@@ -47,12 +46,13 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   })
 }
 
-export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }: {
+export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subtitle, onActiveYearChange }: {
   stations: string[]
+  dayTypes: string[]
+  metric?: "avg" | "total"
   subtitle: string
   onActiveYearChange?: (year: string | null) => void
 }) {
-  const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
   const dbConn = useDb()
 
   const { data: allRows } = useQuery({
@@ -68,7 +68,11 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
           CAST(SUBSTR(month, 1, 4) AS INTEGER) as year,
           CAST(SUBSTR(month, 6, 2) AS INTEGER) as cal_month,
           "avg weekday" as avg_weekday,
-          "avg weekend" as avg_weekend
+          "avg weekend" as avg_weekend,
+          "avg holiday" as avg_holiday,
+          "total weekday" as total_weekday,
+          "total weekend" as total_weekend,
+          "total holiday" as total_holiday
         FROM parquet_scan('${url}')
         ORDER BY year, cal_month, station
       `
@@ -77,16 +81,24 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
       const stationCol: string[] = Arr(table.getChild("station")!.toArray()) as any
       const yearCol = Arr(table.getChild("year")!.toArray())
       const calMonthCol = Arr(table.getChild("cal_month")!.toArray())
-      const weekdayCol = Arr(table.getChild("avg_weekday")!.toArray())
-      const weekendCol = Arr(table.getChild("avg_weekend")!.toArray())
+      const avgWeekdayCol = Arr(table.getChild("avg_weekday")!.toArray())
+      const avgWeekendCol = Arr(table.getChild("avg_weekend")!.toArray())
+      const avgHolidayCol = Arr(table.getChild("avg_holiday")!.toArray())
+      const totalWeekdayCol = Arr(table.getChild("total_weekday")!.toArray())
+      const totalWeekendCol = Arr(table.getChild("total_weekend")!.toArray())
+      const totalHolidayCol = Arr(table.getChild("total_holiday")!.toArray())
       const rows: MonthlyRow[] = []
       for (let i = 0; i < n; i++) {
         rows.push({
           station: stationCol[i],
           year: Number(yearCol[i]),
           cal_month: Number(calMonthCol[i]),
-          avg_weekday: weekdayCol[i] as number,
-          avg_weekend: weekendCol[i] as number,
+          avg_weekday: (avgWeekdayCol[i] as number) || 0,
+          avg_weekend: (avgWeekendCol[i] as number) || 0,
+          avg_holiday: (avgHolidayCol[i] as number) || 0,
+          total_weekday: (totalWeekdayCol[i] as number) || 0,
+          total_weekend: (totalWeekendCol[i] as number) || 0,
+          total_holiday: (totalHolidayCol[i] as number) || 0,
         })
       }
       conn.close()
@@ -94,19 +106,21 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
     },
   })
 
-  const col = dayType === "weekday" ? "avg_weekday" as const : "avg_weekend" as const
-
   const plotData = useMemo(() => {
     if (!allRows) return null
     const allStations = [...new Set(allRows.map(r => r.station))]
     const activeStations = stations.length > 0 ? stations : allStations
     const filtered = allRows.filter(r => activeStations.includes(r.station))
 
-    // Group by (year, cal_month) → sum
+    // Sum across selected day types for each (year, cal_month)
     const sums = new Map<string, number>()
     for (const r of filtered) {
       const key = `${r.year}-${r.cal_month}`
-      sums.set(key, (sums.get(key) ?? 0) + r[col])
+      let val = 0
+      for (const dt of dayTypes) {
+        val += r[`${metric}_${dt}` as keyof MonthlyRow] as number
+      }
+      sums.set(key, (sums.get(key) ?? 0) + val)
     }
 
     const years = [...new Set(filtered.map(r => r.year))].sort()
@@ -130,7 +144,7 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
     }).filter((d): d is Data => d !== null)
 
     return data
-  }, [allRows, stations, col])
+  }, [allRows, stations, dayTypes, metric])
 
   const traceNames = useMemo(
     () => plotData?.map(d => d.name).filter((n): n is string => !!n) ?? [],
@@ -158,12 +172,23 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
     ? { orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
     : {}
 
-  const titleText = `Average ${dayType} rides, by month`
+  const DAY_TYPE_NAMES: Record<string, string> = { weekday: "Weekday", weekend: "Weekend", holiday: "Holiday" }
+  const allDayTypes = dayTypes.length >= 3
+  const excluded = ["weekday", "weekend", "holiday"].filter(dt => !dayTypes.includes(dt))
+  const included = dayTypes.map(dt => DAY_TYPE_NAMES[dt] ?? dt).join(" + ")
+  const dayTypeSubtitle = allDayTypes
+    ? ""
+    : excluded.length === 1
+      ? `${included} (excl. ${(DAY_TYPE_NAMES[excluded[0]] ?? excluded[0]).toLowerCase()})`
+      : included
+  const titleText = metric === "avg" ? "Avg daily rides by month" : "Rides by month"
+
+  const fullSubtitle = [subtitle, dayTypeSubtitle].filter(Boolean).join(" · ")
 
   if (!styledData) {
     return <div className="plot-container">
       <H2 id="monthly">{titleText}</H2>
-      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
+      {fullSubtitle && <div className="plot-subtitle">{fullSubtitle}</div>}
       <Loading />
     </div>
   }
@@ -171,7 +196,7 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
   return (
     <div className="plot-container">
       <H2 id="monthly">{titleText}</H2>
-      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
+      {fullSubtitle && <div className="plot-subtitle">{fullSubtitle}</div>}
       <div ref={containerRef}>
       <PltlyPlot
         plotly={Plotly}
@@ -197,17 +222,6 @@ export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }:
           legend: { ...legendBase, entrywidth: 60 } as Partial<Legend>,
         }}
       />
-      </div>
-      <div className="plot-toggles">
-        <ToggleButtonGroup
-          value={dayType}
-          exclusive
-          size="small"
-          onChange={(_, v) => { if (v) setDayType(v) }}
-        >
-          <ToggleButton value="weekday">Weekday</ToggleButton>
-          <ToggleButton value="weekend">Weekend</ToggleButton>
-        </ToggleButtonGroup>
       </div>
     </div>
   )
