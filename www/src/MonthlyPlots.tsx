@@ -2,7 +2,7 @@ import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { Arr } from "@rdub/base/arr"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { useCallback, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { Data, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
@@ -47,7 +47,11 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   })
 }
 
-export default function MonthlyPlots({ stations, subtitle }: { stations: string[], subtitle: string }) {
+export default function MonthlyPlots({ stations, subtitle, onActiveYearChange }: {
+  stations: string[]
+  subtitle: string
+  onActiveYearChange?: (year: string | null) => void
+}) {
   const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
   const dbConn = useDb()
 
@@ -138,6 +142,11 @@ export default function MonthlyPlots({ stations, subtitle }: { stations: string[
   const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
 
   const highlightTarget = soloTrace ?? hoverTrace
+
+  useEffect(() => {
+    onActiveYearChange?.(highlightTarget)
+  }, [highlightTarget, onActiveYearChange])
+
   const styledData = useMemo(
     () => plotData ? highlightTraces(plotData, highlightTarget) : null,
     [plotData, highlightTarget],

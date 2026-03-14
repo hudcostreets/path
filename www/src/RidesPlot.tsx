@@ -151,10 +151,7 @@ type StationData = {
 type ProcessedData = {
   stations: Map<string, StationData>
   aggregate: StationData
-  pcts2019: { week: number, wknd: number }[]
   idxs2019: number[]
-  monthsFrom2020: Date[]
-  pcts2019From2020: { week: number, wknd: number }[]
 }
 
 function processData(rows: { month: string, station: string, avg_weekday: number, avg_weekend: number }[]): ProcessedData {
@@ -206,30 +203,16 @@ function processData(rows: { month: string, station: string, avg_weekday: number
     })
   }
 
-  // Compute vs-2019 percentages
+  // Find 2019 month indices for vs-2019 computation
   const idxs2019 = months
     .map((m, idx) => [m, idx] as [Date, number])
     .filter(([m]) => m.getFullYear() === 2019)
     .map(([, idx]) => idx)
 
-  const pcts2019 = months.map((m, idx) => {
-    const mo = m.getMonth()
-    const week = aggWeekday[idx] / aggWeekday[idxs2019[mo]]
-    const wknd = aggWeekend[idx] / aggWeekend[idxs2019[mo]]
-    return { week, wknd }
-  })
-
-  const idx2020 = idxs2019[11] + 1
-  const monthsFrom2020 = months.slice(idx2020)
-  const pcts2019From2020 = pcts2019.slice(idx2020)
-
   return {
     stations,
     aggregate: { months, weekday: aggWeekday, weekend: aggWeekend },
-    pcts2019,
     idxs2019,
-    monthsFrom2020,
-    pcts2019From2020,
   }
 }
 
@@ -263,7 +246,10 @@ export function stationSubtitle(stations: string[]): string {
   return stations.map(s => STATION_ABBREVS[s] ?? s).join(", ")
 }
 
-export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveStationsChange?: (stations: string[]) => void } = {}) {
+export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
+  onEffectiveStationsChange?: (stations: string[]) => void
+  activeYear?: string | null
+} = {}) {
   const [mode, setMode] = useUrlState<Mode>("m", modeParam)
   const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
@@ -436,13 +422,32 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
 
   const plotProps = useMemo(() => {
     if (!processed) return {}
-    const { aggregate, stations, pcts2019From2020, monthsFrom2020 } = processed
+    const { aggregate, stations, idxs2019 } = processed
     const { months, weekday: aggWeekday, weekend: aggWeekend } = aggregate
     const n = months.length
 
     if (isVs2019) {
-      // vs. 2019 percentage lines
-      const lastPcts = pcts2019From2020[pcts2019From2020.length - 1]
+      // vs. 2019 percentage lines — computed for selected stations (or all if none selected)
+      const activeStns = selectedStations.length > 0 ? selectedStations : [...STATIONS]
+      const sumForStations = (col: "weekday" | "weekend", idx: number): number => {
+        let sum = 0
+        for (const s of activeStns) {
+          const sd = stations.get(s)
+          if (sd) sum += sd[col][idx]
+        }
+        return sum
+      }
+      const idx2020 = idxs2019[11] + 1
+      const vs2019Months = months.slice(idx2020)
+      const vs2019Pcts = months.slice(idx2020).map((m, i) => {
+        const idx = idx2020 + i
+        const mo = m.getMonth()
+        const base2019 = idxs2019[mo]
+        const week = sumForStations("weekday", idx) / sumForStations("weekday", base2019)
+        const wknd = sumForStations("weekend", idx) / sumForStations("weekend", base2019)
+        return { week, wknd }
+      })
+      const lastPcts = vs2019Pcts[vs2019Pcts.length - 1]
       let lastMoStr = months[n - 1].toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       lastMoStr = `${lastMoStr.substring(0, lastMoStr.length - 2)}'${lastMoStr.substring(lastMoStr.length - 2)}`
       const axo = 5, ayo = .15
@@ -450,15 +455,15 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
         data: [
           {
             name: "Avg Weekday (% of 2019)",
-            x: monthsFrom2020,
-            y: pcts2019From2020.map(p => p.week),
+            x: vs2019Months,
+            y: vs2019Pcts.map(p => p.week),
             line: { color: '#ef4444' },
             hovertemplate: hovertemplatePct,
           },
           {
             name: "Avg Weekend (% of 2019)",
-            x: monthsFrom2020,
-            y: pcts2019From2020.map(p => p.wknd),
+            x: vs2019Months,
+            y: vs2019Pcts.map(p => p.wknd),
             line: { color: '#3b82f6' },
             hovertemplate: hovertemplatePct,
           },
@@ -468,7 +473,7 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
             dtick: window.innerWidth < 600 ? "M6" : "M3",
             tickformat: "%b '%y",
             tickangle: -45,
-            range: [monthsFrom2020[0], monthsFrom2020[monthsFrom2020.length - 1]],
+            range: [vs2019Months[0], vs2019Months[vs2019Months.length - 1]],
           },
           yaxis: {
             dtick: 0.1,
@@ -510,6 +515,7 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
       const col = dayType === "weekday" ? "weekday" : "weekend"
 
       // Build bar traces, applying solo/hover state manually
+      const yearNum = activeYear && !activeTrace ? parseInt(activeYear) : null
       const barData: Data[] = selectedStations.map(station => {
         const sd = stations.get(station)
         if (!sd) return null
@@ -518,12 +524,19 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
         const isHidden = isSoloMode && activeTrace !== null && !isActive
         // Highlight mode: hover/click fades other traces
         const isFaded = !isHidden && !isSoloMode && activeTrace !== null && !isActive
+        // Year highlight from plot2 legend: per-point opacity
+        const yearOpacity = yearNum
+          ? sd.months.map(m => m.getFullYear() === yearNum ? 1 : 0.15)
+          : undefined
         return {
           name: station,
           type: "bar",
           x: sd.months,
           y: sd[col],
-          marker: { color: STATION_COLORS[station] },
+          marker: {
+            color: STATION_COLORS[station],
+            ...(yearOpacity ? { opacity: yearOpacity } : {}),
+          },
           hovertemplate,
           ...(isHidden ? { visible: 'legendonly' as const } : {}),
           ...(isFaded ? { opacity: 0.4 } : {}),
@@ -629,7 +642,7 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
         ],
       } as Partial<Layout>,
     }
-  }, [processed, mode, dayType, timeRange, selectedStations, showStationBars, isVs2019, soloTrace, hoverTrace, legendMode])
+  }, [processed, mode, dayType, timeRange, selectedStations, showStationBars, isVs2019, soloTrace, hoverTrace, legendMode, activeYear])
 
   const title = isVs2019
     ? "Avg PATH rides per day (vs. 2019)"
@@ -702,7 +715,6 @@ export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveSt
           colors={STATION_COLORS}
           selected={effectiveStations}
           onChange={handlePickerChange}
-          disabled={isVs2019}
           lineGroups={LINE_GROUPS}
           regionGroups={REGION_GROUPS}
         />
