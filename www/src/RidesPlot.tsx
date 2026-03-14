@@ -4,12 +4,13 @@ import { Arr } from "@rdub/base/arr"
 import { round } from "@rdub/base/math"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { Float64, Utf8 } from 'apache-arrow'
 import { Data, Layout, Legend } from "plotly.js"
 import { useActions } from "use-kbd"
-import { useUrlState, codeParam, codesParam } from "use-prms"
-import { Plot, ann, hovertemplate, hovertemplatePct, url } from "./plot-utils"
+import { Param, useUrlState, codeParam } from "use-prms"
+import { useLegendHover, useSoloTrace } from "pltly/react"
+import { Plot, ann, dark, hovertemplate, hovertemplatePct, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 
 type Row = {
@@ -78,28 +79,68 @@ const REGION_GROUPS: StationGroup[] = [
 type DayType = "weekday" | "weekend"
 type Mode = "rides" | "vs2019"
 type TimeRange = "all" | "recent"
+type LegendMode = "solo" | "highlight"
 
 const modeParam = codeParam<Mode>("rides", { rides: "r", vs2019: "v" })
 const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
 const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "p" })
-const stationsParam = codesParam<string>(
-  [...STATIONS],
-  {
-    "Christopher Street": "c",
-    "9th Street": "9",
-    "14th Street": "1",
-    "23rd Street": "2",
-    "33rd Street": "3",
-    "WTC": "w",
-    "Newark": "n",
-    "Harrison": "h",
-    "Journal Square": "j",
-    "Grove Street": "g",
-    "Exchange Place": "x",
-    "Newport": "p",
-    "Hoboken": "o",
-  },
+const legendModeParam = codeParam<LegendMode>("solo", { solo: "s", highlight: "h" })
+const STATION_ABBREVS: Record<string, string> = {
+  "Christopher Street": "CHR",
+  "9th Street": "9TH",
+  "14th Street": "14TH",
+  "23rd Street": "23RD",
+  "33rd Street": "33RD",
+  "WTC": "WTC",
+  "Newark": "NWK",
+  "Harrison": "HAR",
+  "Journal Square": "JSQ",
+  "Grove Street": "GRO",
+  "Exchange Place": "EXP",
+  "Newport": "NPT",
+  "Hoboken": "HOB",
+}
+
+const STATION_CODES: Record<string, string> = {
+  "Christopher Street": "c",
+  "9th Street": "9",
+  "14th Street": "1",
+  "23rd Street": "2",
+  "33rd Street": "3",
+  "WTC": "w",
+  "Newark": "n",
+  "Harrison": "h",
+  "Journal Square": "j",
+  "Grove Street": "g",
+  "Exchange Place": "x",
+  "Newport": "p",
+  "Hoboken": "o",
+}
+const CODE_TO_STATION: Record<string, string> = Object.fromEntries(
+  Object.entries(STATION_CODES).map(([k, v]) => [v, k])
 )
+
+// Custom param with `-` complement mode: `-abc` means "all except a, b, c"
+// Max URL length: 7 chars (for 7 of 13 stations) vs 12 without complement
+const stationsParam: Param<string[]> = {
+  encode(stations: string[]): string | undefined {
+    if (stations.length >= STATIONS.length) return undefined
+    if (stations.length === 0) return ''
+    const included = stations.map(s => STATION_CODES[s] ?? '').join('')
+    const excluded = STATIONS.filter(s => !stations.includes(s)).map(s => STATION_CODES[s]).join('')
+    if (excluded.length + 1 < included.length) return `-${excluded}`
+    return included
+  },
+  decode(encoded: string | undefined): string[] {
+    if (encoded === undefined) return [...STATIONS]
+    if (encoded === '') return []
+    if (encoded.startsWith('-')) {
+      const excludedCodes = new Set(encoded.slice(1).split(''))
+      return STATIONS.filter(s => !excludedCodes.has(STATION_CODES[s]))
+    }
+    return encoded.split('').map(c => CODE_TO_STATION[c]).filter(Boolean)
+  },
+}
 
 type StationData = {
   months: Date[]
@@ -192,11 +233,42 @@ function processData(rows: { month: string, station: string, avg_weekday: number
   }
 }
 
-export default function RidesPlot() {
+/** Blend a hex color toward white (dark mode) or black (light mode) by `t` (0–1). */
+function blendAvgColor(hexColor: string, t = 0.5): string {
+  const base = dark ? [255, 255, 255] : [0, 0, 0]
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const mr = Math.round(r + (base[0] - r) * t)
+  const mg = Math.round(g + (base[1] - g) * t)
+  const mb = Math.round(b + (base[2] - b) * t)
+  return `rgb(${mr},${mg},${mb})`
+}
+
+function rollingAvg(values: number[], window: number): (number | null)[] {
+  return values.map((_, i) => {
+    if (i < window - 1) return null
+    let sum = 0
+    for (let j = i - window + 1; j <= i; j++) sum += values[j]
+    return sum / window
+  })
+}
+
+const NUM_STATIONS = STATIONS.length
+
+export function stationSubtitle(stations: string[]): string {
+  if (stations.length === 0 || stations.length >= NUM_STATIONS) return ""
+  if (stations.length === 1) return stations[0]
+  return stations.map(s => STATION_ABBREVS[s] ?? s).join(", ")
+}
+
+export default function RidesPlot({ onEffectiveStationsChange }: { onEffectiveStationsChange?: (stations: string[]) => void } = {}) {
   const [mode, setMode] = useUrlState<Mode>("m", modeParam)
   const [dayType, setDayType] = useUrlState<DayType>("d", dayTypeParam)
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
   const [selectedStations, setSelectedStations] = useUrlState<string[]>("s", stationsParam)
+  const [legendMode, setLegendMode] = useUrlState<LegendMode>("l", legendModeParam)
   const dbConn = useDb()
 
   const selectGroup = useCallback((group: readonly string[]) => {
@@ -332,6 +404,36 @@ export default function RidesPlot() {
   const showStationBars = mode === "rides" && selectedStations.length > 0
   const isVs2019 = mode === "vs2019"
 
+  // External legend management for stacked bars (to know solo state for 12mo avg)
+  const barTraceNames = useMemo(
+    () => showStationBars ? selectedStations.filter(s => processed?.stations.has(s)) : [],
+    [showStationBars, selectedStations, processed],
+  )
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, barTraceNames)
+  const { soloTrace, onLegendClick, onLegendDoubleClick, resetSolo } = useSoloTrace(barTraceNames, hoverTrace)
+  const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
+
+  // In solo mode, legend hover/click → transient active trace
+  const activeTrace = soloTrace ?? hoverTrace ?? null
+  // Effective stations: transient solo/hover narrows to one station, otherwise base selection
+  const isSoloMode = legendMode === "solo"
+  const effectiveStations = useMemo(
+    () => activeTrace ? [activeTrace] : selectedStations,
+    [activeTrace, selectedStations],
+  )
+  // Picker shows effective state; user changes go to base + clear solo
+  const handlePickerChange = useCallback((stations: string[]) => {
+    setSelectedStations(stations)
+    resetSolo()
+  }, [setSelectedStations, resetSolo])
+
+  useEffect(() => {
+    onEffectiveStationsChange?.(effectiveStations)
+  }, [effectiveStations, onEffectiveStationsChange])
+
+  const subtitle = stationSubtitle(effectiveStations)
+
   const plotProps = useMemo(() => {
     if (!processed) return {}
     const { aggregate, stations, pcts2019From2020, monthsFrom2020 } = processed
@@ -406,9 +508,16 @@ export default function RidesPlot() {
       // Stacked bar chart by station
       const isRecent = timeRange === "recent"
       const col = dayType === "weekday" ? "weekday" : "weekend"
-      const data: Data[] = selectedStations.map(station => {
+
+      // Build bar traces, applying solo/hover state manually
+      const barData: Data[] = selectedStations.map(station => {
         const sd = stations.get(station)
         if (!sd) return null
+        const isActive = station === activeTrace
+        // Solo mode: both hover and click hide other traces
+        const isHidden = isSoloMode && activeTrace !== null && !isActive
+        // Highlight mode: hover/click fades other traces
+        const isFaded = !isHidden && !isSoloMode && activeTrace !== null && !isActive
         return {
           name: station,
           type: "bar",
@@ -416,12 +525,43 @@ export default function RidesPlot() {
           y: sd[col],
           marker: { color: STATION_COLORS[station] },
           hovertemplate,
+          ...(isHidden ? { visible: 'legendonly' as const } : {}),
+          ...(isFaded ? { opacity: 0.4 } : {}),
         } as Data
       }).filter((d): d is Data => d !== null)
+
+      // 12mo rolling average: active trace (hover or click) in solo mode, or sum of all selected
+      const avgStation = isSoloMode ? activeTrace : null
+      const avgSource = avgStation
+        ? stations.get(avgStation)?.[col] ?? []
+        : months.map((_, i) => {
+            let sum = 0
+            for (const station of selectedStations) {
+              const sd = stations.get(station)
+              if (sd) sum += sd[col][i]
+            }
+            return sum
+          })
+      const avg12 = rollingAvg(avgSource, 12)
+      const avgColor = avgStation
+        ? blendAvgColor(STATION_COLORS[avgStation], 0.5)
+        : (dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
+      const avgTrace: Data = {
+        name: "12mo avg",
+        x: months,
+        y: avg12,
+        type: "scatter",
+        mode: "lines",
+        line: { color: avgColor, width: 4 },
+        hovertemplate,
+        showlegend: false,
+        connectgaps: false,
+      }
+
       const allTimeRange = ['2011-12-17', '2025-12-17']
       const recentRange = ['2019-12-17', '2025-12-17']
       return {
-        data,
+        data: [...barData, avgTrace],
         layout: {
           barmode: "relative",
           xaxis: {
@@ -489,7 +629,7 @@ export default function RidesPlot() {
         ],
       } as Partial<Layout>,
     }
-  }, [processed, mode, dayType, timeRange, selectedStations, showStationBars, isVs2019])
+  }, [processed, mode, dayType, timeRange, selectedStations, showStationBars, isVs2019, soloTrace, hoverTrace, legendMode])
 
   const title = isVs2019
     ? "Avg PATH rides per day (vs. 2019)"
@@ -498,12 +638,20 @@ export default function RidesPlot() {
       : "Avg PATH rides per day"
 
   return (
-    <div className="plot-container">
+    <div className="plot-container" ref={containerRef}>
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
       <Plot
         id="rides"
         title={title}
-        soloMode={showStationBars ? "hide" : undefined}
+        subtitle={subtitle}
+        {...(showStationBars ? {
+          disableLegendHover: true,
+          disableSoloTrace: true,
+          onLegendClick: onLegendClick as () => boolean,
+          onLegendDoubleClick: onLegendDoubleClick as () => boolean,
+          onAfterPlot: attachLegend,
+          traceNames: barTraceNames,
+        } : {})}
         {...plotProps}
       />
       <div className="plot-toggles">
@@ -538,11 +686,22 @@ export default function RidesPlot() {
             <ToggleButton value="recent">2020–Present</ToggleButton>
           </ToggleButtonGroup>
         )}
+        {showStationBars && (
+          <ToggleButtonGroup
+            value={legendMode}
+            exclusive
+            size="small"
+            onChange={(_, v) => { if (v) setLegendMode(v) }}
+          >
+            <ToggleButton value="solo">Solo</ToggleButton>
+            <ToggleButton value="highlight">Highlight</ToggleButton>
+          </ToggleButtonGroup>
+        )}
         <StationDropdown
           stations={[...STATIONS]}
           colors={STATION_COLORS}
-          selected={selectedStations}
-          onChange={setSelectedStations}
+          selected={effectiveStations}
+          onChange={handlePickerChange}
           disabled={isVs2019}
           lineGroups={LINE_GROUPS}
           regionGroups={REGION_GROUPS}
@@ -556,6 +715,7 @@ export default function RidesPlot() {
             <summary>Plot data</summary>
             <ReactJsonView
               src={processed}
+              theme={dark ? "monokai" : "rjv-default"}
               displayDataTypes={false}
               displayArrayKey={true}
               name={false}
