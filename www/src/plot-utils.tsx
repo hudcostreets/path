@@ -31,6 +31,28 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
 
 export const { H2 } = Headings({ className: "heading" })
 
+/** Blend a hex color toward white (dark mode) or black (light mode) by `t` (0–1). */
+export function blendAvgColor(hexColor: string, t = 0.5): string {
+  const base = dark ? [255, 255, 255] : [0, 0, 0]
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const mr = Math.round(r + (base[0] - r) * t)
+  const mg = Math.round(g + (base[1] - g) * t)
+  const mb = Math.round(b + (base[2] - b) * t)
+  return `rgb(${mr},${mg},${mb})`
+}
+
+export function rollingAvg(values: number[], window: number): (number | null)[] {
+  return values.map((_, i) => {
+    if (i < window - 1) return null
+    let sum = 0
+    for (let j = i - window + 1; j <= i; j++) sum += values[j]
+    return sum / window
+  })
+}
+
 export function Loading({ height = DefaultHeight }: { height?: number }) {
   return <div className={"loading"} style={{ height }}>Loading...</div>
 }
@@ -56,7 +78,7 @@ export function Plot(
   } | {})
 ) {
   const h2 = <H2 id={id}>{title}</H2>
-  const sub = subtitle ? <div className="plot-subtitle">{subtitle}</div> : null
+  const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
   const narrow = window.innerWidth < 600
   const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
   if (!('data' in props)) {

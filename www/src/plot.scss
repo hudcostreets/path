@@ -1,6 +1,10 @@
 .plot-container {
   width: 100%;
 }
+// Prevent Plotly's hover tooltip from blocking mouse events on bars
+.js-plotly-plot .hoverlayer {
+  pointer-events: none !important;
+}
 .plot-subtitle {
   font-size: 0.85rem;
   color: #999;

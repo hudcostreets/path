@@ -1,15 +1,16 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
-import { useCallback, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Data, Layout, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam, codesParam } from "use-prms"
-import { Plot, H2, Loading, dark, hovertemplate, hovertemplatePct } from "./plot-utils"
+import { Plot, H2, Loading, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import type { StationGroup } from "./RidesPlot"
+import { useTraceLegend } from "./useTraceLegend"
 
 // --- Constants ---
 
@@ -41,6 +42,10 @@ const CROSSING_ABBREV: Record<string, string> = {
   "Bayonne Bridge": "Bayonne",
 }
 
+const ABBREV_TO_CROSSING: Record<string, string> = Object.fromEntries(
+  Object.entries(CROSSING_ABBREV).map(([k, v]) => [v, k])
+)
+
 const HUDSON_CROSSINGS = ["Holland Tunnel", "Lincoln Tunnel", "George Washington Bridge"] as const
 const SI_CROSSINGS = ["Bayonne Bridge", "Outerbridge Crossing", "Goethals Bridge"] as const
 
@@ -59,9 +64,29 @@ const VEHICLE_TYPE_COLORS: Record<string, string> = {
 }
 
 const VEHICLE_TYPE_ABBREV: Record<string, string> = {
-  "Automobiles": "Auto",
-  "Buses": "Bus",
-  "Trucks": "Truck",
+  "Automobiles": "Autos",
+  "Buses": "Buses",
+  "Trucks": "Trucks",
+}
+
+const ABBREV_TO_TYPE: Record<string, string> = Object.fromEntries(
+  Object.entries(VEHICLE_TYPE_ABBREV).map(([k, v]) => [v, k])
+)
+
+// --- Subtitle helper ---
+
+function btCrossingSubtitle(crossings: string[]): string {
+  if (crossings.length > 0 && crossings.length < CROSSINGS.length) {
+    return crossings.map(c => CROSSING_ABBREV[c] ?? c).join(", ")
+  }
+  return ""
+}
+
+function btTypeSuffix(types: string[]): string {
+  if (types.length > 0 && types.length < VEHICLE_TYPES.length) {
+    return types.map(t => VEHICLE_TYPE_ABBREV[t] ?? t).join(", ")
+  }
+  return ""
 }
 
 // --- URL params ---
@@ -69,10 +94,11 @@ const VEHICLE_TYPE_ABBREV: Record<string, string> = {
 type Mode = "traffic" | "vs2019" | "ezpass"
 type StackBy = "crossing" | "vehicle"
 type TimeRange = "all" | "recent"
-
+type LegendMode = "solo" | "highlight"
 const modeParam = codeParam<Mode>("traffic", { traffic: "t", vs2019: "v", ezpass: "e" })
 const stackByParam = codeParam<StackBy>("crossing", { crossing: "c", vehicle: "v" })
 const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "r" })
+const legendModeParam = codeParam<LegendMode>("solo", { solo: "s", highlight: "h" })
 
 const crossingsParam = codesParam<string>(
   [...CROSSINGS],
@@ -182,11 +208,11 @@ function filterRows(rows: TrafficRow[], crossings: string[], types: string[]): T
   return rows.filter(r => crossings.includes(r.crossing) && types.includes(r.type))
 }
 
+
 // --- Trace builders ---
 
 function buildStackedByCrossing(rows: TrafficRow[], crossings: string[], types: string[]): Data[] {
   const filtered = filterRows(rows, crossings, types)
-  // Sum across selected vehicle types per crossing per month
   const crossingData = new Map<string, Map<string, number>>()
   for (const row of filtered) {
     let monthMap = crossingData.get(row.crossing)
@@ -222,7 +248,6 @@ function buildStackedByCrossing(rows: TrafficRow[], crossings: string[], types: 
 
 function buildStackedByVehicle(rows: TrafficRow[], crossings: string[], types: string[]): Data[] {
   const filtered = filterRows(rows, crossings, types)
-  // Sum across selected crossings per vehicle type per month
   const typeData = new Map<string, Map<string, number>>()
   for (const row of filtered) {
     let monthMap = typeData.get(row.type)
@@ -260,7 +285,6 @@ function buildVs2019Traces(rows: TrafficRow[], crossings: string[], types: strin
   const filtered = filterRows(rows, crossings, types)
 
   if (stackBy === "vehicle") {
-    // Per vehicle type vs-2019
     return buildVs2019ByDimension(
       filtered,
       VEHICLE_TYPES.filter(t => types.includes(t)),
@@ -269,7 +293,6 @@ function buildVs2019Traces(rows: TrafficRow[], crossings: string[], types: strin
       VEHICLE_TYPE_COLORS,
     )
   }
-  // Per crossing vs-2019
   return buildVs2019ByDimension(
     filtered,
     CROSSINGS.filter(c => crossings.includes(c)),
@@ -286,7 +309,6 @@ function buildVs2019ByDimension(
   abbrev: Record<string, string>,
   colors: Record<string, string>,
 ): Data[] {
-  // Build baseline: sum across other dimensions per dim per month
   const baseline = new Map<string, Map<string, number>>()
   for (const row of rows) {
     if (row.year !== 2019) continue
@@ -299,7 +321,6 @@ function buildVs2019ByDimension(
     monthMap.set(row.month, (monthMap.get(row.month) ?? 0) + row.count)
   }
 
-  // Build per-dim data
   const dimData = new Map<string, Map<string, number>>()
   for (const row of rows) {
     if (row.year < 2020) continue
@@ -388,22 +409,100 @@ function buildEZPassTraces(rows: EZPassRow[], crossings: string[]): Data[] {
 // --- Main traffic plot ---
 
 function TrafficPlot({
+  allRows,
   selectedCrossings, setSelectedCrossings,
   selectedTypes, setSelectedTypes,
+  activeYear,
+  subtitle,
+  typeSuffix,
+  onEffectiveChange,
 }: {
-  selectedCrossings: string[], setSelectedCrossings: (v: string[]) => void,
-  selectedTypes: string[], setSelectedTypes: (v: string[]) => void,
+  allRows: TrafficRow[] | null | undefined
+  selectedCrossings: string[], setSelectedCrossings: (v: string[]) => void
+  selectedTypes: string[], setSelectedTypes: (v: string[]) => void
+  activeYear: string | null
+  subtitle: string
+  typeSuffix: string
+  onEffectiveChange?: (eff: { crossings: string[], types: string[] }) => void
 }) {
   const [mode, setMode] = useUrlState<Mode>("m", modeParam)
   const [stackBy, setStackBy] = useUrlState<StackBy>("g", stackByParam)
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
-  const { data: allRows } = useAllTrafficData()
+  const [legendMode, setLegendMode] = useUrlState<LegendMode>("l", legendModeParam)
   const { data: ezpassRows } = useEZPassData()
 
   const isEZPass = mode === "ezpass"
   const isVs2019 = mode === "vs2019"
+  const isTraffic = mode === "traffic"
+
+  // Unified legend: click → URL state, hover → transient highlight
+  // Hook manages whichever dimension is currently stacked by
+  const stackedItems = useMemo(
+    () => (stackBy === "crossing" ? [...CROSSINGS] : [...VEHICLE_TYPES]) as string[],
+    [stackBy],
+  )
+  const stackedNameMap = useMemo(
+    () => stackBy === "crossing" ? CROSSING_ABBREV : VEHICLE_TYPE_ABBREV,
+    [stackBy],
+  )
+  const stackedSelected = stackBy === "crossing" ? selectedCrossings : selectedTypes
+  const setStackedSelected = stackBy === "crossing" ? setSelectedCrossings : setSelectedTypes
+
+  // Picker snapshot: last selection set via picker (not LI clicks)
+  const pickerSnapshotRef = useRef<string[]>([...stackedItems])
+  const onPickerChange = useCallback((items: string[]) => {
+    pickerSnapshotRef.current = items
+    setStackedSelected(items)
+  }, [setStackedSelected])
+
+  const legend = useTraceLegend(stackedItems, stackedSelected, setStackedSelected, stackedNameMap, pickerSnapshotRef.current)
+
+  // Debounced hover → URL sync: hover updates URL after delay, revert on hover-end
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const isHoverActiveRef = useRef(false)
+  useEffect(() => {
+    clearTimeout(hoverTimerRef.current)
+    if (legend.hoveredItem) {
+      isHoverActiveRef.current = true
+      hoverTimerRef.current = setTimeout(() => {
+        setStackedSelected([legend.hoveredItem!])
+      }, 300)
+    } else if (isHoverActiveRef.current) {
+      isHoverActiveRef.current = false
+      hoverTimerRef.current = setTimeout(() => {
+        setStackedSelected([...pickerSnapshotRef.current])
+      }, 300)
+    }
+  }, [legend.hoveredItem, setStackedSelected])
+
+  // Wrap legend click to cancel hover revert
+  const onLegendClick = useCallback((event: unknown) => {
+    isHoverActiveRef.current = false
+    clearTimeout(hoverTimerRef.current)
+    return legend.onLegendClick(event)
+  }, [legend.onLegendClick])
+
+  // Effective selection: hover-inclusive for immediate downstream updates
   const activeCrossings = selectedCrossings.length > 0 ? selectedCrossings : [...CROSSINGS]
   const activeTypes = selectedTypes.length > 0 ? selectedTypes : [...VEHICLE_TYPES]
+
+  const effectiveCrossings = useMemo(() => {
+    if (stackBy === "crossing" && legend.hoveredItem) return [legend.hoveredItem]
+    return stackBy === "crossing"
+      ? (legend.isAllSelected ? [...CROSSINGS] as string[] : selectedCrossings)
+      : activeCrossings
+  }, [stackBy, legend.hoveredItem, legend.isAllSelected, selectedCrossings, activeCrossings])
+
+  const effectiveTypes = useMemo(() => {
+    if (stackBy === "vehicle" && legend.hoveredItem) return [legend.hoveredItem]
+    return stackBy === "vehicle"
+      ? (legend.isAllSelected ? [...VEHICLE_TYPES] as string[] : selectedTypes)
+      : activeTypes
+  }, [stackBy, legend.hoveredItem, legend.isAllSelected, selectedTypes, activeTypes])
+
+  useEffect(() => {
+    onEffectiveChange?.({ crossings: effectiveCrossings, types: effectiveTypes })
+  }, [effectiveCrossings, effectiveTypes, onEffectiveChange])
 
   const plotProps = useMemo(() => {
     if (isEZPass) {
@@ -439,13 +538,68 @@ function TrafficPlot({
       }
     }
 
-    // Traffic mode
-    const traces = stackBy === "vehicle"
-      ? buildStackedByVehicle(allRows, activeCrossings, activeTypes)
-      : buildStackedByCrossing(allRows, activeCrossings, activeTypes)
+    // Traffic mode — build ALL traces for stacked dimension, solo or fade non-selected
+    const rawTraces = stackBy === "vehicle"
+      ? buildStackedByVehicle(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
+      : buildStackedByCrossing(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
+
+    const isSolo = legendMode === "solo"
+    const yearNum = activeYear && !legend.activeItem ? parseInt(activeYear) : null
+    const traces = rawTraces.map(trace => {
+      const faded = legend.isFaded(trace.name!)
+      const dates = (trace as any).x as Date[]
+      const ys = (trace as any).y as number[]
+      const yearOpacity = yearNum
+        ? dates.map(d => d.getFullYear() === yearNum ? 1 : 0.15)
+        : undefined
+      return {
+        ...trace,
+        y: faded && isSolo ? ys.map(() => 0) : ys,
+        marker: {
+          ...(trace as any).marker,
+          ...(yearOpacity ? { opacity: yearOpacity } : {}),
+        },
+        ...(faded && isSolo ? { hoverinfo: "skip" as const } : {}),
+        ...(faded ? { opacity: 0.4 } : {}),
+      } as Data
+    })
+
+    // 12mo rolling average line
+    const allDates: Date[] = rawTraces.length > 0 ? (rawTraces[0] as any).x : []
+    const activeTraceName = legend.activeItem ? (stackedNameMap[legend.activeItem] ?? legend.activeItem) : null
+    const avgSource: number[] = (() => {
+      if (activeTraceName) {
+        const trace = rawTraces.find(t => t.name === activeTraceName)
+        return trace ? (trace as any).y as number[] : []
+      }
+      return allDates.map((_, i) => {
+        let sum = 0
+        for (const t of rawTraces) sum += ((t as any).y as number[])[i] ?? 0
+        return sum
+      })
+    })()
+    const avg12 = rollingAvg(avgSource, 12)
+    const avgColor = (() => {
+      if (legend.activeItem) {
+        const colors = stackBy === "crossing" ? CROSSING_COLORS : VEHICLE_TYPE_COLORS
+        if (colors[legend.activeItem]) return blendAvgColor(colors[legend.activeItem], 0.5)
+      }
+      return dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
+    })()
+    const avgTrace: Data = {
+      name: "12mo avg",
+      x: allDates,
+      y: avg12,
+      type: "scatter",
+      mode: "lines",
+      line: { color: avgColor, width: 4 },
+      hovertemplate,
+      showlegend: false,
+      connectgaps: false,
+    }
 
     return {
-      data: traces,
+      data: [...traces, avgTrace],
       layout: {
         barmode: "stack",
         yaxis: { fixedrange: true },
@@ -457,24 +611,35 @@ function TrafficPlot({
           hoverformat: "%b '%y",
           tickangle: -45,
         },
-        legend: { entrywidth: 80 } as Partial<Legend>,
+        legend: { entrywidth: 80, traceorder: "reversed" } as Partial<Legend>,
       } as Partial<Layout>,
     }
-  }, [allRows, ezpassRows, mode, stackBy, timeRange, activeCrossings, activeTypes, isEZPass, isVs2019])
+  }, [allRows, ezpassRows, mode, stackBy, timeRange, activeCrossings, activeTypes, isEZPass, isVs2019, legend.activeItem, legend.isFaded, legend.isAllSelected, activeYear, stackedNameMap, legendMode])
 
   const stackLabel = stackBy === "vehicle" ? "vehicle type" : "crossing"
-  const title = isEZPass
+  const baseTitle = isEZPass
     ? "E-ZPass adoption by crossing"
     : isVs2019
       ? `% of 2019, by ${stackLabel}`
       : `Monthly traffic by ${stackLabel}`
+  const title = typeSuffix ? `${baseTitle} — ${typeSuffix}` : baseTitle
 
   return (
-    <div className="plot-container">
+    <div className="plot-container" ref={legend.containerRef}>
       <Plot
         id="bt-traffic"
         title={title}
-        soloMode="hide"
+        subtitle={subtitle}
+        {...(isTraffic ? {
+          disableLegendHover: true,
+          disableSoloTrace: true,
+          onLegendClick,
+          onLegendDoubleClick: legend.onLegendDoubleClick,
+          onAfterPlot: legend.attachLegend,
+          traceNames: legend.traceNames,
+        } : {
+          soloMode: "hide" as const,
+        })}
         {...plotProps}
       />
       <div className="plot-toggles">
@@ -510,11 +675,22 @@ function TrafficPlot({
             <ToggleButton value="recent">2020–Present</ToggleButton>
           </ToggleButtonGroup>
         )}
+        {isTraffic && (
+          <ToggleButtonGroup
+            value={legendMode}
+            exclusive
+            size="small"
+            onChange={(_, v) => { if (v) setLegendMode(v) }}
+          >
+            <ToggleButton value="solo">Solo</ToggleButton>
+            <ToggleButton value="highlight">Highlight</ToggleButton>
+          </ToggleButtonGroup>
+        )}
         <StationDropdown
           stations={[...CROSSINGS]}
           colors={CROSSING_COLORS}
-          selected={selectedCrossings}
-          onChange={setSelectedCrossings}
+          selected={effectiveCrossings}
+          onChange={stackBy === "crossing" ? onPickerChange : setSelectedCrossings}
           regionGroups={REGION_GROUPS}
           label="Crossings"
         />
@@ -522,8 +698,8 @@ function TrafficPlot({
           <StationDropdown
             stations={[...VEHICLE_TYPES]}
             colors={VEHICLE_TYPE_COLORS}
-            selected={selectedTypes}
-            onChange={setSelectedTypes}
+            selected={effectiveTypes}
+            onChange={stackBy === "vehicle" ? onPickerChange : setSelectedTypes}
             label="Vehicle Types"
           />
         )}
@@ -533,65 +709,6 @@ function TrafficPlot({
 }
 
 // --- By-month plot (year traces, INFERNO) ---
-
-function useMonthlyData(types: string[], crossings: string[]) {
-  const dbConn = useDb()
-  const url = trafficUrl()
-  const typesKey = types.join(',')
-  const crossingsKey = crossings.join(',')
-  return useQuery({
-    queryKey: ['bt-monthly', typesKey, crossingsKey, dbConn === null],
-    queryFn: async () => {
-      if (!dbConn) return null
-      const { conn } = dbConn
-      const typeList = types.map(t => `'${t}'`).join(', ')
-      const crossingList = crossings.map(c => `'${c}'`).join(', ')
-      const result = await conn.query(`
-        SELECT Year as year, Month as month, SUM(Count) as count
-        FROM parquet_scan('${url}')
-        WHERE Type IN (${typeList})
-          AND Crossing IN (${crossingList})
-        GROUP BY Year, Month
-        ORDER BY Year, CASE Month
-          WHEN 'Jan' THEN 1 WHEN 'Feb' THEN 2 WHEN 'Mar' THEN 3 WHEN 'Apr' THEN 4
-          WHEN 'May' THEN 5 WHEN 'Jun' THEN 6 WHEN 'Jul' THEN 7 WHEN 'Aug' THEN 8
-          WHEN 'Sep' THEN 9 WHEN 'Oct' THEN 10 WHEN 'Nov' THEN 11 WHEN 'Dec' THEN 12
-        END
-      `)
-      const yearData = new Map<number, { months: string[], counts: number[] }>()
-      for (let i = 0; i < result.numRows; i++) {
-        const year = Number(result.getChildAt(0)!.get(i))
-        const month = result.getChildAt(1)!.get(i) as string
-        const count = Number(result.getChildAt(2)!.get(i))
-        let entry = yearData.get(year)
-        if (!entry) {
-          entry = { months: [], counts: [] }
-          yearData.set(year, entry)
-        }
-        entry.months.push(month)
-        entry.counts.push(count)
-      }
-      const years = [...yearData.keys()].sort()
-      const minYear = years[0]
-      const maxYear = years[years.length - 1]
-      const range = maxYear - minYear || 1
-      const data: Data[] = years.map(year => {
-        const { months, counts } = yearData.get(year)!
-        const t = 0.15 + 0.85 * (year - minYear) / range
-        return {
-          name: String(year),
-          x: months,
-          y: counts,
-          type: "bar",
-          marker: { color: getColorAt(INFERNO, t) },
-          hovertemplate,
-        } as Data
-      })
-      return data
-    },
-    enabled: !!dbConn,
-  })
-}
 
 function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   if (!activeTrace) return data
@@ -610,7 +727,7 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
           return `<b>${Math.round(v / 1000)}k</b>`
         }),
         textposition: 'outside',
-        textfont: { color: '#e4e4e4', size: 11 },
+        textfont: { color: dark ? '#e4e4e4' : '#333', size: 11 },
         textangle: 0,
         constraintext: 'none',
         cliponaxis: false,
@@ -623,19 +740,60 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
 const monthlyHeight = 450
 
 function BTMonthlyPlot({
-  selectedCrossings,
-  selectedTypes,
+  allRows,
+  crossings,
+  types,
+  subtitle,
+  typeSuffix,
+  onActiveYearChange,
 }: {
-  selectedCrossings: string[],
-  selectedTypes: string[],
+  allRows: TrafficRow[] | null | undefined
+  crossings: string[]
+  types: string[]
+  subtitle: string
+  typeSuffix: string
+  onActiveYearChange?: (year: string | null) => void
 }) {
-  const activeCrossings = selectedCrossings.length > 0 ? selectedCrossings : [...CROSSINGS]
-  const activeTypes = selectedTypes.length > 0 ? selectedTypes : [...VEHICLE_TYPES]
-  const { data: traces } = useMonthlyData(activeTypes, activeCrossings)
+  // Aggregate allRows by year + calendar month, filtered by crossings/types
+  const plotData = useMemo(() => {
+    if (!allRows) return null
+    const activeCrossings = crossings.length > 0 ? crossings : [...CROSSINGS]
+    const activeTypes = types.length > 0 ? types : [...VEHICLE_TYPES]
+    const filtered = allRows.filter(r => activeCrossings.includes(r.crossing) && activeTypes.includes(r.type))
+
+    // Group by (year, month) → sum
+    const sums = new Map<string, number>()
+    for (const r of filtered) {
+      const key = `${r.year}-${r.month}`
+      sums.set(key, (sums.get(key) ?? 0) + r.count)
+    }
+
+    const years = [...new Set(filtered.map(r => r.year))].sort()
+    if (years.length === 0) return null
+    const minYear = Math.min(...years)
+    const maxYear = Math.max(...years)
+    const range = maxYear - minYear || 1
+
+    const data: Data[] = years.map(year => {
+      const ys = MONTHS.map(m => sums.get(`${year}-${m}`) ?? 0)
+      if (ys.every(v => v === 0)) return null
+      const t = 0.15 + 0.85 * (year - minYear) / range
+      return {
+        name: String(year),
+        type: "bar",
+        x: MONTHS,
+        y: ys,
+        marker: { color: getColorAt(INFERNO, t) },
+        hovertemplate,
+      } as Data
+    }).filter((d): d is Data => d !== null)
+
+    return data
+  }, [allRows, crossings, types])
 
   const traceNames = useMemo(
-    () => traces?.map(d => d.name).filter((n): n is string => !!n) ?? [],
-    [traces],
+    () => plotData?.map(d => d.name).filter((n): n is string => !!n) ?? [],
+    [plotData],
   )
   const containerRef = useRef<HTMLDivElement>(null)
   const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, traceNames)
@@ -643,9 +801,14 @@ function BTMonthlyPlot({
   const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
 
   const highlightTarget = soloTrace ?? hoverTrace
+
+  useEffect(() => {
+    onActiveYearChange?.(highlightTarget)
+  }, [highlightTarget, onActiveYearChange])
+
   const styledData = useMemo(
-    () => traces ? highlightTraces(traces, highlightTarget) : null,
-    [traces, highlightTarget],
+    () => plotData ? highlightTraces(plotData, highlightTarget) : null,
+    [plotData, highlightTarget],
   )
 
   const narrow = typeof window !== 'undefined' && window.innerWidth < 600
@@ -656,14 +819,16 @@ function BTMonthlyPlot({
 
   if (!styledData) {
     return <div className="plot-container">
-      <H2 id="bt-monthly">Monthly traffic, by month</H2>
+      <H2 id="bt-monthly">{typeSuffix ? `Monthly traffic, by month — ${typeSuffix}` : "Monthly traffic, by month"}</H2>
+      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
       <Loading />
     </div>
   }
 
   return (
     <div className="plot-container">
-      <H2 id="bt-monthly">Monthly traffic, by month</H2>
+      <H2 id="bt-monthly">{typeSuffix ? `Monthly traffic, by month — ${typeSuffix}` : "Monthly traffic, by month"}</H2>
+      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
       <div ref={containerRef}>
         <PltlyPlot
           plotly={Plotly}
@@ -694,6 +859,14 @@ function BTMonthlyPlot({
 export default function BridgeTunnel() {
   const [selectedCrossings, setSelectedCrossings] = useUrlState<string[]>("c", crossingsParam)
   const [selectedTypes, setSelectedTypes] = useUrlState<string[]>("v", vehicleTypesParam)
+  const { data: allRows } = useAllTrafficData()
+  const [activeYear, setActiveYear] = useState<string | null>(null)
+  const [effective, setEffective] = useState<{ crossings: string[], types: string[] }>({
+    crossings: [], types: [],
+  })
+  const subtitle = btCrossingSubtitle(effective.crossings)
+  const typeSuffix = btTypeSuffix(effective.types)
+
   return <>
     <h1>PANYNJ Bridge &amp; Tunnel Traffic</h1>
     <p style={{ color: "#888", marginTop: "-0.5em" }}>
@@ -701,10 +874,22 @@ export default function BridgeTunnel() {
       <a href="/">← PATH ridership</a>
     </p>
     <TrafficPlot
+      allRows={allRows}
       selectedCrossings={selectedCrossings} setSelectedCrossings={setSelectedCrossings}
       selectedTypes={selectedTypes} setSelectedTypes={setSelectedTypes}
+      activeYear={activeYear}
+      subtitle={subtitle}
+      typeSuffix={typeSuffix}
+      onEffectiveChange={setEffective}
     />
-    <BTMonthlyPlot selectedCrossings={selectedCrossings} selectedTypes={selectedTypes} />
+    <BTMonthlyPlot
+      allRows={allRows}
+      crossings={effective.crossings}
+      types={effective.types}
+      subtitle={subtitle}
+      typeSuffix={typeSuffix}
+      onActiveYearChange={setActiveYear}
+    />
     <div className="abp-footer">
       <p>
         Data from <a href="https://www.panynj.gov/bridges-tunnels/en/traffic---volume-information---background.html">PANYNJ</a> ·

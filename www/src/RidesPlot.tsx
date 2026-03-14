@@ -9,9 +9,9 @@ import { Float64, Utf8 } from 'apache-arrow'
 import { Data, Layout, Legend } from "plotly.js"
 import { useActions } from "use-kbd"
 import { Param, useUrlState, codeParam } from "use-prms"
-import { useLegendHover, useSoloTrace } from "pltly/react"
-import { Plot, ann, dark, hovertemplate, hovertemplatePct, url } from "./plot-utils"
+import { Plot, ann, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
+import { useTraceLegend } from "./useTraceLegend"
 
 type Row = {
   month: Utf8
@@ -80,7 +80,6 @@ type DayType = "weekday" | "weekend"
 type Mode = "rides" | "vs2019"
 type TimeRange = "all" | "recent"
 type LegendMode = "solo" | "highlight"
-
 const modeParam = codeParam<Mode>("rides", { rides: "r", vs2019: "v" })
 const dayTypeParam = codeParam<DayType>("weekday", { weekday: "w", weekend: "e" })
 const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "p" })
@@ -216,28 +215,6 @@ function processData(rows: { month: string, station: string, avg_weekday: number
   }
 }
 
-/** Blend a hex color toward white (dark mode) or black (light mode) by `t` (0–1). */
-function blendAvgColor(hexColor: string, t = 0.5): string {
-  const base = dark ? [255, 255, 255] : [0, 0, 0]
-  const hex = hexColor.replace('#', '')
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const mr = Math.round(r + (base[0] - r) * t)
-  const mg = Math.round(g + (base[1] - g) * t)
-  const mb = Math.round(b + (base[2] - b) * t)
-  return `rgb(${mr},${mg},${mb})`
-}
-
-function rollingAvg(values: number[], window: number): (number | null)[] {
-  return values.map((_, i) => {
-    if (i < window - 1) return null
-    let sum = 0
-    for (let j = i - window + 1; j <= i; j++) sum += values[j]
-    return sum / window
-  })
-}
-
 const NUM_STATIONS = STATIONS.length
 
 export function stationSubtitle(stations: string[]): string {
@@ -257,23 +234,30 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
   const [legendMode, setLegendMode] = useUrlState<LegendMode>("l", legendModeParam)
   const dbConn = useDb()
 
+  // Picker snapshot: last selection set via picker (not LI clicks)
+  const pickerSnapshotRef = useRef<string[]>([...STATIONS])
+  const onPickerChange = useCallback((stations: string[]) => {
+    pickerSnapshotRef.current = stations
+    setSelectedStations(stations)
+  }, [setSelectedStations])
+
   const selectGroup = useCallback((group: readonly string[]) => {
-    setSelectedStations([...group])
+    onPickerChange([...group])
     setMode("rides")
-  }, [setSelectedStations, setMode])
+  }, [onPickerChange, setMode])
 
   useActions({
     'stations:all': {
       label: 'All stations',
       group: 'Stations',
       defaultBindings: ['s a'],
-      handler: () => setSelectedStations([...STATIONS]),
+      handler: () => onPickerChange([...STATIONS]),
     },
     'stations:none': {
       label: 'No stations (aggregate)',
       group: 'Stations',
       defaultBindings: ['s 0'],
-      handler: () => setSelectedStations([]),
+      handler: () => onPickerChange([]),
     },
     'stations:ny': {
       label: 'New York stations',
@@ -390,35 +374,49 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
   const showStationBars = mode === "rides" && selectedStations.length > 0
   const isVs2019 = mode === "vs2019"
 
-  // External legend management for stacked bars (to know solo state for 12mo avg)
-  const barTraceNames = useMemo(
-    () => showStationBars ? selectedStations.filter(s => processed?.stations.has(s)) : [],
-    [showStationBars, selectedStations, processed],
-  )
-  const containerRef = useRef<HTMLDivElement>(null)
-  const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, barTraceNames)
-  const { soloTrace, onLegendClick, onLegendDoubleClick, resetSolo } = useSoloTrace(barTraceNames, hoverTrace)
-  const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
+  // Unified legend management: click → URL state, hover → transient highlight
+  // LI un-solo restores to picker snapshot, not "all"
+  const legend = useTraceLegend(STATIONS, selectedStations, setSelectedStations, undefined, pickerSnapshotRef.current)
 
-  // In solo mode, legend hover/click → transient active trace
-  const activeTrace = soloTrace ?? hoverTrace ?? null
-  // Effective stations: transient solo/hover narrows to one station, otherwise base selection
-  const isSoloMode = legendMode === "solo"
+  // Debounced hover → URL sync: hover updates URL after delay, revert on hover-end
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const isHoverActiveRef = useRef(false)
+  useEffect(() => {
+    clearTimeout(hoverTimerRef.current)
+    if (legend.hoveredItem) {
+      isHoverActiveRef.current = true
+      hoverTimerRef.current = setTimeout(() => {
+        setSelectedStations([legend.hoveredItem!])
+      }, 300)
+    } else if (isHoverActiveRef.current) {
+      isHoverActiveRef.current = false
+      hoverTimerRef.current = setTimeout(() => {
+        setSelectedStations([...pickerSnapshotRef.current])
+      }, 300)
+    }
+  }, [legend.hoveredItem, setSelectedStations])
+
+  // Wrap legend click to cancel hover revert
+  const onLegendClick = useCallback((event: unknown) => {
+    isHoverActiveRef.current = false
+    clearTimeout(hoverTimerRef.current)
+    return legend.onLegendClick(event)
+  }, [legend.onLegendClick])
+
+  // Effective stations: hover-inclusive for immediate downstream updates
   const effectiveStations = useMemo(
-    () => activeTrace ? [activeTrace] : selectedStations,
-    [activeTrace, selectedStations],
+    () => legend.hoveredItem
+      ? [legend.hoveredItem]
+      : (legend.isAllSelected ? [...STATIONS] as string[] : selectedStations),
+    [legend.hoveredItem, legend.isAllSelected, selectedStations],
   )
-  // Picker shows effective state; user changes go to base + clear solo
-  const handlePickerChange = useCallback((stations: string[]) => {
-    setSelectedStations(stations)
-    resetSolo()
-  }, [setSelectedStations, resetSolo])
 
   useEffect(() => {
-    onEffectiveStationsChange?.(effectiveStations)
-  }, [effectiveStations, onEffectiveStationsChange])
+    onEffectiveStationsChange?.(showStationBars ? effectiveStations : [...STATIONS])
+  }, [showStationBars, effectiveStations, onEffectiveStationsChange])
 
-  const subtitle = stationSubtitle(effectiveStations)
+  // Subtitle: same as effective stations, without layout shift
+  const subtitle = stationSubtitle(showStationBars ? effectiveStations : [])
 
   const plotProps = useMemo(() => {
     if (!processed) return {}
@@ -510,21 +508,16 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
     }
 
     if (showStationBars) {
-      // Stacked bar chart by station
+      // Stacked bar chart — always render ALL stations, fade non-selected
       const isRecent = timeRange === "recent"
       const col = dayType === "weekday" ? "weekday" : "weekend"
+      const yearNum = activeYear && !legend.activeItem ? parseInt(activeYear) : null
 
-      // Build bar traces, applying solo/hover state manually
-      const yearNum = activeYear && !activeTrace ? parseInt(activeYear) : null
-      const barData: Data[] = selectedStations.map(station => {
+      const isSolo = legendMode === "solo"
+      const barData: Data[] = (STATIONS as readonly string[]).map(station => {
         const sd = stations.get(station)
         if (!sd) return null
-        const isActive = station === activeTrace
-        // Solo mode: both hover and click hide other traces
-        const isHidden = isSoloMode && activeTrace !== null && !isActive
-        // Highlight mode: hover/click fades other traces
-        const isFaded = !isHidden && !isSoloMode && activeTrace !== null && !isActive
-        // Year highlight from plot2 legend: per-point opacity
+        const faded = legend.isFaded(station)
         const yearOpacity = yearNum
           ? sd.months.map(m => m.getFullYear() === yearNum ? 1 : 0.15)
           : undefined
@@ -532,32 +525,32 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
           name: station,
           type: "bar",
           x: sd.months,
-          y: sd[col],
+          y: faded && isSolo ? sd[col].map(() => 0) : sd[col],
           marker: {
             color: STATION_COLORS[station],
             ...(yearOpacity ? { opacity: yearOpacity } : {}),
           },
-          hovertemplate,
-          ...(isHidden ? { visible: 'legendonly' as const } : {}),
-          ...(isFaded ? { opacity: 0.4 } : {}),
+          ...(faded && isSolo ? { hoverinfo: "skip" as const } : { hovertemplate }),
+          ...(faded ? { opacity: 0.4 } : {}),
         } as Data
       }).filter((d): d is Data => d !== null)
 
-      // 12mo rolling average: active trace (hover or click) in solo mode, or sum of all selected
-      const avgStation = isSoloMode ? activeTrace : null
-      const avgSource = avgStation
-        ? stations.get(avgStation)?.[col] ?? []
+      // 12mo rolling average: single active item or sum of selected
+      const activeStation = legend.activeItem
+      const avgItems = legend.isAllSelected ? [...STATIONS] as string[] : selectedStations
+      const avgSource = activeStation
+        ? stations.get(activeStation)?.[col] ?? []
         : months.map((_, i) => {
             let sum = 0
-            for (const station of selectedStations) {
-              const sd = stations.get(station)
+            for (const s of avgItems) {
+              const sd = stations.get(s)
               if (sd) sum += sd[col][i]
             }
             return sum
           })
       const avg12 = rollingAvg(avgSource, 12)
-      const avgColor = avgStation
-        ? blendAvgColor(STATION_COLORS[avgStation], 0.5)
+      const avgColor = activeStation
+        ? blendAvgColor(STATION_COLORS[activeStation], 0.5)
         : (dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
       const avgTrace: Data = {
         name: "12mo avg",
@@ -587,7 +580,7 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
           yaxis: {
             hoverformat: ",.0f",
           },
-          legend: { entrywidth: 100 } as Partial<Legend>,
+          legend: { entrywidth: 100, traceorder: "reversed" } as Partial<Legend>,
         } as Partial<Layout>,
       }
     }
@@ -642,7 +635,7 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
         ],
       } as Partial<Layout>,
     }
-  }, [processed, mode, dayType, timeRange, selectedStations, showStationBars, isVs2019, soloTrace, hoverTrace, legendMode, activeYear])
+  }, [processed, mode, dayType, timeRange, selectedStations, showStationBars, isVs2019, legend.activeItem, legend.isFaded, legend.isAllSelected, activeYear, legendMode])
 
   const title = isVs2019
     ? "Avg PATH rides per day (vs. 2019)"
@@ -651,7 +644,7 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
       : "Avg PATH rides per day"
 
   return (
-    <div className="plot-container" ref={containerRef}>
+    <div className="plot-container" ref={legend.containerRef}>
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
       <Plot
         id="rides"
@@ -660,10 +653,10 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
         {...(showStationBars ? {
           disableLegendHover: true,
           disableSoloTrace: true,
-          onLegendClick: onLegendClick as () => boolean,
-          onLegendDoubleClick: onLegendDoubleClick as () => boolean,
-          onAfterPlot: attachLegend,
-          traceNames: barTraceNames,
+          onLegendClick,
+          onLegendDoubleClick: legend.onLegendDoubleClick,
+          onAfterPlot: legend.attachLegend,
+          traceNames: legend.traceNames,
         } : {})}
         {...plotProps}
       />
@@ -714,7 +707,7 @@ export default function RidesPlot({ onEffectiveStationsChange, activeYear }: {
           stations={[...STATIONS]}
           colors={STATION_COLORS}
           selected={effectiveStations}
-          onChange={handlePickerChange}
+          onChange={onPickerChange}
           lineGroups={LINE_GROUPS}
           regionGroups={REGION_GROUPS}
         />
