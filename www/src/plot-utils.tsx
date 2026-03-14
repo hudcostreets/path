@@ -35,37 +35,62 @@ export function Loading({ height = DefaultHeight }: { height?: number }) {
   return <div className={"loading"} style={{ height }}>Loading...</div>
 }
 
+export type PlotExtraProps = {
+  onLegendClick?: (data: unknown) => boolean
+  onLegendDoubleClick?: () => boolean
+  onAfterPlot?: () => void
+  disableLegendHover?: boolean
+  disableSoloTrace?: boolean
+  traceNames?: string[]
+}
+
 export function Plot(
-  { id, title, soloMode, ...props }: {
+  { id, title, subtitle, soloMode, ...props }: {
     id: string
     title: string
+    subtitle?: string
     soloMode?: 'fade' | 'hide'
-  } & ({
+  } & PlotExtraProps & ({
     data: Data[]
     layout: Partial<Layout>
   } | {})
 ) {
   const h2 = <H2 id={id}>{title}</H2>
+  const sub = subtitle ? <div className="plot-subtitle">{subtitle}</div> : null
   const narrow = window.innerWidth < 600
   const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
   if (!('data' in props)) {
     return <>
       {h2}
+      {sub}
       <Loading/>
     </>
   }
-  let { data, layout: { xaxis = {}, yaxis = {}, legend = {}, ...layout } } = props
-  xaxis = { fixedrange: true, ...xaxis }
-  yaxis = { fixedrange: true, ...yaxis }
+  const {
+    data,
+    layout: { xaxis: xaxisIn = {}, yaxis: yaxisIn = {}, legend: legendIn = {}, ...layout },
+    onLegendClick, onLegendDoubleClick, onAfterPlot,
+    disableLegendHover, disableSoloTrace, traceNames,
+  } = props
+  let xaxis = { fixedrange: true, ...xaxisIn }
+  let yaxis = { fixedrange: true, ...yaxisIn }
+  let legend = { ...legendIn }
   if (narrow) {
     legend = { ...legend, orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
   }
   return <>
     {h2}
+    {sub}
     <PltlyPlot
       plotly={Plotly}
       data={data}
       soloMode={soloMode}
+      onLegendClick={onLegendClick}
+      onLegendDoubleClick={onLegendDoubleClick}
+      onAfterPlot={onAfterPlot}
+      disableLegendHover={disableLegendHover}
+      disableSoloTrace={disableSoloTrace}
+      traceNames={traceNames}
       style={{ width: '100%', height: `${height}px` }}
       layout={{
         autosize: true,
