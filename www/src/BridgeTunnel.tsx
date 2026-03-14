@@ -13,13 +13,14 @@ import type { StationGroup } from "./RidesPlot"
 
 // --- Constants ---
 
+// Ordered smallest → largest for stacking (smallest at bottom)
 const CROSSINGS = [
-  "George Washington Bridge",
-  "Lincoln Tunnel",
-  "Holland Tunnel",
-  "Goethals Bridge",
-  "Outerbridge Crossing",
   "Bayonne Bridge",
+  "Outerbridge Crossing",
+  "Goethals Bridge",
+  "Holland Tunnel",
+  "Lincoln Tunnel",
+  "George Washington Bridge",
 ] as const
 
 const CROSSING_COLORS: Record<string, string> = {
@@ -40,15 +41,16 @@ const CROSSING_ABBREV: Record<string, string> = {
   "Bayonne Bridge": "Bayonne",
 }
 
-const HUDSON_CROSSINGS = ["George Washington Bridge", "Lincoln Tunnel", "Holland Tunnel"] as const
-const SI_CROSSINGS = ["Goethals Bridge", "Outerbridge Crossing", "Bayonne Bridge"] as const
+const HUDSON_CROSSINGS = ["Holland Tunnel", "Lincoln Tunnel", "George Washington Bridge"] as const
+const SI_CROSSINGS = ["Bayonne Bridge", "Outerbridge Crossing", "Goethals Bridge"] as const
 
 const REGION_GROUPS: StationGroup[] = [
   { label: "Hudson River", color: "#aaa", stations: [...HUDSON_CROSSINGS] },
   { label: "Staten Island", color: "#aaa", stations: [...SI_CROSSINGS] },
 ]
 
-const VEHICLE_TYPES = ["Automobiles", "Buses", "Trucks"] as const
+// Ordered smallest → largest for stacking
+const VEHICLE_TYPES = ["Buses", "Trucks", "Automobiles"] as const
 
 const VEHICLE_TYPE_COLORS: Record<string, string> = {
   "Automobiles": "#636efa",
@@ -385,12 +387,16 @@ function buildEZPassTraces(rows: EZPassRow[], crossings: string[]): Data[] {
 
 // --- Main traffic plot ---
 
-function TrafficPlot() {
+function TrafficPlot({
+  selectedCrossings, setSelectedCrossings,
+  selectedTypes, setSelectedTypes,
+}: {
+  selectedCrossings: string[], setSelectedCrossings: (v: string[]) => void,
+  selectedTypes: string[], setSelectedTypes: (v: string[]) => void,
+}) {
   const [mode, setMode] = useUrlState<Mode>("m", modeParam)
   const [stackBy, setStackBy] = useUrlState<StackBy>("g", stackByParam)
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
-  const [selectedCrossings, setSelectedCrossings] = useUrlState<string[]>("c", crossingsParam)
-  const [selectedTypes, setSelectedTypes] = useUrlState<string[]>("v", vehicleTypesParam)
   const { data: allRows } = useAllTrafficData()
   const { data: ezpassRows } = useEZPassData()
 
@@ -528,21 +534,23 @@ function TrafficPlot() {
 
 // --- By-month plot (year traces, INFERNO) ---
 
-function useMonthlyData(types: string[]) {
+function useMonthlyData(types: string[], crossings: string[]) {
   const dbConn = useDb()
   const url = trafficUrl()
   const typesKey = types.join(',')
+  const crossingsKey = crossings.join(',')
   return useQuery({
-    queryKey: ['bt-monthly', typesKey, dbConn === null],
+    queryKey: ['bt-monthly', typesKey, crossingsKey, dbConn === null],
     queryFn: async () => {
       if (!dbConn) return null
       const { conn } = dbConn
       const typeList = types.map(t => `'${t}'`).join(', ')
+      const crossingList = crossings.map(c => `'${c}'`).join(', ')
       const result = await conn.query(`
         SELECT Year as year, Month as month, SUM(Count) as count
         FROM parquet_scan('${url}')
         WHERE Type IN (${typeList})
-          AND Crossing != 'All Crossings'
+          AND Crossing IN (${crossingList})
         GROUP BY Year, Month
         ORDER BY Year, CASE Month
           WHEN 'Jan' THEN 1 WHEN 'Feb' THEN 2 WHEN 'Mar' THEN 3 WHEN 'Apr' THEN 4
@@ -614,10 +622,16 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
 
 const monthlyHeight = 450
 
-function BTMonthlyPlot() {
-  const [selectedTypes, setSelectedTypes] = useUrlState<string[]>("bv", vehicleTypesParam)
+function BTMonthlyPlot({
+  selectedCrossings,
+  selectedTypes,
+}: {
+  selectedCrossings: string[],
+  selectedTypes: string[],
+}) {
+  const activeCrossings = selectedCrossings.length > 0 ? selectedCrossings : [...CROSSINGS]
   const activeTypes = selectedTypes.length > 0 ? selectedTypes : [...VEHICLE_TYPES]
-  const { data: traces } = useMonthlyData(activeTypes)
+  const { data: traces } = useMonthlyData(activeTypes, activeCrossings)
 
   const traceNames = useMemo(
     () => traces?.map(d => d.name).filter((n): n is string => !!n) ?? [],
@@ -671,15 +685,6 @@ function BTMonthlyPlot() {
           }}
         />
       </div>
-      <div className="plot-toggles">
-        <StationDropdown
-          stations={[...VEHICLE_TYPES]}
-          colors={VEHICLE_TYPE_COLORS}
-          selected={selectedTypes}
-          onChange={setSelectedTypes}
-          label="Vehicle Types"
-        />
-      </div>
     </div>
   )
 }
@@ -687,14 +692,19 @@ function BTMonthlyPlot() {
 // --- Page ---
 
 export default function BridgeTunnel() {
+  const [selectedCrossings, setSelectedCrossings] = useUrlState<string[]>("c", crossingsParam)
+  const [selectedTypes, setSelectedTypes] = useUrlState<string[]>("v", vehicleTypesParam)
   return <>
     <h1>PANYNJ Bridge &amp; Tunnel Traffic</h1>
     <p style={{ color: "#888", marginTop: "-0.5em" }}>
       Eastbound (tolled direction) vehicle counts, 2011–2025.{" "}
       <a href="/">← PATH ridership</a>
     </p>
-    <TrafficPlot />
-    <BTMonthlyPlot />
+    <TrafficPlot
+      selectedCrossings={selectedCrossings} setSelectedCrossings={setSelectedCrossings}
+      selectedTypes={selectedTypes} setSelectedTypes={setSelectedTypes}
+    />
+    <BTMonthlyPlot selectedCrossings={selectedCrossings} selectedTypes={selectedTypes} />
     <div className="abp-footer">
       <p>
         Data from <a href="https://www.panynj.gov/bridges-tunnels/en/traffic---volume-information---background.html">PANYNJ</a> ·
