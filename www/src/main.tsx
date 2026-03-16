@@ -38,6 +38,10 @@ const speedDialActions: SpeedDialAction[] = [
   },
 ]
 
+if (new URLSearchParams(window.location.search).has('clean')) {
+  document.documentElement.classList.add('clean')
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider theme={theme}>

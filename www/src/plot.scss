@@ -192,6 +192,13 @@
   }
 }
 
+// Clean mode: hide non-essential UI for screenshots/GIFs
+html.clean {
+  .abp-header, .abp-footer, .kbd-speed-dial, h1 {
+    display: none !important;
+  }
+}
+
 // Speed dial dark mode fix
 .kbd-speed-dial {
   color: #eee;

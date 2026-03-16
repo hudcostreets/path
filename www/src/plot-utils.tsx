@@ -7,6 +7,7 @@ import { resolve as dvcResolve } from 'virtual:dvc-data'
 const height = 450
 const DefaultHeight = height
 export const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+export const clean = new URLSearchParams(window.location.search).has('clean')
 
 export const hovertemplate = "%{y:,.0f}"
 export const hovertemplatePct = "%{y:.1%}"

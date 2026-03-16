@@ -11,7 +11,7 @@ import { useActions } from "use-kbd"
 import { Param, useUrlState, codeParam } from "use-prms"
 import { repelLabels } from "pltly/plotly"
 import type { RepelLineObstacle, RepelPoint, RepelRectObstacle } from "pltly/plotly"
-import { Plot, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
+import { Plot, blendAvgColor, clean, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 import { usePinnedLegend } from "pltly/react"
@@ -1196,134 +1196,136 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         } : {})}
         {...plotProps}
       />
-      <div className="plot-toggles">
-        <ToggleButtonGroup
-          value={metric}
-          exclusive
-          size="small"
-          onChange={(_, v) => { if (v) setMetric(v) }}
-        >
-          <ToggleButton value="avg">Avg/Day</ToggleButton>
-          <ToggleButton value="total">Total</ToggleButton>
-          <ToggleButton value="pct2019">Recovery</ToggleButton>
-        </ToggleButtonGroup>
-        <ToggleButtonGroup
-          value={groupBy}
-          exclusive
-          size="small"
-          onChange={(_, v) => { if (v) setGroupBy(v) }}
-        >
-          <ToggleButton value="daytype">By Day Type</ToggleButton>
-          <ToggleButton value="station">By Station</ToggleButton>
-        </ToggleButtonGroup>
-        {metric !== "pct2019" && (
+      {!clean && <>
+        <div className="plot-toggles">
           <ToggleButtonGroup
-            value={effectiveTimeRange}
+            value={metric}
             exclusive
             size="small"
-            onChange={(_, v) => { if (v) setTimeRange(v) }}
+            onChange={(_, v) => { if (v) setMetric(v) }}
           >
-            <ToggleButton value="all">All Time</ToggleButton>
-            <ToggleButton value="recent">2020–Present</ToggleButton>
+            <ToggleButton value="avg">Avg/Day</ToggleButton>
+            <ToggleButton value="total">Total</ToggleButton>
+            <ToggleButton value="pct2019">Recovery</ToggleButton>
           </ToggleButtonGroup>
-        )}
-        {hasLegend && <>
           <ToggleButtonGroup
-            value={legendMode}
+            value={groupBy}
             exclusive
             size="small"
-            onChange={(_, v) => { if (v) setLegendMode(v) }}
+            onChange={(_, v) => { if (v) setGroupBy(v) }}
           >
-            <ToggleButton value="solo">Solo</ToggleButton>
-            <ToggleButton value="highlight">Highlight</ToggleButton>
+            <ToggleButton value="daytype">By Day Type</ToggleButton>
+            <ToggleButton value="station">By Station</ToggleButton>
           </ToggleButtonGroup>
-          <InfoTip>
-            <strong>Solo</strong>: clicking a legend item hides all others.<br/>
-            <strong>Highlight</strong>: clicking fades others but keeps them visible.
-          </InfoTip>
-        </>}
+          {metric !== "pct2019" && (
+            <ToggleButtonGroup
+              value={effectiveTimeRange}
+              exclusive
+              size="small"
+              onChange={(_, v) => { if (v) setTimeRange(v) }}
+            >
+              <ToggleButton value="all">All Time</ToggleButton>
+              <ToggleButton value="recent">2020–Present</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+          {hasLegend && <>
+            <ToggleButtonGroup
+              value={legendMode}
+              exclusive
+              size="small"
+              onChange={(_, v) => { if (v) setLegendMode(v) }}
+            >
+              <ToggleButton value="solo">Solo</ToggleButton>
+              <ToggleButton value="highlight">Highlight</ToggleButton>
+            </ToggleButtonGroup>
+            <InfoTip>
+              <strong>Solo</strong>: clicking a legend item hides all others.<br/>
+              <strong>Highlight</strong>: clicking fades others but keeps them visible.
+            </InfoTip>
+          </>}
 
-        <StationDropdown
-          stations={[...DAY_TYPES] as string[]}
-          colors={DAY_TYPE_COLORS}
-          selected={selectedDayTypes}
-          onChange={dayTypeLegend.onPickerChange}
-          label="Day Types"
-          nameMap={DAY_TYPE_LABELS}
-        />
-        <StationDropdown
-          stations={[...STATIONS]}
-          colors={STATION_COLORS}
-          selected={effectiveStations}
-          onChange={stationLegend.onPickerChange}
-          lineGroups={LINE_GROUPS}
-          regionGroups={REGION_GROUPS}
-        />
-      </div>
-      {metric === "pct2019" && (
-        <div className="plot-toggles baseline-controls" style={{ flexWrap: 'wrap', gap: '0.5em', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85em' }}>Baseline:</span>
-          <input
-            type="number"
-            min={1}
-            max={8}
-            value={baselineYears}
-            onChange={e => {
-              const n = parseInt(e.target.value)
-              if (!isNaN(n) && n >= 1 && n <= 8) setBaselineYears(n)
-            }}
-            style={{ width: '3em', textAlign: 'center', fontSize: '0.85em' }}
+          <StationDropdown
+            stations={[...DAY_TYPES] as string[]}
+            colors={DAY_TYPE_COLORS}
+            selected={selectedDayTypes}
+            onChange={dayTypeLegend.onPickerChange}
+            label="Day Types"
+            nameMap={DAY_TYPE_LABELS}
           />
-          <span style={{ fontSize: '0.85em' }}>yrs ({baselineYears === 1 ? '2019' : `${2019 - baselineYears + 1}–2019`})</span>
-          <InfoTip>Number of pre-COVID years to average for the baseline. More years = smoother baseline, fewer = more sensitive to recent trends.</InfoTip>
-          <details className="station-dropdown" style={{ fontSize: '0.85em' }}>
-            <summary>{exclusions.length} excluded</summary>
-            <div className="station-list">
-              {DEFAULT_EXCLUSIONS.map(e => {
-                const key = `${e.station}|${e.month}`
-                const active = exclusions.some(x => x.station === e.station && x.month === e.month)
-                return (
-                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.3em', padding: '0.2em 0.5em', cursor: 'pointer', fontSize: '0.85rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={() => {
-                        if (active) {
-                          setExclusions(exclusions.filter(x => !(x.station === e.station && x.month === e.month)))
-                        } else {
-                          setExclusions([...exclusions, e])
-                        }
-                      }}
-                    />
-                    {formatExclusion(e)}
-                  </label>
-                )
-              })}
-            </div>
-          </details>
-          <InfoTip>Station-months excluded from baseline due to anomalous data (e.g. weekend closures).</InfoTip>
+          <StationDropdown
+            stations={[...STATIONS]}
+            colors={STATION_COLORS}
+            selected={effectiveStations}
+            onChange={stationLegend.onPickerChange}
+            lineGroups={LINE_GROUPS}
+            regionGroups={REGION_GROUPS}
+          />
         </div>
-      )}
-      {metric === "pct2019" && groupBy === "daytype" && <p>Weekend ridership has surpassed pre-COVID levels (2017–2019 avg baseline), though service remains degraded.</p>}
-      <hr/>
-      <div>
-        {processed ?
-          <details>
-            <summary>Plot data</summary>
-            <ReactJsonView
-              src={processed}
-              theme={dark ? "monokai" : "rjv-default"}
-              displayDataTypes={false}
-              displayArrayKey={true}
-              name={false}
-              displayObjectSize
-              enableClipboard
-              quotesOnKeys={false}
+        {metric === "pct2019" && (
+          <div className="plot-toggles baseline-controls" style={{ flexWrap: 'wrap', gap: '0.5em', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85em' }}>Baseline:</span>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={baselineYears}
+              onChange={e => {
+                const n = parseInt(e.target.value)
+                if (!isNaN(n) && n >= 1 && n <= 8) setBaselineYears(n)
+              }}
+              style={{ width: '3em', textAlign: 'center', fontSize: '0.85em' }}
             />
-          </details>
-          : null
-        }
-      </div>
+            <span style={{ fontSize: '0.85em' }}>yrs ({baselineYears === 1 ? '2019' : `${2019 - baselineYears + 1}–2019`})</span>
+            <InfoTip>Number of pre-COVID years to average for the baseline. More years = smoother baseline, fewer = more sensitive to recent trends.</InfoTip>
+            <details className="station-dropdown" style={{ fontSize: '0.85em' }}>
+              <summary>{exclusions.length} excluded</summary>
+              <div className="station-list">
+                {DEFAULT_EXCLUSIONS.map(e => {
+                  const key = `${e.station}|${e.month}`
+                  const active = exclusions.some(x => x.station === e.station && x.month === e.month)
+                  return (
+                    <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.3em', padding: '0.2em 0.5em', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() => {
+                          if (active) {
+                            setExclusions(exclusions.filter(x => !(x.station === e.station && x.month === e.month)))
+                          } else {
+                            setExclusions([...exclusions, e])
+                          }
+                        }}
+                      />
+                      {formatExclusion(e)}
+                    </label>
+                  )
+                })}
+              </div>
+            </details>
+            <InfoTip>Station-months excluded from baseline due to anomalous data (e.g. weekend closures).</InfoTip>
+          </div>
+        )}
+        {metric === "pct2019" && groupBy === "daytype" && <p>Weekend ridership has surpassed pre-COVID levels (2017–2019 avg baseline), though service remains degraded.</p>}
+        <hr/>
+        <div>
+          {processed ?
+            <details>
+              <summary>Plot data</summary>
+              <ReactJsonView
+                src={processed}
+                theme={dark ? "monokai" : "rjv-default"}
+                displayDataTypes={false}
+                displayArrayKey={true}
+                name={false}
+                displayObjectSize
+                enableClipboard
+                quotesOnKeys={false}
+              />
+            </details>
+            : null
+          }
+        </div>
+      </>}
     </div>
   )
 }

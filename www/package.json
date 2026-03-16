@@ -43,6 +43,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "eslint": "^9",
     "sass-embedded": "^1.81.0",
+    "scrns": "https://gitlab.com/runsascoded/js/scrns/-/archive/17a7273a3d08d7b50e519dcecdbbfd42bf1623e9/scrns-17a7273a3d08d7b50e519dcecdbbfd42bf1623e9.tar.gz",
     "typescript": "^5.5.3",
     "vite": "^5.4.11",
     "vite-plugin-dvc": "https://github.com/runsascoded/vite-plugin-dvc#f2e511db003444748913609583e8c3404ceb67fc"
