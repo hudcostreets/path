@@ -34,6 +34,7 @@
     "use-prms": "^0.4.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@rdub/eslint-config": "0.0.2",
     "@types/plotly.js": "^3.0.10",
     "@types/react": "^18.3.3",
