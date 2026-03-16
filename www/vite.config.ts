@@ -19,6 +19,14 @@ export default defineConfig({
     }),
     dvc({ root: 'public' }),
   ],
+  resolve: {
+    alias: {
+      'plotly.js-dist-min': 'plotly.js/dist/plotly.min.js',
+    },
+  },
+  define: {
+    'process.env': {},
+  },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' }
   }

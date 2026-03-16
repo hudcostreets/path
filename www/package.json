@@ -25,6 +25,7 @@
     "@rdub/next-params": "0.3.0",
     "@tanstack/react-query": "^5.60.5",
     "apache-arrow": "^18.0.0",
+    "plotly.js": "https://github.com/runsascoded/plotly.js#51ce181d5143758b08ab6fd14ae0f7a3a1c5222e",
     "plotly.js-dist-min": "^3.4.0",
     "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/0b6ac99f3270fad707d054e6f6ff0e7eb8887281/pltly-0b6ac99f3270fad707d054e6f6ff0e7eb8887281.tar.gz",
     "react": "^18.3.1",
