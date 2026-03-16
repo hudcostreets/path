@@ -428,6 +428,17 @@ function sumAcrossDayTypes(
   return sum
 }
 
+/** Sort traces by last y-value descending so legend order matches visual trace order */
+function sortTracesByLastY(traces: Data[]): Data[] {
+  return [...traces].sort((a, b) => {
+    const ay = (a as any).y as number[]
+    const by = (b as any).y as number[]
+    const lastA = ay?.[ay.length - 1] ?? 0
+    const lastB = by?.[by.length - 1] ?? 0
+    return lastB - lastA
+  })
+}
+
 const PLOT_HEIGHT = 450
 const NARROW_MARGIN = { t: 0, r: 0, b: 50, l: 30 }
 const WIDE_MARGIN = { t: 0, r: 0, b: 40, l: 40 }
@@ -548,7 +559,7 @@ function buildByStation(
       }).filter((d): d is Data => d !== null)
 
     return {
-      data: traces,
+      data: sortTracesByLastY(traces),
       layout: {
         xaxis: {
           dtick: window.innerWidth < 600 ? "M6" : "M3",
@@ -666,7 +677,7 @@ function buildByStation(
   const allTimeRange = ['2011-12-17', '2025-12-17']
   const recentRange = ['2019-12-17', '2025-12-17']
   return {
-    data: traces,
+    data: sortTracesByLastY(traces),
     layout: {
       xaxis: {
         range: isRecent ? recentRange : allTimeRange,
@@ -754,7 +765,7 @@ function buildByDayType(
       : []
 
     return {
-      data: traces,
+      data: sortTracesByLastY(traces),
       layout: {
         xaxis: {
           dtick: window.innerWidth < 600 ? "M6" : "M3",
@@ -881,7 +892,7 @@ function buildByDayType(
     : []
 
   return {
-    data: traces,
+    data: sortTracesByLastY(traces),
     layout: {
       xaxis: {
         dtick: isRecent ? "M3" : "M12",
