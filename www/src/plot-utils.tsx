@@ -24,6 +24,7 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
     arrowhead: 0,
     arrowwidth: 1,
     xanchor: "right",
+    standoff: 6,
     ...a,
     x, ax,
   }

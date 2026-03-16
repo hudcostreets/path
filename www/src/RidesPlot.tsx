@@ -1,4 +1,4 @@
-import { Chip, ToggleButton, ToggleButtonGroup } from "@mui/material"
+import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import ReactJsonView from '@microlink/react-json-view'
 import { Arr } from "@rdub/base/arr"
 import { round } from "@rdub/base/math"
@@ -9,10 +9,12 @@ import { Float64, Int32, Utf8 } from 'apache-arrow'
 import { Data, Layout, Legend } from "plotly.js"
 import { useActions } from "use-kbd"
 import { Param, useUrlState, codeParam } from "use-prms"
-import { Plot, ann, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
+import { repelLabels } from "pltly/plotly"
+import type { RepelLineObstacle, RepelPoint, RepelRectObstacle } from "pltly/plotly"
+import { Plot, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
-import { useTraceLegend } from "./useTraceLegend"
+import { usePinnedLegend } from "pltly/react"
 
 type Row = {
   month: Utf8
@@ -87,9 +89,9 @@ type TimeRange = "all" | "recent"
 type LegendMode = "solo" | "highlight"
 
 const metricParam = codeParam<Metric>("avg", { avg: "a", total: "t", pct2019: "p" })
-const groupByParam = codeParam<GroupBy>("daytype", { daytype: "d", station: "s" })
+const groupByParam = codeParam<GroupBy>("station", { daytype: "d", station: "s" })
 const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "p" })
-const legendModeParam = codeParam<LegendMode>("solo", { solo: "s", highlight: "h" })
+const legendModeParam = codeParam<LegendMode>("highlight", { solo: "s", highlight: "h" })
 
 type Exclusion = { station: string, month: string }
 
@@ -426,13 +428,85 @@ function sumAcrossDayTypes(
   return sum
 }
 
+const PLOT_HEIGHT = 450
+const NARROW_MARGIN = { t: 0, r: 0, b: 50, l: 30 }
+const WIDE_MARGIN = { t: 0, r: 0, b: 40, l: 40 }
+
+/** Build repel-aware annotations for line-chart endpoints.
+ *  Uses pltly's repel solver with trace line obstacles. */
+function endpointAnnotations(
+  traces: { label: string, x: Date[], y: number[] }[],
+  formatY: (v: number) => string,
+  xRange: [number, number],
+  legendRect?: RepelRectObstacle,
+): Partial<import("plotly.js").Annotations>[] {
+  if (traces.length < 2) return []
+  const n = traces[0].x.length
+  if (n < 2) return []
+  const lastMonth = traces[0].x[n - 1]
+  let lastMoStr = lastMonth.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+  lastMoStr = `${lastMoStr.substring(0, lastMoStr.length - 2)}'${lastMoStr.substring(lastMoStr.length - 2)}`
+
+  const points: RepelPoint[] = traces.map(t => ({
+    x: t.x[n - 1].getTime(),
+    y: t.y[n - 1],
+    markerSize: 6,
+    text: `${lastMoStr}<br>${formatY(t.y[n - 1])}`,
+  }))
+
+  // Line obstacles: last ~8 segments of each trace
+  const segStart = Math.max(0, n - 9)
+  const lineObstacles: RepelLineObstacle[] = []
+  for (const t of traces) {
+    for (let i = segStart; i < n - 1; i++) {
+      lineObstacles.push({
+        x0: t.x[i].getTime(),
+        y0: t.y[i],
+        x1: t.x[i + 1].getTime(),
+        y1: t.y[i + 1],
+        buffer: 16,
+      })
+    }
+  }
+
+  // Compute y-range from the visible trace data
+  const allY = traces.flatMap(t => t.y.filter(v => v != null && isFinite(v)))
+  const yMin = Math.min(...allY)
+  const yMax = Math.max(...allY)
+  const yPad = (yMax - yMin) * 0.15
+  const yRange: [number, number] = [yMin - yPad, yMax + yPad]
+
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 600
+  const plotWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth, 1200) : 1000
+  const margin = narrow ? NARROW_MARGIN : WIDE_MARGIN
+
+  const rectObstacles: RepelRectObstacle[] = legendRect ? [legendRect] : []
+
+  const { annotations } = repelLabels(points, {
+    plotWidth,
+    plotHeight: PLOT_HEIGHT,
+    xRange,
+    yRange,
+    margin,
+    fontSize: 12,
+    standoff: 6,
+    textColor: dark ? '#e4e4e4' : '#333',
+    connectors: { color: '#888', width: 1 },
+    lineObstacles,
+    rectObstacles,
+    distanceFactors: [1, 1.5, 2, 2.8, 4],
+    numCandidates: 24,
+  })
+  return annotations
+}
+
 function buildByStation(
   processed: ProcessedData,
   baselines: Map<string, StationBaseline>,
   metric: Metric,
   dayTypes: string[],
   selectedStations: string[],
-  legend: ReturnType<typeof useTraceLegend>,
+  legend: { activeItem: string | null, isAllSelected: boolean, isFaded: (name: string) => boolean },
   legendMode: LegendMode,
   timeRange: TimeRange,
   activeYear: string | null,
@@ -612,7 +686,7 @@ function buildByDayType(
   metric: Metric,
   dayTypes: string[],
   selectedStations: string[],
-  legend: ReturnType<typeof useTraceLegend>,
+  legend: { activeItem: string | null, isAllSelected: boolean, isFaded: (name: string) => boolean },
   legendMode: LegendMode,
   timeRange: TimeRange,
   activeYear: string | null,
@@ -621,7 +695,7 @@ function buildByDayType(
   const { months } = aggregate
   const activeStns = selectedStations.length > 0 ? selectedStations : [...STATIONS] as string[]
   const isRecent = timeRange === "recent"
-  const baseMetric: "avg" | "total" = metric === "pct2019" ? "total" : metric
+  const baseMetric: "avg" | "total" = metric === "pct2019" ? "avg" : metric
   const isSolo = legendMode === "solo"
 
   // Aggregate across selected stations for each day type
@@ -646,19 +720,24 @@ function buildByDayType(
 
   if (metric === "pct2019") {
     const vs2019Months = months.slice(firstPostBaselineIdx)
-    const traces: Data[] = dayTypes.map(dt => {
-      const faded = legend.isFaded(DAY_TYPE_LABELS[dt])
-      const pcts = vs2019Months.map((m, i) => {
+    const traceData = dayTypes.map(dt => ({
+      label: DAY_TYPE_LABELS[dt],
+      x: vs2019Months,
+      y: vs2019Months.map((m, i) => {
         const idx = firstPostBaselineIdx + i
         const mo = m.getMonth()
         const cur = sumForDayType(dt, idx)
         const base = baselineForDayType(dt, mo)
-        return base > 0 ? cur / base : null
-      })
+        return base > 0 ? cur / base : 0
+      }),
+    }))
+    const traces: Data[] = traceData.map((td, i) => {
+      const dt = dayTypes[i]
+      const faded = legend.isFaded(td.label)
       return {
-        name: DAY_TYPE_LABELS[dt],
-        x: vs2019Months,
-        y: pcts,
+        name: td.label,
+        x: td.x,
+        y: td.y,
         type: "scatter",
         mode: "lines",
         line: { color: DAY_TYPE_COLORS[dt], width: !faded && legend.activeItem ? 5 : 2 },
@@ -668,33 +747,11 @@ function buildByDayType(
         ...(faded && !isSolo ? { opacity: 0.4 } : {}),
       } as Data
     })
-    const n = months.length
-    const lastPcts: Record<string, number> = {}
-    for (const dt of dayTypes) {
-      const mo = months[n - 1].getMonth()
-      const cur = sumForDayType(dt, n - 1)
-      const base = baselineForDayType(dt, mo)
-      lastPcts[dt] = base > 0 ? cur / base : 0
-    }
-    let lastMoStr = months[n - 1].toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-    lastMoStr = `${lastMoStr.substring(0, lastMoStr.length - 2)}'${lastMoStr.substring(lastMoStr.length - 2)}`
-    const axo = 5, ayo = .15
-    const annotations = dayTypes.length === 2 ? [
-      ann({
-        ax: months[n - axo], ay: lastPcts[dayTypes[0]] - ayo,
-        yanchor: "top",
-        text: `${lastMoStr}<br>${round(lastPcts[dayTypes[0]] * 1000) / 10}%`,
-        x: months[n - 1],
-        y: lastPcts[dayTypes[0]],
-      }),
-      ann({
-        ax: months[n - axo], ay: lastPcts[dayTypes[1]] + ayo / 2,
-        yanchor: "bottom",
-        text: `${lastMoStr}<br>${round(lastPcts[dayTypes[1]] * 1000) / 10}%`,
-        x: months[n - 1],
-        y: lastPcts[dayTypes[1]],
-      }),
-    ] : []
+
+    const pctXRange: [number, number] = [vs2019Months[0].getTime(), vs2019Months[vs2019Months.length - 1].getTime()]
+    const annotations = traceData.length >= 2
+      ? endpointAnnotations(traceData, v => `${round(v * 1000) / 10}%`, pctXRange)
+      : []
 
     return {
       data: traces,
@@ -796,16 +853,18 @@ function buildByDayType(
 
   // metric === "avg", grouped by day type: lines per day type
   const n = months.length
-  let lastMoStr = months[n - 1].toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-  lastMoStr = `${lastMoStr.substring(0, lastMoStr.length - 2)}'${lastMoStr.substring(lastMoStr.length - 2)}`
-  const axo = 13, ayo = 50_000
-  const traces: Data[] = dayTypes.map(dt => {
-    const faded = legend.isFaded(DAY_TYPE_LABELS[dt])
-    const ys = months.map((_, i) => sumForDayType(dt, i))
+  const traceData = dayTypes.map(dt => ({
+    label: DAY_TYPE_LABELS[dt],
+    x: months,
+    y: months.map((_, i) => sumForDayType(dt, i)),
+  }))
+  const traces: Data[] = traceData.map((td, i) => {
+    const dt = dayTypes[i]
+    const faded = legend.isFaded(td.label)
     return {
-      name: DAY_TYPE_LABELS[dt],
-      x: months,
-      y: ys,
+      name: td.label,
+      x: td.x,
+      y: td.y,
       line: { color: DAY_TYPE_COLORS[dt], width: !faded && legend.activeItem ? 5 : 2 },
       hovertemplate,
       zorder: faded ? 1 : 100,
@@ -814,26 +873,12 @@ function buildByDayType(
     } as Data
   })
 
-  const lastValues: Record<string, number> = {}
-  for (const dt of dayTypes) {
-    lastValues[dt] = sumForDayType(dt, n - 1)
-  }
-  const annotations = dayTypes.length === 2 ? [
-    ann({
-      ax: months[n - axo], ay: lastValues[dayTypes[0]] + ayo / 2,
-      yanchor: "bottom",
-      text: `${lastMoStr}<br>${round(lastValues[dayTypes[0]]).toLocaleString()}`,
-      x: months[n - 1],
-      y: lastValues[dayTypes[0]],
-    }),
-    ann({
-      ax: months[n - axo], ay: lastValues[dayTypes[1]] - ayo,
-      yanchor: "top",
-      text: `${lastMoStr}<br>${round(lastValues[dayTypes[1]]).toLocaleString()}`,
-      x: months[n - 1],
-      y: lastValues[dayTypes[1]],
-    }),
-  ] : []
+  const avgXRange: [number, number] = isRecent
+    ? [new Date(2019, 11, 17).getTime(), new Date(2025, 11, 17).getTime()]
+    : [new Date(2011, 11, 17).getTime(), new Date(2025, 11, 17).getTime()]
+  const annotations = traceData.length >= 2
+    ? endpointAnnotations(traceData, v => round(v).toLocaleString(), avgXRange)
+    : []
 
   return {
     data: traces,
@@ -888,42 +933,45 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
   // Force time range to recent when pct2019
   const effectiveTimeRange = metric === "pct2019" ? "recent" : timeRange
 
-  // Picker snapshot: last selection set via picker (not LI clicks)
-  const stationPickerSnapshotRef = useRef<string[]>([...STATIONS])
-  const stationPinnedRef = useRef<string | null>(null)
-  // Suppress hover re-highlight after unpin until mouse leaves the LI
-  const stationSuppressRef = useRef<string | null>(null)
-  const onStationPickerChange = useCallback((stations: string[]) => {
-    stationPickerSnapshotRef.current = stations
-    stationPinnedRef.current = null
-    setSelectedStations(stations)
-  }, [setSelectedStations])
+  // Shared containerRef for both legend instances
+  const sharedContainerRef = useRef<HTMLDivElement>(null)
 
-  const dayTypePickerSnapshotRef = useRef<string[]>(["weekday", "weekend"])
-  const dayTypePinnedRef = useRef<string | null>(null)
-  const dayTypeSuppressRef = useRef<string | null>(null)
-  const onDayTypePickerChange = useCallback((types: string[]) => {
-    dayTypePickerSnapshotRef.current = types
-    dayTypePinnedRef.current = null
-    setSelectedDayTypes(types)
-  }, [setSelectedDayTypes])
+  const stationLegend = usePinnedLegend({
+    allItems: STATIONS,
+    selectedItems: selectedStations,
+    setSelectedItems: setSelectedStations,
+    active: groupBy === "station",
+    containerRef: sharedContainerRef,
+    unpinExcludeSelectors: ['.baseline-controls'],
+  })
+
+  const dayTypeLegend = usePinnedLegend({
+    allItems: DAY_TYPES as unknown as string[],
+    selectedItems: selectedDayTypes,
+    setSelectedItems: setSelectedDayTypes,
+    nameMap: DAY_TYPE_LABELS,
+    active: groupBy === "daytype",
+    containerRef: sharedContainerRef,
+  })
+
+  const legend = groupBy === "station" ? stationLegend : dayTypeLegend
 
   const selectGroup = useCallback((group: readonly string[]) => {
-    onStationPickerChange([...group])
-  }, [onStationPickerChange])
+    stationLegend.onPickerChange([...group])
+  }, [stationLegend.onPickerChange])
 
   useActions({
     'stations:all': {
       label: 'All stations',
       group: 'Stations',
       defaultBindings: ['s a'],
-      handler: () => onStationPickerChange([...STATIONS]),
+      handler: () => stationLegend.onPickerChange([...STATIONS]),
     },
     'stations:none': {
       label: 'No stations (aggregate)',
       group: 'Stations',
       defaultBindings: ['s 0'],
-      handler: () => onStationPickerChange([]),
+      handler: () => stationLegend.onPickerChange([]),
     },
     'stations:ny': {
       label: 'New York stations',
@@ -1053,136 +1101,8 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     },
   })
 
-  const showStationBars = groupBy === "station" && metric === "total" && selectedStations.length > 0
-  const showDayTypeBars = groupBy === "daytype" && metric === "total"
-
-  // Two legend instances: one for stations, one for day types
-  const stationLegend = useTraceLegend(STATIONS, selectedStations, setSelectedStations, undefined, stationPickerSnapshotRef.current)
-  const dayTypeLegend = useTraceLegend(
-    DAY_TYPES as unknown as string[],
-    selectedDayTypes,
-    setSelectedDayTypes,
-    DAY_TYPE_LABELS,
-    dayTypePickerSnapshotRef.current,
-  )
-  const legend = groupBy === "station" ? stationLegend : dayTypeLegend
-
-  // Hover -> state sync (immediate; URL debounced by use-prms)
-  const stationIsHoverActiveRef = useRef(false)
-  useEffect(() => {
-    if (groupBy !== "station") return
-    // When pinned, ignore all hover events
-    if (stationPinnedRef.current) return
-    if (stationLegend.hoveredItem) {
-      if (stationSuppressRef.current && stationSuppressRef.current !== stationLegend.hoveredItem) {
-        stationSuppressRef.current = null
-      }
-      if (stationSuppressRef.current) return
-      stationIsHoverActiveRef.current = true
-      setSelectedStations([stationLegend.hoveredItem])
-    } else {
-      stationSuppressRef.current = null
-      if (stationIsHoverActiveRef.current) {
-        stationIsHoverActiveRef.current = false
-        setSelectedStations([...stationPickerSnapshotRef.current])
-      }
-    }
-  }, [stationLegend.hoveredItem, setSelectedStations, groupBy])
-
-  const dayTypeIsHoverActiveRef = useRef(false)
-  useEffect(() => {
-    if (groupBy !== "daytype") return
-    if (dayTypePinnedRef.current) return
-    if (dayTypeLegend.hoveredItem) {
-      if (dayTypeSuppressRef.current && dayTypeSuppressRef.current !== dayTypeLegend.hoveredItem) {
-        dayTypeSuppressRef.current = null
-      }
-      if (dayTypeSuppressRef.current) return
-      dayTypeIsHoverActiveRef.current = true
-      setSelectedDayTypes([dayTypeLegend.hoveredItem])
-    } else {
-      dayTypeSuppressRef.current = null
-      if (dayTypeIsHoverActiveRef.current) {
-        dayTypeIsHoverActiveRef.current = false
-        setSelectedDayTypes([...dayTypePickerSnapshotRef.current])
-      }
-    }
-  }, [dayTypeLegend.hoveredItem, setSelectedDayTypes, groupBy])
-
-  // Wrap legend click: pin/unpin hovered item
-  const onLegendClick = useCallback((event: unknown) => {
-    if (groupBy === "station") {
-      if (stationIsHoverActiveRef.current && stationLegend.hoveredItem) {
-        stationIsHoverActiveRef.current = false
-        if (stationPinnedRef.current === stationLegend.hoveredItem) {
-          // Unpin: restore to snapshot, suppress hover until mouse leaves
-          stationPinnedRef.current = null
-          stationSuppressRef.current = stationLegend.hoveredItem
-          setSelectedStations([...stationPickerSnapshotRef.current])
-        } else {
-          // Pin this item
-          stationPinnedRef.current = stationLegend.hoveredItem
-          setSelectedStations([stationLegend.hoveredItem])
-        }
-        return false
-      }
-      // Clicking a different LI while pinned: switch pin
-      if (stationPinnedRef.current && stationLegend.hoveredItem && stationPinnedRef.current !== stationLegend.hoveredItem) {
-        stationPinnedRef.current = stationLegend.hoveredItem
-        setSelectedStations([stationLegend.hoveredItem])
-        return false
-      }
-      stationIsHoverActiveRef.current = false
-      stationPinnedRef.current = null
-    } else {
-      if (dayTypeIsHoverActiveRef.current && dayTypeLegend.hoveredItem) {
-        dayTypeIsHoverActiveRef.current = false
-        if (dayTypePinnedRef.current === dayTypeLegend.hoveredItem) {
-          dayTypePinnedRef.current = null
-          dayTypeSuppressRef.current = dayTypeLegend.hoveredItem
-          setSelectedDayTypes([...dayTypePickerSnapshotRef.current])
-        } else {
-          dayTypePinnedRef.current = dayTypeLegend.hoveredItem
-          setSelectedDayTypes([dayTypeLegend.hoveredItem])
-        }
-        return false
-      }
-      if (dayTypePinnedRef.current && dayTypeLegend.hoveredItem && dayTypePinnedRef.current !== dayTypeLegend.hoveredItem) {
-        dayTypePinnedRef.current = dayTypeLegend.hoveredItem
-        setSelectedDayTypes([dayTypeLegend.hoveredItem])
-        return false
-      }
-      dayTypeIsHoverActiveRef.current = false
-      dayTypePinnedRef.current = null
-    }
-    return legend.onLegendClick(event)
-  }, [legend.onLegendClick, groupBy, stationLegend.hoveredItem, dayTypeLegend.hoveredItem, setSelectedStations, setSelectedDayTypes])
-
-  // Effective stations/dayTypes: hover-inclusive for downstream.
-  // Ignores hover when pinned or suppressed.
-  const effectiveStations = useMemo(
-    () => {
-      if (groupBy === "station" && stationLegend.hoveredItem
-        && !stationPinnedRef.current
-        && stationSuppressRef.current !== stationLegend.hoveredItem) {
-        return [stationLegend.hoveredItem]
-      }
-      return stationLegend.isAllSelected ? [...STATIONS] as string[] : selectedStations
-    },
-    [groupBy, stationLegend.hoveredItem, stationLegend.isAllSelected, selectedStations],
-  )
-
-  const effectiveDayTypes = useMemo(
-    () => {
-      if (groupBy === "daytype" && dayTypeLegend.hoveredItem
-        && !dayTypePinnedRef.current
-        && dayTypeSuppressRef.current !== dayTypeLegend.hoveredItem) {
-        return [dayTypeLegend.hoveredItem]
-      }
-      return selectedDayTypes
-    },
-    [groupBy, dayTypeLegend.hoveredItem, selectedDayTypes],
-  )
+  const effectiveStations = stationLegend.effectiveItems
+  const effectiveDayTypes = dayTypeLegend.effectiveItems
 
   useEffect(() => {
     onEffectiveStationsChange?.(effectiveStations)
@@ -1204,11 +1124,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
       badges.push(
         <span key="stations" className="filter-badge">
           {stSub}
-          <span className="clear-filter" onClick={() => {
-            stationPinnedRef.current = null
-            stationSuppressRef.current = null
-            setSelectedStations([...stationPickerSnapshotRef.current])
-          }}>&times;</span>
+          <span className="clear-filter" onClick={() => stationLegend.clearPin()}>&times;</span>
         </span>
       )
     }
@@ -1217,17 +1133,13 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
       badges.push(
         <span key="daytypes" className="filter-badge">
           {dtText}
-          <span className="clear-filter" onClick={() => {
-            dayTypePinnedRef.current = null
-            dayTypeSuppressRef.current = null
-            setSelectedDayTypes([...dayTypePickerSnapshotRef.current])
-          }}>&times;</span>
+          <span className="clear-filter" onClick={() => dayTypeLegend.clearPin()}>&times;</span>
         </span>
       )
     }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [effectiveStations, effectiveDayTypes, setSelectedStations, setSelectedDayTypes])
+  }, [effectiveStations, effectiveDayTypes, stationLegend.clearPin, dayTypeLegend.clearPin])
 
   const hasLegend = (groupBy === "station" && selectedStations.length > 0) || groupBy === "daytype"
 
@@ -1236,121 +1148,28 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     [processed, baselineYears, exclusions],
   )
 
-  // Effective legends: strip hover when pinned or suppressed
-  const effectiveStationLegend = useMemo(() => {
-    const stripHover = stationPinnedRef.current
-      || (stationSuppressRef.current && stationSuppressRef.current === stationLegend.hoveredItem)
-    if (stripHover && stationLegend.hoveredItem) {
-      const noHoverFaded = (_name: string) => {
-        if (stationLegend.isAllSelected) return false
-        return !selectedStations.includes(_name)
-      }
-      return {
-        ...stationLegend,
-        activeItem: stationPinnedRef.current ?? null,
-        isFaded: noHoverFaded,
-      }
-    }
-    return stationLegend
-  }, [stationLegend, selectedStations])
-
-  const effectiveDayTypeLegend = useMemo(() => {
-    const stripHover = dayTypePinnedRef.current
-      || (dayTypeSuppressRef.current && dayTypeSuppressRef.current === dayTypeLegend.hoveredItem)
-    if (stripHover && dayTypeLegend.hoveredItem) {
-      const noHoverFaded = (name: string) => {
-        if (dayTypeLegend.isAllSelected) return false
-        const dt = Object.entries(DAY_TYPE_LABELS).find(([, v]) => v === name)?.[0]
-        return dt ? !selectedDayTypes.includes(dt) : false
-      }
-      return {
-        ...dayTypeLegend,
-        activeItem: dayTypePinnedRef.current ? (DAY_TYPE_LABELS[dayTypePinnedRef.current] ?? dayTypePinnedRef.current) : null,
-        isFaded: noHoverFaded,
-      }
-    }
-    return dayTypeLegend
-  }, [dayTypeLegend, selectedDayTypes])
-
   const plotProps = useMemo(() => {
     if (!processed) return {}
     if (groupBy === "station") {
-      return buildByStation(processed, baselines, metric, selectedDayTypes, selectedStations, effectiveStationLegend, legendMode, effectiveTimeRange, activeYear ?? null)
+      return buildByStation(processed, baselines, metric, selectedDayTypes, selectedStations, stationLegend, legendMode, effectiveTimeRange, activeYear ?? null)
     }
-    return buildByDayType(processed, baselines, metric, dayTypePickerSnapshotRef.current, selectedStations, effectiveDayTypeLegend, legendMode, effectiveTimeRange, activeYear ?? null)
-  }, [processed, baselines, metric, groupBy, selectedDayTypes, selectedStations, effectiveTimeRange, effectiveStationLegend.activeItem, effectiveStationLegend.isFaded, effectiveStationLegend.isAllSelected, effectiveDayTypeLegend.activeItem, effectiveDayTypeLegend.isFaded, effectiveDayTypeLegend.isAllSelected, activeYear, legendMode])
+    // Pass all day types via snapshot so all traces are built; legend.isFaded handles fading
+    const allDayTypes = [...DAY_TYPES] as string[]
+    return buildByDayType(processed, baselines, metric, allDayTypes, selectedStations, dayTypeLegend, legendMode, effectiveTimeRange, activeYear ?? null)
+  }, [processed, baselines, metric, groupBy, selectedDayTypes, selectedStations, effectiveTimeRange, stationLegend.activeItem, stationLegend.isFaded, stationLegend.isAllSelected, dayTypeLegend.activeItem, dayTypeLegend.isFaded, dayTypeLegend.isAllSelected, activeYear, legendMode])
 
   const title = useMemo(() => {
     const metricLabel = metric === "avg"
       ? "Avg PATH rides per day"
       : metric === "total"
         ? "Monthly PATH ridership"
-        : `PATH ridership (% of ${2019 - baselineYears + 1}–19 avg)`
+        : `PATH ridership (% of ${baselineYears === 1 ? '2019' : `${2019 - baselineYears + 1}–19`} avg)`
     const groupLabel = groupBy === "station" ? "by station" : "by day type"
     return `${metricLabel} ${groupLabel}`
   }, [metric, groupBy, baselineYears])
 
-  // Apply pinned styling to legend items
-  // Pinned: bold + full opacity. Hovered non-pinned: slightly bright (clickability cue). Others: faded.
-  const applyPinnedStyling = useCallback(() => {
-    const container = legend.containerRef.current
-    if (!container) return
-    const pinnedItem = groupBy === "station" ? stationPinnedRef.current : dayTypePinnedRef.current
-    const nameMap = groupBy === "station" ? undefined : DAY_TYPE_LABELS
-    const pinnedName = pinnedItem ? (nameMap?.[pinnedItem] ?? pinnedItem) : null
-    const hoveredName = legend.hoverTrace
-    container.querySelectorAll('.legend .traces').forEach(traceEl => {
-      const svg = traceEl as SVGElement
-      const textEl = traceEl.querySelector('.legendtext') as SVGTextElement | null
-      if (!textEl) return
-      const name = textEl.textContent?.trim() ?? ''
-      svg.style.pointerEvents = ''
-      if (pinnedName) {
-        if (name === pinnedName) {
-          textEl.style.fontWeight = '700'
-          svg.style.opacity = '1'
-        } else if (name === hoveredName) {
-          textEl.style.fontWeight = ''
-          svg.style.opacity = '0.7'
-        } else {
-          textEl.style.fontWeight = ''
-          svg.style.opacity = '0.4'
-        }
-      } else {
-        textEl.style.fontWeight = ''
-        // opacity handled by attachLegend
-      }
-    })
-  }, [legend.containerRef, legend.hoverTrace, groupBy])
-
-  // Re-apply pinned styling whenever selection changes (pin/unpin)
-  useEffect(() => {
-    applyPinnedStyling()
-  }, [selectedStations, selectedDayTypes, applyPinnedStyling])
-
-  const onAfterPlot = useCallback(() => {
-    legend.attachLegend()
-    applyPinnedStyling()
-  }, [legend.attachLegend, applyPinnedStyling])
-
-  // Click empty space in plot area to unpin
-  const onContainerClick = useCallback((e: React.MouseEvent) => {
-    const pinnedRef = groupBy === "station" ? stationPinnedRef : dayTypePinnedRef
-    if (!pinnedRef.current) return
-    // Don't unpin if clicking on legend items, toggles, or controls
-    const target = e.target as HTMLElement
-    if (target.closest('.legend .traces, .plot-toggles, .filter-badge, .baseline-controls, .station-dropdown')) return
-    pinnedRef.current = null
-    ;(groupBy === "station" ? stationSuppressRef : dayTypeSuppressRef).current = null
-    if (groupBy === "station") {
-      setSelectedStations([...stationPickerSnapshotRef.current])
-    } else {
-      setSelectedDayTypes([...dayTypePickerSnapshotRef.current])
-    }
-  }, [groupBy, setSelectedStations, setSelectedDayTypes])
-
   return (
-    <div className="plot-container" ref={legend.containerRef} onClick={onContainerClick}>
+    <div className="plot-container" ref={sharedContainerRef} onClick={legend.onContainerClick}>
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
       <Plot
         id="rides"
@@ -1359,9 +1178,9 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         {...(hasLegend ? {
           disableLegendHover: true,
           disableSoloTrace: true,
-          onLegendClick,
+          onLegendClick: legend.onLegendClick,
           onLegendDoubleClick: legend.onLegendDoubleClick,
-          onAfterPlot,
+          onAfterPlot: legend.onAfterPlot,
           traceNames: legend.traceNames,
         } : {})}
         {...plotProps}
@@ -1375,7 +1194,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         >
           <ToggleButton value="avg">Avg/Day</ToggleButton>
           <ToggleButton value="total">Total</ToggleButton>
-          <ToggleButton value="pct2019">% of '17–'19</ToggleButton>
+          <ToggleButton value="pct2019">Recovery</ToggleButton>
         </ToggleButtonGroup>
         <ToggleButtonGroup
           value={groupBy}
@@ -1417,7 +1236,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
           stations={[...DAY_TYPES] as string[]}
           colors={DAY_TYPE_COLORS}
           selected={selectedDayTypes}
-          onChange={onDayTypePickerChange}
+          onChange={dayTypeLegend.onPickerChange}
           label="Day Types"
           nameMap={DAY_TYPE_LABELS}
         />
@@ -1425,7 +1244,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
           stations={[...STATIONS]}
           colors={STATION_COLORS}
           selected={effectiveStations}
-          onChange={onStationPickerChange}
+          onChange={stationLegend.onPickerChange}
           lineGroups={LINE_GROUPS}
           regionGroups={REGION_GROUPS}
         />
@@ -1444,30 +1263,34 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
             }}
             style={{ width: '3em', textAlign: 'center', fontSize: '0.85em' }}
           />
-          <span style={{ fontSize: '0.85em' }}>yrs ({2019 - baselineYears + 1}–2019)</span>
+          <span style={{ fontSize: '0.85em' }}>yrs ({baselineYears === 1 ? '2019' : `${2019 - baselineYears + 1}–2019`})</span>
           <InfoTip>Number of pre-COVID years to average for the baseline. More years = smoother baseline, fewer = more sensitive to recent trends.</InfoTip>
-          <span style={{ fontSize: '0.85em', marginLeft: '0.5em' }}>Excluded:</span>
-          <InfoTip>Station-months excluded from baseline due to anomalous data (e.g. weekend closures). Remove chips to include them.</InfoTip>
-          {exclusions.length === 0 && <span style={{ fontSize: '0.8em', opacity: 0.5 }}>none</span>}
-          {exclusions.map((e, i) => (
-            <Chip
-              key={`${e.station}|${e.month}`}
-              label={formatExclusion(e)}
-              onDelete={() => setExclusions(exclusions.filter((_, j) => j !== i))}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.75em', height: '1.5em' }}
-            />
-          ))}
-          {!exclusionsEqual(exclusions, DEFAULT_EXCLUSIONS) && (
-            <Chip
-              label="Reset defaults"
-              size="small"
-              variant="outlined"
-              onClick={() => setExclusions([...DEFAULT_EXCLUSIONS])}
-              sx={{ fontSize: '0.75em', height: '1.5em', cursor: 'pointer' }}
-            />
-          )}
+          <details className="station-dropdown" style={{ fontSize: '0.85em' }}>
+            <summary>{exclusions.length} excluded</summary>
+            <div className="station-list">
+              {DEFAULT_EXCLUSIONS.map(e => {
+                const key = `${e.station}|${e.month}`
+                const active = exclusions.some(x => x.station === e.station && x.month === e.month)
+                return (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.3em', padding: '0.2em 0.5em', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => {
+                        if (active) {
+                          setExclusions(exclusions.filter(x => !(x.station === e.station && x.month === e.month)))
+                        } else {
+                          setExclusions([...exclusions, e])
+                        }
+                      }}
+                    />
+                    {formatExclusion(e)}
+                  </label>
+                )
+              })}
+            </div>
+          </details>
+          <InfoTip>Station-months excluded from baseline due to anomalous data (e.g. weekend closures).</InfoTip>
         </div>
       )}
       {metric === "pct2019" && groupBy === "daytype" && <p>Weekend ridership has surpassed pre-COVID levels (2017–2019 avg baseline), though service remains degraded.</p>}

@@ -1,7 +1,9 @@
+import React from "react"
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { usePinnedLegend } from "pltly/react"
 import { Data, Layout, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
@@ -9,8 +11,8 @@ import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam, codesParam } from "use-prms"
 import { Plot, H2, Loading, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
+import { InfoTip } from "./Tooltip"
 import type { StationGroup } from "./RidesPlot"
-import { useTraceLegend } from "./useTraceLegend"
 
 // --- Constants ---
 
@@ -448,61 +450,63 @@ function TrafficPlot({
   const stackedSelected = stackBy === "crossing" ? selectedCrossings : selectedTypes
   const setStackedSelected = stackBy === "crossing" ? setSelectedCrossings : setSelectedTypes
 
-  // Picker snapshot: last selection set via picker (not LI clicks)
-  const pickerSnapshotRef = useRef<string[]>([...stackedItems])
-  const onPickerChange = useCallback((items: string[]) => {
-    pickerSnapshotRef.current = items
-    setStackedSelected(items)
-  }, [setStackedSelected])
+  const legend = usePinnedLegend({
+    allItems: stackedItems,
+    selectedItems: stackedSelected,
+    setSelectedItems: setStackedSelected,
+    nameMap: stackedNameMap,
+  })
 
-  const legend = useTraceLegend(stackedItems, stackedSelected, setStackedSelected, stackedNameMap, pickerSnapshotRef.current)
-
-  // Debounced hover → URL sync: hover updates URL after delay, revert on hover-end
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const isHoverActiveRef = useRef(false)
-  useEffect(() => {
-    clearTimeout(hoverTimerRef.current)
-    if (legend.hoveredItem) {
-      isHoverActiveRef.current = true
-      hoverTimerRef.current = setTimeout(() => {
-        setStackedSelected([legend.hoveredItem!])
-      }, 300)
-    } else if (isHoverActiveRef.current) {
-      isHoverActiveRef.current = false
-      hoverTimerRef.current = setTimeout(() => {
-        setStackedSelected([...pickerSnapshotRef.current])
-      }, 300)
-    }
-  }, [legend.hoveredItem, setStackedSelected])
-
-  // Wrap legend click to cancel hover revert
-  const onLegendClick = useCallback((event: unknown) => {
-    isHoverActiveRef.current = false
-    clearTimeout(hoverTimerRef.current)
-    return legend.onLegendClick(event)
-  }, [legend.onLegendClick])
-
-  // Effective selection: hover-inclusive for immediate downstream updates
+  // Effective selections: use legend.effectiveItems for the stacked dimension
   const activeCrossings = selectedCrossings.length > 0 ? selectedCrossings : [...CROSSINGS]
   const activeTypes = selectedTypes.length > 0 ? selectedTypes : [...VEHICLE_TYPES]
 
   const effectiveCrossings = useMemo(() => {
-    if (stackBy === "crossing" && legend.hoveredItem) return [legend.hoveredItem]
-    return stackBy === "crossing"
-      ? (legend.isAllSelected ? [...CROSSINGS] as string[] : selectedCrossings)
-      : activeCrossings
-  }, [stackBy, legend.hoveredItem, legend.isAllSelected, selectedCrossings, activeCrossings])
+    return stackBy === "crossing" ? legend.effectiveItems : activeCrossings
+  }, [stackBy, legend.effectiveItems, activeCrossings])
 
   const effectiveTypes = useMemo(() => {
-    if (stackBy === "vehicle" && legend.hoveredItem) return [legend.hoveredItem]
-    return stackBy === "vehicle"
-      ? (legend.isAllSelected ? [...VEHICLE_TYPES] as string[] : selectedTypes)
-      : activeTypes
-  }, [stackBy, legend.hoveredItem, legend.isAllSelected, selectedTypes, activeTypes])
+    return stackBy === "vehicle" ? legend.effectiveItems : activeTypes
+  }, [stackBy, legend.effectiveItems, activeTypes])
 
   useEffect(() => {
     onEffectiveChange?.({ crossings: effectiveCrossings, types: effectiveTypes })
   }, [effectiveCrossings, effectiveTypes, onEffectiveChange])
+
+  // Subtitle with filter badges
+  const subtitleNode: React.ReactNode = useMemo(() => {
+    const badges: React.ReactNode[] = []
+    if (subtitle) {
+      badges.push(
+        <span key="crossings" className="filter-badge">
+          {subtitle}
+          <span className="clear-filter" onClick={() => {
+            if (stackBy === "crossing") {
+              legend.clearPin()
+            } else {
+              setSelectedCrossings([...CROSSINGS])
+            }
+          }}>&times;</span>
+        </span>
+      )
+    }
+    if (typeSuffix) {
+      badges.push(
+        <span key="types" className="filter-badge">
+          {typeSuffix}
+          <span className="clear-filter" onClick={() => {
+            if (stackBy === "vehicle") {
+              legend.clearPin()
+            } else {
+              setSelectedTypes([...VEHICLE_TYPES])
+            }
+          }}>&times;</span>
+        </span>
+      )
+    }
+    if (badges.length === 0) return ""
+    return <>{badges}</>
+  }, [subtitle, typeSuffix, stackBy, legend.clearPin, setSelectedCrossings, setSelectedTypes])
 
   const plotProps = useMemo(() => {
     if (isEZPass) {
@@ -523,7 +527,20 @@ function TrafficPlot({
     const recentRange = ['2019-12-01', '2026-01-01']
 
     if (isVs2019) {
-      const traces = buildVs2019Traces(allRows, activeCrossings, activeTypes, stackBy)
+      // Build ALL traces, use isFaded to style non-selected
+      const rawTraces = buildVs2019Traces(allRows, [...CROSSINGS], [...VEHICLE_TYPES], stackBy)
+      const isSolo = legendMode === "solo"
+      const traces = rawTraces.map(trace => {
+        if ((trace as any).showlegend === false) return trace // baseline line
+        const faded = legend.isFaded(trace.name!)
+        return {
+          ...trace,
+          line: { ...(trace as any).line, width: !faded && legend.activeItem ? 5 : 2 },
+          zorder: faded ? 1 : 100,
+          ...(faded && isSolo ? { visible: 'legendonly' as const } : {}),
+          ...(faded && !isSolo ? { opacity: 0.4 } : {}),
+        } as Data
+      })
       return {
         data: traces,
         layout: {
@@ -566,7 +583,7 @@ function TrafficPlot({
 
     // 12mo rolling average line
     const allDates: Date[] = rawTraces.length > 0 ? (rawTraces[0] as any).x : []
-    const activeTraceName = legend.activeItem ? (stackedNameMap[legend.activeItem] ?? legend.activeItem) : null
+    const activeTraceName = legend.activeItem ? (typeof legend.activeItem === 'string' ? legend.activeItem : null) : null
     const avgSource: number[] = (() => {
       if (activeTraceName) {
         const trace = rawTraces.find(t => t.name === activeTraceName)
@@ -582,7 +599,7 @@ function TrafficPlot({
     const avgColor = (() => {
       if (legend.activeItem) {
         const colors = stackBy === "crossing" ? CROSSING_COLORS : VEHICLE_TYPE_COLORS
-        if (colors[legend.activeItem]) return blendAvgColor(colors[legend.activeItem], 0.5)
+        if (colors[legend.activeItem!]) return blendAvgColor(colors[legend.activeItem!], 0.5)
       }
       return dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
     })()
@@ -625,17 +642,17 @@ function TrafficPlot({
   const title = typeSuffix ? `${baseTitle} — ${typeSuffix}` : baseTitle
 
   return (
-    <div className="plot-container" ref={legend.containerRef}>
+    <div className="plot-container" ref={legend.containerRef} onClick={legend.onContainerClick}>
       <Plot
         id="bt-traffic"
         title={title}
-        subtitle={subtitle}
-        {...(isTraffic ? {
+        subtitle={subtitleNode}
+        {...((isTraffic || isVs2019) ? {
           disableLegendHover: true,
           disableSoloTrace: true,
-          onLegendClick,
+          onLegendClick: legend.onLegendClick,
           onLegendDoubleClick: legend.onLegendDoubleClick,
-          onAfterPlot: legend.attachLegend,
+          onAfterPlot: legend.onAfterPlot,
           traceNames: legend.traceNames,
         } : {
           soloMode: "hide" as const,
@@ -675,7 +692,7 @@ function TrafficPlot({
             <ToggleButton value="recent">2020–Present</ToggleButton>
           </ToggleButtonGroup>
         )}
-        {isTraffic && (
+        {(isTraffic || isVs2019) && <>
           <ToggleButtonGroup
             value={legendMode}
             exclusive
@@ -685,12 +702,16 @@ function TrafficPlot({
             <ToggleButton value="solo">Solo</ToggleButton>
             <ToggleButton value="highlight">Highlight</ToggleButton>
           </ToggleButtonGroup>
-        )}
+          <InfoTip>
+            <strong>Solo</strong>: clicking a legend item hides all others.<br/>
+            <strong>Highlight</strong>: clicking fades others but keeps them visible.
+          </InfoTip>
+        </>}
         <StationDropdown
           stations={[...CROSSINGS]}
           colors={CROSSING_COLORS}
           selected={effectiveCrossings}
-          onChange={stackBy === "crossing" ? onPickerChange : setSelectedCrossings}
+          onChange={stackBy === "crossing" ? legend.onPickerChange : setSelectedCrossings}
           regionGroups={REGION_GROUPS}
           label="Crossings"
         />
@@ -699,7 +720,7 @@ function TrafficPlot({
             stations={[...VEHICLE_TYPES]}
             colors={VEHICLE_TYPE_COLORS}
             selected={effectiveTypes}
-            onChange={stackBy === "vehicle" ? onPickerChange : setSelectedTypes}
+            onChange={stackBy === "vehicle" ? legend.onPickerChange : setSelectedTypes}
             label="Vehicle Types"
           />
         )}
@@ -857,8 +878,23 @@ function BTMonthlyPlot({
 // --- Page ---
 
 export default function BridgeTunnel() {
-  const [selectedCrossings, setSelectedCrossings] = useUrlState<string[]>("c", crossingsParam)
-  const [selectedTypes, setSelectedTypes] = useUrlState<string[]>("v", vehicleTypesParam)
+  const [urlCrossings, setUrlCrossings] = useUrlState<string[]>("c", crossingsParam)
+  const [urlTypes, setUrlTypes] = useUrlState<string[]>("v", vehicleTypesParam)
+  // Immediate local state; URL syncs on debounce
+  const [selectedCrossings, setSelectedCrossingsRaw] = useState<string[]>(urlCrossings)
+  const [selectedTypes, setSelectedTypesRaw] = useState<string[]>(urlTypes)
+  const crossingUrlTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const typeUrlTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const setSelectedCrossings = useCallback((crossings: string[]) => {
+    setSelectedCrossingsRaw(crossings)
+    clearTimeout(crossingUrlTimerRef.current)
+    crossingUrlTimerRef.current = setTimeout(() => setUrlCrossings(crossings), 300)
+  }, [setUrlCrossings])
+  const setSelectedTypes = useCallback((types: string[]) => {
+    setSelectedTypesRaw(types)
+    clearTimeout(typeUrlTimerRef.current)
+    typeUrlTimerRef.current = setTimeout(() => setUrlTypes(types), 300)
+  }, [setUrlTypes])
   const { data: allRows } = useAllTrafficData()
   const [activeYear, setActiveYear] = useState<string | null>(null)
   const [effective, setEffective] = useState<{ crossings: string[], types: string[] }>({
