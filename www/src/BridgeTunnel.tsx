@@ -5,7 +5,6 @@ import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePinnedLegend } from "pltly/react"
 import { Data, Layout, Legend } from "plotly.js"
-import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam, codesParam } from "use-prms"
@@ -834,7 +833,7 @@ function BTMonthlyPlot({
       {subtitle && <div className="plot-subtitle">{subtitle}</div>}
       <div ref={containerRef}>
         <PltlyPlot
-          plotly={Plotly}
+          
           data={styledData}
           disableLegendHover
           onLegendClick={onLegendClick as () => boolean}

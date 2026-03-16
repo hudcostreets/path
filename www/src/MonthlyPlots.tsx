@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { Data, Legend } from "plotly.js"
-import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { H2, Loading, dark, hovertemplate, url } from "./plot-utils"
@@ -175,7 +174,7 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
       {fullSubtitle && <div className="plot-subtitle">{fullSubtitle}</div>}
       <div ref={containerRef}>
       <PltlyPlot
-        plotly={Plotly}
+        
         data={styledData}
         disableLegendHover
         onLegendClick={onLegendClick as () => boolean}

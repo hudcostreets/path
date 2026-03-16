@@ -1,5 +1,6 @@
 import mdx from '@mdx-js/rollup'
 import react from '@vitejs/plugin-react'
+import { pdsPlugin } from 'pnpm-dep-source/vite'
 import { defineConfig } from 'vite'
 import dvc from 'vite-plugin-dvc'
 
@@ -18,13 +19,20 @@ export default defineConfig({
       providerImportSource: "@mdx-js/react",
     }),
     dvc({ root: 'public' }),
+    pdsPlugin(),
   ],
-  resolve: {
-    alias: {
-      'plotly.js-dist-min': 'plotly.js/dist/plotly.min.js',
+  build: {
+    commonjsOptions: {
+      include: [/plotly\.js/],
     },
+    rollupOptions: {
+      external: ['plotly.js-dist-min'],
+    },
+  },
+  optimizeDeps: {
+    include: ['plotly.js/basic'],
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' }
-  }
+  },
 })

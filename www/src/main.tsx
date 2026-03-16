@@ -4,6 +4,7 @@ import A from "@rdub/base/a"
 import { Theme } from "@rdub/icons/Tooltip"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { HotkeysProvider, Omnibar, SequenceModal, SpeedDial, type SpeedDialAction } from "use-kbd"
+import { PlotlyProvider } from "pltly/react"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import "use-kbd/styles.css"
 import { StrictMode, lazy, Suspense } from 'react'
@@ -46,6 +47,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
+        <PlotlyProvider loader={() => import('plotly.js/basic').then(m => (m as any).default ?? m)}>
         <HotkeysProvider>
           <BrowserRouter>
             <Routes>
@@ -65,6 +67,7 @@ createRoot(document.getElementById('root')!).render(
           <SequenceModal />
           <SpeedDial actions={speedDialActions} chevronMode="badge" />
         </HotkeysProvider>
+        </PlotlyProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

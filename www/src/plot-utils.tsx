@@ -1,6 +1,6 @@
 import { Headings } from "@rdub/base/heading"
 import { Annotations, Data, Layout } from "plotly.js"
-import Plotly from 'plotly.js-dist-min'
+
 import { Plot as PltlyPlot } from 'pltly/react'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
@@ -106,7 +106,7 @@ export function Plot(
     {h2}
     {sub}
     <PltlyPlot
-      plotly={Plotly}
+      
       data={data}
       soloMode={soloMode}
       onLegendClick={onLegendClick}
