@@ -25,6 +25,8 @@ jobs:
         run: pnpm install
       - working-directory: www
         run: pnpm run build
+      - name: Copy index.html to 404.html for SPA routing
+        run: cp www/dist/index.html www/dist/404.html
       - name: Install Playwright browsers
         working-directory: www
         run: npx playwright install --with-deps chromium
