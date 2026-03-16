@@ -1,7 +1,7 @@
 import React from "react"
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
-import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
+import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePinnedLegend } from "pltly/react"
 import { Data, Layout, Legend } from "plotly.js"
@@ -140,68 +140,49 @@ function ezpassUrl(): string {
 
 type TrafficRow = { crossing: string, type: string, year: number, month: string, count: number }
 
+const MONTH_ORDER: Record<string, number> = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 }
+
 function useAllTrafficData() {
-  const dbConn = useDb()
   const url = trafficUrl()
   return useQuery({
-    queryKey: ['bt-traffic-all', dbConn === null],
+    queryKey: ['bt-traffic-all', url],
     queryFn: async () => {
-      if (!dbConn) return null
-      const { conn } = dbConn
-      const result = await conn.query(`
-        SELECT Crossing as crossing, Type as type, Year as year, Month as month, Count as count
-        FROM parquet_scan('${url}')
-        WHERE Crossing != 'All Crossings'
-          AND Type != 'Total Vehicles'
-        ORDER BY Year, CASE Month
-          WHEN 'Jan' THEN 1 WHEN 'Feb' THEN 2 WHEN 'Mar' THEN 3 WHEN 'Apr' THEN 4
-          WHEN 'May' THEN 5 WHEN 'Jun' THEN 6 WHEN 'Jul' THEN 7 WHEN 'Aug' THEN 8
-          WHEN 'Sep' THEN 9 WHEN 'Oct' THEN 10 WHEN 'Nov' THEN 11 WHEN 'Dec' THEN 12
-        END
-      `)
-      const rows: TrafficRow[] = []
-      for (let i = 0; i < result.numRows; i++) {
-        rows.push({
-          crossing: result.getChildAt(0)!.get(i),
-          type: result.getChildAt(1)!.get(i),
-          year: Number(result.getChildAt(2)!.get(i)),
-          month: result.getChildAt(3)!.get(i),
-          count: Number(result.getChildAt(4)!.get(i)),
-        })
-      }
-      return rows
+      const file = await asyncBufferFromUrl({ url })
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({ file, rowFormat: 'object', onComplete: data => raw.push(...data) })
+      return raw
+        .filter(r => r['Crossing'] !== 'All Crossings' && r['Type'] !== 'Total Vehicles')
+        .map(r => ({
+          crossing: r['Crossing'] as string,
+          type: r['Type'] as string,
+          year: Number(r['Year']),
+          month: r['Month'] as string,
+          count: Number(r['Count']),
+        }))
+        .sort((a, b) => a.year - b.year || (MONTH_ORDER[a.month] ?? 0) - (MONTH_ORDER[b.month] ?? 0))
     },
-    enabled: !!dbConn,
   })
 }
 
 type EZPassRow = { crossing: string, year: number, pct: number }
 
 function useEZPassData() {
-  const dbConn = useDb()
   const url = ezpassUrl()
   return useQuery({
-    queryKey: ['bt-ezpass', dbConn === null],
+    queryKey: ['bt-ezpass', url],
     queryFn: async () => {
-      if (!dbConn) return null
-      const { conn } = dbConn
-      const result = await conn.query(`
-        SELECT Crossing as crossing, Year as year, "E-Z Pass Percent" as pct
-        FROM parquet_scan('${url}')
-        WHERE Month = 'Annual'
-        ORDER BY Year
-      `)
-      const rows: EZPassRow[] = []
-      for (let i = 0; i < result.numRows; i++) {
-        rows.push({
-          crossing: result.getChildAt(0)!.get(i),
-          year: Number(result.getChildAt(1)!.get(i)),
-          pct: Number(result.getChildAt(2)!.get(i)),
-        })
-      }
-      return rows
+      const file = await asyncBufferFromUrl({ url })
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({ file, rowFormat: 'object', onComplete: data => raw.push(...data) })
+      return raw
+        .filter(r => r['Month'] === 'Annual')
+        .map(r => ({
+          crossing: r['Crossing'] as string,
+          year: Number(r['Year']),
+          pct: Number(r['E-Z Pass Percent']),
+        }))
+        .sort((a, b) => a.year - b.year)
     },
-    enabled: !!dbConn,
   })
 }
 

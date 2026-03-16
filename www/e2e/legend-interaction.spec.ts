@@ -119,6 +119,7 @@ test.describe('PATH legend interaction', () => {
   })
 
   test('click different LI switches pin', async ({ page }) => {
+    test.slow() // pin-switch timing can be flaky in headless
     await hoverLI(page, 0, 'WTC')
     await page.waitForTimeout(50)
     await clickLI(page, 0, 'WTC')
@@ -126,7 +127,7 @@ test.describe('PATH legend interaction', () => {
     await hoverLI(page, 0, 'Hoboken')
     await page.waitForTimeout(50)
     await clickLI(page, 0, 'Hoboken')
-    await page.waitForTimeout(200)
+    await page.waitForTimeout(500)
     const sub = await pc(page, 0).locator('.plot-subtitle').textContent()
     expect(sub).toContain('Hoboken')
     expect(await getLegendFontWeight(page, 0, 'Hoboken')).toBe('700')

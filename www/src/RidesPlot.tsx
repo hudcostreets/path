@@ -1,11 +1,9 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import ReactJsonView from '@microlink/react-json-view'
-import { Arr } from "@rdub/base/arr"
 import { round } from "@rdub/base/math"
-import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Float64, Int32, Utf8 } from 'apache-arrow'
+import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { Data, Layout, Legend } from "plotly.js"
 import { useActions } from "use-kbd"
 import { Param, useUrlState, codeParam } from "use-prms"
@@ -16,16 +14,6 @@ import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 import { usePinnedLegend } from "pltly/react"
 
-type Row = {
-  month: Utf8
-  station: Utf8
-  avg_weekday: Float64
-  avg_weekend: Float64
-  avg_holiday: Float64
-  total_weekday: Int32
-  total_weekend: Int32
-  total_holiday: Int32
-}
 
 const STATIONS = [
   "Christopher Street",
@@ -939,8 +927,6 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
   const [legendMode, setLegendMode] = useUrlState<LegendMode>("l", legendModeParam)
   const [baselineYears, setBaselineYears] = useUrlState<number>("b", baselineYearsParam)
   const [exclusions, setExclusions] = useUrlState<Exclusion[]>("x", exclusionsParam)
-  const dbConn = useDb()
-
   // Force time range to recent when pct2019
   const effectiveTimeRange = metric === "pct2019" ? "recent" : timeRange
 
@@ -1071,43 +1057,30 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
   })
 
   const { data: processed, isError, error } = useQuery({
-    queryKey: ['rides', url, dbConn === null],
+    queryKey: ['rides', url],
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async () => {
-      if (!dbConn) return null
-      const { conn } = dbConn
-      const query = `
-        SELECT station, month,
-          "avg weekday" as avg_weekday, "avg weekend" as avg_weekend, "avg holiday" as avg_holiday,
-          "total weekday" as total_weekday, "total weekend" as total_weekend, "total holiday" as total_holiday
-        FROM parquet_scan('${url}')
-        ORDER BY month, station
-      `
-      const table = await conn.query<Row>(query)
-      const n = table.numRows
-      const monthCol: string[] = Arr(table.getChild("month")!.toArray()) as any
-      const stationCol: string[] = Arr(table.getChild("station")!.toArray()) as any
-      const avgWeekdayCol = Arr(table.getChild("avg_weekday")!.toArray())
-      const avgWeekendCol = Arr(table.getChild("avg_weekend")!.toArray())
-      const avgHolidayCol = Arr(table.getChild("avg_holiday")!.toArray())
-      const totalWeekdayCol = Arr(table.getChild("total_weekday")!.toArray())
-      const totalWeekendCol = Arr(table.getChild("total_weekend")!.toArray())
-      const totalHolidayCol = Arr(table.getChild("total_holiday")!.toArray())
-      const rows: RawRow[] = []
-      for (let i = 0; i < n; i++) {
-        rows.push({
-          month: monthCol[i],
-          station: stationCol[i],
-          avg_weekday: (avgWeekdayCol[i] as number) || 0,
-          avg_weekend: (avgWeekendCol[i] as number) || 0,
-          avg_holiday: (avgHolidayCol[i] as number) || 0,
-          total_weekday: (totalWeekdayCol[i] as number) || 0,
-          total_weekend: (totalWeekendCol[i] as number) || 0,
-          total_holiday: (totalHolidayCol[i] as number) || 0,
-        })
-      }
-      conn.close()
+      const file = await asyncBufferFromUrl({ url })
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({
+        file,
+        columns: ['month', 'station', 'avg weekday', 'avg weekend', 'avg holiday', 'total weekday', 'total weekend', 'total holiday'],
+        rowFormat: 'object',
+        onComplete: data => raw.push(...data),
+      })
+      const rows: RawRow[] = raw
+        .map(r => ({
+          month: r['month'] as string,
+          station: r['station'] as string,
+          avg_weekday: (r['avg weekday'] as number) || 0,
+          avg_weekend: (r['avg weekend'] as number) || 0,
+          avg_holiday: (r['avg holiday'] as number) || 0,
+          total_weekday: (r['total weekday'] as number) || 0,
+          total_weekend: (r['total weekend'] as number) || 0,
+          total_holiday: (r['total holiday'] as number) || 0,
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month) || a.station.localeCompare(b.station))
       return processData(rows)
     },
   })

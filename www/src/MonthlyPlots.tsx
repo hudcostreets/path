@@ -1,6 +1,5 @@
-import { Arr } from "@rdub/base/arr"
-import { useDb } from "@rdub/duckdb-wasm/duckdb"
 import { useQuery } from "@tanstack/react-query"
+import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { Data, Legend } from "plotly.js"
 import Plotly from "plotly.js-dist-min"
@@ -53,56 +52,33 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
   subtitle: string
   onActiveYearChange?: (year: string | null) => void
 }) {
-  const dbConn = useDb()
-
   const { data: allRows } = useQuery({
-    queryKey: ['monthly-by-station', url, dbConn === null],
+    queryKey: ['monthly-by-station', url],
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async () => {
-      if (!dbConn) return null
-      const { conn } = dbConn
-      const query = `
-        SELECT
-          station,
-          CAST(SUBSTR(month, 1, 4) AS INTEGER) as year,
-          CAST(SUBSTR(month, 6, 2) AS INTEGER) as cal_month,
-          "avg weekday" as avg_weekday,
-          "avg weekend" as avg_weekend,
-          "avg holiday" as avg_holiday,
-          "total weekday" as total_weekday,
-          "total weekend" as total_weekend,
-          "total holiday" as total_holiday
-        FROM parquet_scan('${url}')
-        ORDER BY year, cal_month, station
-      `
-      const table = await conn.query(query)
-      const n = table.numRows
-      const stationCol: string[] = Arr(table.getChild("station")!.toArray()) as any
-      const yearCol = Arr(table.getChild("year")!.toArray())
-      const calMonthCol = Arr(table.getChild("cal_month")!.toArray())
-      const avgWeekdayCol = Arr(table.getChild("avg_weekday")!.toArray())
-      const avgWeekendCol = Arr(table.getChild("avg_weekend")!.toArray())
-      const avgHolidayCol = Arr(table.getChild("avg_holiday")!.toArray())
-      const totalWeekdayCol = Arr(table.getChild("total_weekday")!.toArray())
-      const totalWeekendCol = Arr(table.getChild("total_weekend")!.toArray())
-      const totalHolidayCol = Arr(table.getChild("total_holiday")!.toArray())
-      const rows: MonthlyRow[] = []
-      for (let i = 0; i < n; i++) {
-        rows.push({
-          station: stationCol[i],
-          year: Number(yearCol[i]),
-          cal_month: Number(calMonthCol[i]),
-          avg_weekday: (avgWeekdayCol[i] as number) || 0,
-          avg_weekend: (avgWeekendCol[i] as number) || 0,
-          avg_holiday: (avgHolidayCol[i] as number) || 0,
-          total_weekday: (totalWeekdayCol[i] as number) || 0,
-          total_weekend: (totalWeekendCol[i] as number) || 0,
-          total_holiday: (totalHolidayCol[i] as number) || 0,
-        })
-      }
-      conn.close()
-      return rows
+      const file = await asyncBufferFromUrl({ url })
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({
+        file,
+        columns: ['month', 'station', 'avg weekday', 'avg weekend', 'avg holiday', 'total weekday', 'total weekend', 'total holiday'],
+        rowFormat: 'object',
+        onComplete: data => raw.push(...data),
+      })
+      return raw.map(r => {
+        const month = r['month'] as string
+        return {
+          station: r['station'] as string,
+          year: parseInt(month.substring(0, 4)),
+          cal_month: parseInt(month.substring(5, 7)),
+          avg_weekday: (r['avg weekday'] as number) || 0,
+          avg_weekend: (r['avg weekend'] as number) || 0,
+          avg_holiday: (r['avg holiday'] as number) || 0,
+          total_weekday: (r['total weekday'] as number) || 0,
+          total_weekend: (r['total weekend'] as number) || 0,
+          total_holiday: (r['total holiday'] as number) || 0,
+        }
+      })
     },
   })
 
