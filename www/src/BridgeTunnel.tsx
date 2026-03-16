@@ -9,6 +9,7 @@ import Plotly from "plotly.js-dist-min"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam, codesParam } from "use-prms"
+import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { Plot, H2, Loading, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
@@ -128,13 +129,13 @@ const vehicleTypesParam = codesParam<string>(
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 function trafficUrl(): string {
-  const path = '/bt-traffic.pqt'
-  return path.startsWith('/') ? `${window.location.origin}${path}` : path
+  const resolved = dvcResolve('bt-traffic.pqt')
+  return resolved.startsWith('/') ? `${window.location.origin}${resolved}` : resolved
 }
 
 function ezpassUrl(): string {
-  const path = '/bt-ezpass.pqt'
-  return path.startsWith('/') ? `${window.location.origin}${path}` : path
+  const resolved = dvcResolve('bt-ezpass.pqt')
+  return resolved.startsWith('/') ? `${window.location.origin}${resolved}` : resolved
 }
 
 type TrafficRow = { crossing: string, type: string, year: number, month: string, count: number }
