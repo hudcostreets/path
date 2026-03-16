@@ -25,6 +25,12 @@ jobs:
         run: pnpm install
       - working-directory: www
         run: pnpm run build
+      - name: Install Playwright browsers
+        working-directory: www
+        run: npx playwright install --with-deps chromium
+      - name: Run e2e tests
+        working-directory: www
+        run: npx playwright test
       - name: Deploy to GH Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:

@@ -8,9 +8,9 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'pnpm dev --port 8858',
+    command: process.env.CI ? 'pnpm preview --port 8858' : 'pnpm dev --port 8858',
     port: 8858,
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 30_000,
   },
   projects: [
