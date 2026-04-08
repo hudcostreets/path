@@ -24,14 +24,14 @@
     "@rdub/next-params": "0.3.0",
     "@tanstack/react-query": "^5.60.5",
     "hyparquet": "^1.25.1",
-    "plotly.js": "workspace:*",
-    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/0b6ac99f3270fad707d054e6f6ff0e7eb8887281/pltly-0b6ac99f3270fad707d054e6f6ff0e7eb8887281.tar.gz",
+    "plotly.js": "https://github.com/runsascoded/plotly.js#61e90c2ead90aa3c4a3e4bdc68b1a2c1f86ff101",
+    "plotly.js-dist-min": "^3.4.0",
+    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/f1991fbb778d485a91c5cc4cf32e6da6c5936a96/pltly-f1991fbb778d485a91c5cc4cf32e6da6c5936a96.tar.gz",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.13.1",
     "use-kbd": "^0.12.0",
-    "use-prms": "^0.4.1",
-    "plotly.js-dist-min": "^3.4.0"
+    "use-prms": "^0.4.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

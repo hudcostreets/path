@@ -1,7 +1,7 @@
 import { Headings } from "@rdub/base/heading"
 import { Annotations, Data, Layout } from "plotly.js"
 
-import { Plot as PltlyPlot } from 'pltly/react'
+import { Plot as PltlyPlot, type PlotProps as PltlyPlotProps } from 'pltly/react'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 
 const height = 450
@@ -59,31 +59,20 @@ export function Loading({ height = DefaultHeight }: { height?: number }) {
   return <div className={"loading"} style={{ height }}>Loading...</div>
 }
 
-export type PlotExtraProps = {
-  onLegendClick?: (data: unknown) => boolean
-  onLegendDoubleClick?: () => boolean
-  onAfterPlot?: () => void
-  disableLegendHover?: boolean
-  disableSoloTrace?: boolean
-  traceNames?: string[]
+type PlotOwnProps = {
+  id: string
+  title: string
+  subtitle?: React.ReactNode
 }
 
 export function Plot(
-  { id, title, subtitle, soloMode, ...props }: {
-    id: string
-    title: string
-    subtitle?: React.ReactNode
-    soloMode?: 'fade' | 'hide'
-  } & PlotExtraProps & ({
-    data: Data[]
-    layout: Partial<Layout>
-  } | {})
+  { id, title, subtitle, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
 ) {
   const h2 = <H2 id={id}>{title}</H2>
   const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
   const narrow = window.innerWidth < 600
   const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
-  if (!('data' in props)) {
+  if (!props.data) {
     return <>
       {h2}
       {sub}
@@ -92,10 +81,9 @@ export function Plot(
   }
   const {
     data,
-    layout: { xaxis: xaxisIn = {}, yaxis: yaxisIn = {}, legend: legendIn = {}, ...layout },
-    onLegendClick, onLegendDoubleClick, onAfterPlot,
-    disableLegendHover, disableSoloTrace, traceNames,
-  } = props
+    layout: { xaxis: xaxisIn = {}, yaxis: yaxisIn = {}, legend: legendIn = {}, ...layout } = {},
+    ...plotProps
+  } = props as { data: Data[], layout?: Partial<Layout> } & Omit<PltlyPlotProps, 'style' | 'data' | 'layout'>
   let xaxis = { fixedrange: true, ...xaxisIn }
   let yaxis = { fixedrange: true, ...yaxisIn }
   let legend = { ...legendIn }
@@ -106,15 +94,8 @@ export function Plot(
     {h2}
     {sub}
     <PltlyPlot
-      
       data={data}
-      soloMode={soloMode}
-      onLegendClick={onLegendClick}
-      onLegendDoubleClick={onLegendDoubleClick}
-      onAfterPlot={onAfterPlot}
-      disableLegendHover={disableLegendHover}
-      disableSoloTrace={disableSoloTrace}
-      traceNames={traceNames}
+      {...plotProps}
       style={{ width: '100%', height: `${height}px` }}
       layout={{
         autosize: true,

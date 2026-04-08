@@ -12,7 +12,6 @@ import type { RepelLineObstacle, RepelPoint, RepelRectObstacle } from "pltly/plo
 import { Plot, blendAvgColor, clean, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
-import { usePinnedLegend } from "pltly/react"
 
 
 const STATIONS = [
@@ -74,12 +73,9 @@ const REGION_GROUPS: StationGroup[] = [
 export type Metric = "avg" | "total" | "pct2019"
 type GroupBy = "daytype" | "station"
 type TimeRange = "all" | "recent"
-type LegendMode = "solo" | "highlight"
-
 const metricParam = codeParam<Metric>("avg", { avg: "a", total: "t", pct2019: "p" })
 const groupByParam = codeParam<GroupBy>("station", { daytype: "d", station: "s" })
 const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "p" })
-const legendModeParam = codeParam<LegendMode>("highlight", { solo: "s", highlight: "h" })
 
 type Exclusion = { station: string, month: string }
 
@@ -357,6 +353,17 @@ function processData(rows: RawRow[]): ProcessedData {
   }
 }
 
+/** Compute padded date-string ranges from the last month in the data */
+function dataRanges(months: Date[]): { allTimeRange: [string, string], recentRange: [string, string] } {
+  const last = months[months.length - 1]
+  const endDate = new Date(last.getFullYear(), last.getMonth() + 1, 17)
+  const end = endDate.toISOString().slice(0, 10)
+  return {
+    allTimeRange: ['2011-12-17', end],
+    recentRange: ['2019-12-17', end],
+  }
+}
+
 const BASELINE_COLS: MetricDayTypeCol[] = ["avg_weekday", "avg_weekend", "avg_holiday", "total_weekday", "total_weekend", "total_holiday"]
 
 function computeBaselines(
@@ -505,8 +512,6 @@ function buildByStation(
   metric: Metric,
   dayTypes: string[],
   selectedStations: string[],
-  legend: { activeItem: string | null, isAllSelected: boolean, isFaded: (name: string) => boolean },
-  legendMode: LegendMode,
   timeRange: TimeRange,
   activeYear: string | null,
 ): { data: Data[], layout: Partial<Layout> } {
@@ -515,15 +520,12 @@ function buildByStation(
   const activeStns = selectedStations.length > 0 ? selectedStations : [...STATIONS] as string[]
   const isRecent = timeRange === "recent"
 
-  const isSolo = legendMode === "solo"
-
   if (metric === "pct2019") {
     const vs2019Months = months.slice(firstPostBaselineIdx)
     const traces: Data[] = (STATIONS as readonly string[]).map(station => {
         const sd = stations.get(station)
         const bl = baselines.get(station)
         if (!sd || !bl) return null
-        const faded = legend.isFaded(station)
         const pcts = vs2019Months.map((m, i) => {
           const idx = firstPostBaselineIdx + i
           const mo = m.getMonth()
@@ -538,11 +540,8 @@ function buildByStation(
           y: pcts,
           type: "scatter",
           mode: "lines",
-          line: { color: STATION_COLORS[station], width: !faded && legend.activeItem ? 5 : 2 },
+          line: { color: STATION_COLORS[station] },
           hovertemplate: hovertemplatePct,
-          zorder: faded ? 1 : 100,
-          ...(faded && isSolo ? { visible: 'legendonly' as const } : {}),
-          ...(faded && !isSolo ? { opacity: 0.4 } : {}),
         } as Data
       }).filter((d): d is Data => d !== null)
 
@@ -569,12 +568,10 @@ function buildByStation(
   }
 
   if (metric === "total") {
-    const isSolo = legendMode === "solo"
-    const yearNum = activeYear && !legend.activeItem ? parseInt(activeYear) : null
+    const yearNum = activeYear ? parseInt(activeYear) : null
     const barData: Data[] = (STATIONS as readonly string[]).map(station => {
       const sd = stations.get(station)
       if (!sd) return null
-      const faded = legend.isFaded(station)
       const ys = sd.months.map((_, i) => sumAcrossDayTypes(sd, "total", dayTypes, i))
       const yearOpacity = yearNum
         ? sd.months.map(m => m.getFullYear() === yearNum ? 1 : 0.15)
@@ -583,21 +580,17 @@ function buildByStation(
         name: station,
         type: "bar",
         x: sd.months,
-        y: faded && isSolo ? ys.map(() => 0) : ys,
+        y: ys,
         marker: {
           color: STATION_COLORS[station],
           ...(yearOpacity ? { opacity: yearOpacity } : {}),
         },
-        ...(faded && isSolo ? { hoverinfo: "skip" as const } : { hovertemplate }),
-        ...(faded ? { opacity: 0.4 } : {}),
+        hovertemplate,
       } as Data
     }).filter((d): d is Data => d !== null)
 
-    const activeStation = legend.activeItem
-    const avgItems = legend.isAllSelected ? [...STATIONS] as string[] : selectedStations
-    const avgSource = activeStation
-      ? stations.get(activeStation)?.months.map((_, i) => sumAcrossDayTypes(stations.get(activeStation)!, "total", dayTypes, i)) ?? []
-      : months.map((_, i) => {
+    const avgItems = selectedStations.length > 0 ? selectedStations : [...STATIONS] as string[]
+    const avgSource = months.map((_, i) => {
           let sum = 0
           for (const s of avgItems) {
             const sd = stations.get(s)
@@ -606,9 +599,7 @@ function buildByStation(
           return sum
         })
     const avg12 = rollingAvg(avgSource, 12)
-    const avgColor = activeStation
-      ? blendAvgColor(STATION_COLORS[activeStation], 0.5)
-      : (dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
+    const avgColor = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
     const avgTrace: Data = {
       name: "12mo avg",
       x: months,
@@ -621,8 +612,7 @@ function buildByStation(
       connectgaps: false,
     }
 
-    const allTimeRange = ['2011-12-17', '2025-12-17']
-    const recentRange = ['2019-12-17', '2025-12-17']
+    const { allTimeRange, recentRange } = dataRanges(months)
     return {
       data: [...barData, avgTrace],
       layout: {
@@ -646,7 +636,6 @@ function buildByStation(
   const traces: Data[] = (STATIONS as readonly string[]).map(station => {
       const sd = stations.get(station)
       if (!sd) return null
-      const faded = legend.isFaded(station)
       const ys = sd.months.map((_, i) => sumAcrossDayTypes(sd, "avg", dayTypes, i))
       return {
         name: station,
@@ -654,16 +643,12 @@ function buildByStation(
         y: ys,
         type: "scatter",
         mode: "lines",
-        line: { color: STATION_COLORS[station], width: !faded && legend.activeItem ? 5 : 2 },
+        line: { color: STATION_COLORS[station] },
         hovertemplate,
-        zorder: faded ? 1 : 100,
-        ...(faded && isSolo ? { visible: 'legendonly' as const } : {}),
-        ...(faded && !isSolo ? { opacity: 0.4 } : {}),
       } as Data
     }).filter((d): d is Data => d !== null)
 
-  const allTimeRange = ['2011-12-17', '2025-12-17']
-  const recentRange = ['2019-12-17', '2025-12-17']
+  const { allTimeRange, recentRange } = dataRanges(months)
   return {
     data: sortTracesByLastY(traces),
     layout: {
@@ -685,8 +670,6 @@ function buildByDayType(
   metric: Metric,
   dayTypes: string[],
   selectedStations: string[],
-  legend: { activeItem: string | null, isAllSelected: boolean, isFaded: (name: string) => boolean },
-  legendMode: LegendMode,
   timeRange: TimeRange,
   activeYear: string | null,
 ): { data: Data[], layout: Partial<Layout> } {
@@ -695,7 +678,6 @@ function buildByDayType(
   const activeStns = selectedStations.length > 0 ? selectedStations : [...STATIONS] as string[]
   const isRecent = timeRange === "recent"
   const baseMetric: "avg" | "total" = metric === "pct2019" ? "avg" : metric
-  const isSolo = legendMode === "solo"
 
   // Aggregate across selected stations for each day type
   function sumForDayType(dayType: string, idx: number): number {
@@ -732,18 +714,14 @@ function buildByDayType(
     }))
     const traces: Data[] = traceData.map((td, i) => {
       const dt = dayTypes[i]
-      const faded = legend.isFaded(td.label)
       return {
         name: td.label,
         x: td.x,
         y: td.y,
         type: "scatter",
         mode: "lines",
-        line: { color: DAY_TYPE_COLORS[dt], width: !faded && legend.activeItem ? 5 : 2 },
+        line: { color: DAY_TYPE_COLORS[dt] },
         hovertemplate: hovertemplatePct,
-        zorder: faded ? 1 : 100,
-        ...(faded && isSolo ? { visible: 'legendonly' as const } : {}),
-        ...(faded && !isSolo ? { opacity: 0.4 } : {}),
       } as Data
     })
 
@@ -780,10 +758,8 @@ function buildByDayType(
   }
 
   if (metric === "total") {
-    const isSolo = legendMode === "solo"
-    const yearNum = activeYear && !legend.activeItem ? parseInt(activeYear) : null
+    const yearNum = activeYear ? parseInt(activeYear) : null
     const barData: Data[] = dayTypes.map(dt => {
-      const faded = legend.isFaded(DAY_TYPE_LABELS[dt])
       const ys = months.map((_, i) => sumForDayType(dt, i))
       const yearOpacity = yearNum
         ? months.map(m => m.getFullYear() === yearNum ? 1 : 0.15)
@@ -792,31 +768,22 @@ function buildByDayType(
         name: DAY_TYPE_LABELS[dt],
         type: "bar",
         x: months,
-        y: faded && isSolo ? ys.map(() => 0) : ys,
+        y: ys,
         marker: {
           color: DAY_TYPE_COLORS[dt],
           ...(yearOpacity ? { opacity: yearOpacity } : {}),
         },
-        ...(faded && isSolo ? { hoverinfo: "skip" as const } : { hovertemplate }),
-        ...(faded ? { opacity: 0.4 } : {}),
+        hovertemplate,
       } as Data
     })
 
-    const activeDayType = legend.activeItem
-    const activeDt = activeDayType
-      ? Object.entries(DAY_TYPE_LABELS).find(([, v]) => v === activeDayType)?.[0]
-      : null
-    const avgSource = activeDt
-      ? months.map((_, i) => sumForDayType(activeDt, i))
-      : months.map((_, i) => {
+    const avgSource = months.map((_, i) => {
           let sum = 0
           for (const dt of dayTypes) sum += sumForDayType(dt, i)
           return sum
         })
     const avg12 = rollingAvg(avgSource, 12)
-    const avgColor = activeDt
-      ? blendAvgColor(DAY_TYPE_COLORS[activeDt], 0.5)
-      : (dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
+    const avgColor = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
     const avgTrace: Data = {
       name: "12mo avg",
       x: months,
@@ -829,8 +796,7 @@ function buildByDayType(
       connectgaps: false,
     }
 
-    const allTimeRange = ['2011-12-17', '2025-12-17']
-    const recentRange = ['2019-12-17', '2025-12-17']
+    const { allTimeRange, recentRange } = dataRanges(months)
     return {
       data: [...barData, avgTrace],
       layout: {
@@ -859,22 +825,21 @@ function buildByDayType(
   }))
   const traces: Data[] = traceData.map((td, i) => {
     const dt = dayTypes[i]
-    const faded = legend.isFaded(td.label)
     return {
       name: td.label,
       x: td.x,
       y: td.y,
-      line: { color: DAY_TYPE_COLORS[dt], width: !faded && legend.activeItem ? 5 : 2 },
+      line: { color: DAY_TYPE_COLORS[dt] },
       hovertemplate,
-      zorder: faded ? 1 : 100,
-      ...(faded && isSolo ? { visible: 'legendonly' as const } : {}),
-      ...(faded && !isSolo ? { opacity: 0.4 } : {}),
     } as Data
   })
 
-  const avgXRange: [number, number] = isRecent
-    ? [new Date(2019, 11, 17).getTime(), new Date(2025, 11, 17).getTime()]
-    : [new Date(2011, 11, 17).getTime(), new Date(2025, 11, 17).getTime()]
+  const { allTimeRange, recentRange } = dataRanges(months)
+  const rangeStr = isRecent ? recentRange : allTimeRange
+  const avgXRange: [number, number] = [
+    new Date(rangeStr[0]).getTime(),
+    new Date(rangeStr[1]).getTime(),
+  ]
   const annotations = traceData.length >= 2
     ? endpointAnnotations(traceData, v => round(v).toLocaleString(), avgXRange)
     : []
@@ -887,7 +852,7 @@ function buildByDayType(
         tickformat: isRecent ? "%b '%y" : "'%y",
         hoverformat: "%b '%y",
         tickangle: -45,
-        ...(isRecent ? { range: ['2019-12-17', '2025-12-17'] } : {}),
+        ...(isRecent ? { range: recentRange } : {}),
       },
       legend: {
         yanchor: "top" as const, y: 0.99,
@@ -924,51 +889,27 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     clearTimeout(dayTypeUrlTimerRef.current)
     dayTypeUrlTimerRef.current = setTimeout(() => setUrlDayTypes(dayTypes), 300)
   }, [setUrlDayTypes])
-  const [legendMode, setLegendMode] = useUrlState<LegendMode>("l", legendModeParam)
   const [baselineYears, setBaselineYears] = useUrlState<number>("b", baselineYearsParam)
   const [exclusions, setExclusions] = useUrlState<Exclusion[]>("x", exclusionsParam)
   // Force time range to recent when pct2019
   const effectiveTimeRange = metric === "pct2019" ? "recent" : timeRange
 
-  // Shared containerRef for both legend instances
-  const sharedContainerRef = useRef<HTMLDivElement>(null)
-
-  const stationLegend = usePinnedLegend({
-    allItems: STATIONS,
-    selectedItems: selectedStations,
-    setSelectedItems: setSelectedStations,
-    active: groupBy === "station",
-    containerRef: sharedContainerRef,
-    unpinExcludeSelectors: ['.baseline-controls'],
-  })
-
-  const dayTypeLegend = usePinnedLegend({
-    allItems: DAY_TYPES as unknown as string[],
-    selectedItems: selectedDayTypes,
-    setSelectedItems: setSelectedDayTypes,
-    nameMap: DAY_TYPE_LABELS,
-    active: groupBy === "daytype",
-    containerRef: sharedContainerRef,
-  })
-
-  const legend = groupBy === "station" ? stationLegend : dayTypeLegend
-
   const selectGroup = useCallback((group: readonly string[]) => {
-    stationLegend.onPickerChange([...group])
-  }, [stationLegend.onPickerChange])
+    setSelectedStations([...group])
+  }, [setSelectedStations])
 
   useActions({
     'stations:all': {
       label: 'All stations',
       group: 'Stations',
       defaultBindings: ['s a'],
-      handler: () => stationLegend.onPickerChange([...STATIONS]),
+      handler: () => setSelectedStations([...STATIONS]),
     },
     'stations:none': {
       label: 'No stations (aggregate)',
       group: 'Stations',
       defaultBindings: ['s 0'],
-      handler: () => stationLegend.onPickerChange([]),
+      handler: () => setSelectedStations([]),
     },
     'stations:ny': {
       label: 'New York stations',
@@ -1085,47 +1026,42 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     },
   })
 
-  const effectiveStations = stationLegend.effectiveItems
-  const effectiveDayTypes = dayTypeLegend.effectiveItems
-
   useEffect(() => {
-    onEffectiveStationsChange?.(effectiveStations)
-  }, [effectiveStations, onEffectiveStationsChange])
+    onEffectiveStationsChange?.(selectedStations)
+  }, [selectedStations, onEffectiveStationsChange])
 
   useEffect(() => {
     onMetricChange?.(metric)
   }, [metric, onMetricChange])
 
   useEffect(() => {
-    onEffectiveDayTypesChange?.(effectiveDayTypes)
-  }, [effectiveDayTypes, onEffectiveDayTypesChange])
+    onEffectiveDayTypesChange?.(selectedDayTypes)
+  }, [selectedDayTypes, onEffectiveDayTypesChange])
 
   // Subtitle: badge-style facets with individual × clear buttons
   const subtitle = useMemo(() => {
     const badges: React.ReactNode[] = []
-    const stSub = stationSubtitle(effectiveStations)
+    const stSub = stationSubtitle(selectedStations)
     if (stSub) {
       badges.push(
         <span key="stations" className="filter-badge">
           {stSub}
-          <span className="clear-filter" onClick={() => stationLegend.clearPin()}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedStations([...STATIONS])}>&times;</span>
         </span>
       )
     }
-    if (effectiveDayTypes.length < DAY_TYPES.length && effectiveDayTypes.length > 0) {
-      const dtText = effectiveDayTypes.map(dt => DAY_TYPE_LABELS[dt] ?? dt).join(", ")
+    if (selectedDayTypes.length < DAY_TYPES.length && selectedDayTypes.length > 0) {
+      const dtText = selectedDayTypes.map(dt => DAY_TYPE_LABELS[dt] ?? dt).join(", ")
       badges.push(
         <span key="daytypes" className="filter-badge">
           {dtText}
-          <span className="clear-filter" onClick={() => dayTypeLegend.clearPin()}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedDayTypes([...DAY_TYPES] as string[])}>&times;</span>
         </span>
       )
     }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [effectiveStations, effectiveDayTypes, stationLegend.clearPin, dayTypeLegend.clearPin])
-
-  const hasLegend = (groupBy === "station" && selectedStations.length > 0) || groupBy === "daytype"
+  }, [selectedStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes])
 
   const baselines = useMemo(
     () => processed ? computeBaselines(processed.stations, baselineYears, exclusions) : new Map<string, StationBaseline>(),
@@ -1135,12 +1071,10 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
   const plotProps = useMemo(() => {
     if (!processed) return {}
     if (groupBy === "station") {
-      return buildByStation(processed, baselines, metric, selectedDayTypes, selectedStations, stationLegend, legendMode, effectiveTimeRange, activeYear ?? null)
+      return buildByStation(processed, baselines, metric, selectedDayTypes, selectedStations, effectiveTimeRange, activeYear ?? null)
     }
-    // Pass all day types via snapshot so all traces are built; legend.isFaded handles fading
-    const allDayTypes = [...DAY_TYPES] as string[]
-    return buildByDayType(processed, baselines, metric, allDayTypes, selectedStations, dayTypeLegend, legendMode, effectiveTimeRange, activeYear ?? null)
-  }, [processed, baselines, metric, groupBy, selectedDayTypes, selectedStations, effectiveTimeRange, stationLegend.activeItem, stationLegend.isFaded, stationLegend.isAllSelected, dayTypeLegend.activeItem, dayTypeLegend.isFaded, dayTypeLegend.isAllSelected, activeYear, legendMode])
+    return buildByDayType(processed, baselines, metric, selectedDayTypes, selectedStations, effectiveTimeRange, activeYear ?? null)
+  }, [processed, baselines, metric, groupBy, selectedDayTypes, selectedStations, effectiveTimeRange, activeYear])
 
   const title = useMemo(() => {
     const metricLabel = metric === "avg"
@@ -1153,20 +1087,14 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
   }, [metric, groupBy, baselineYears])
 
   return (
-    <div className="plot-container" ref={sharedContainerRef} onClick={legend.onContainerClick}>
+    <div className="plot-container">
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
       <Plot
+        key={groupBy}
         id="rides"
         title={title}
         subtitle={subtitle}
-        {...(hasLegend ? {
-          disableLegendHover: true,
-          disableSoloTrace: true,
-          onLegendClick: legend.onLegendClick,
-          onLegendDoubleClick: legend.onLegendDoubleClick,
-          onAfterPlot: legend.onAfterPlot,
-          traceNames: legend.traceNames,
-        } : {})}
+        fadeOpacity={0.4}
         {...plotProps}
       />
       {!clean && <>
@@ -1201,35 +1129,20 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
               <ToggleButton value="recent">2020–Present</ToggleButton>
             </ToggleButtonGroup>
           )}
-          {hasLegend && <>
-            <ToggleButtonGroup
-              value={legendMode}
-              exclusive
-              size="small"
-              onChange={(_, v) => { if (v) setLegendMode(v) }}
-            >
-              <ToggleButton value="solo">Solo</ToggleButton>
-              <ToggleButton value="highlight">Highlight</ToggleButton>
-            </ToggleButtonGroup>
-            <InfoTip>
-              <strong>Solo</strong>: clicking a legend item hides all others.<br/>
-              <strong>Highlight</strong>: clicking fades others but keeps them visible.
-            </InfoTip>
-          </>}
 
           <StationDropdown
             stations={[...DAY_TYPES] as string[]}
             colors={DAY_TYPE_COLORS}
             selected={selectedDayTypes}
-            onChange={dayTypeLegend.onPickerChange}
+            onChange={setSelectedDayTypes}
             label="Day Types"
             nameMap={DAY_TYPE_LABELS}
           />
           <StationDropdown
             stations={[...STATIONS]}
             colors={STATION_COLORS}
-            selected={effectiveStations}
-            onChange={stationLegend.onPickerChange}
+            selected={selectedStations}
+            onChange={setSelectedStations}
             lineGroups={LINE_GROUPS}
             regionGroups={REGION_GROUPS}
           />
