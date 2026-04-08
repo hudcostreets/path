@@ -29,15 +29,18 @@ jobs:
       - run: pip install -e .
 
       - name: Check for new PDFs
-        run: path-data refresh -c
+        run: path-data refresh
 
       - name: Run pipeline
-        run: dvx run
+        run: dvx run data/*.dvc www/public/*.dvc
+
+      - name: Stage all data changes
+        run: git add data/ www/public/ img/
 
       - name: Check for changes
         id: check
         run: |
-          if git diff --quiet && git diff --cached --quiet; then
+          if git diff --cached --quiet; then
             echo "changes=false" >> $GITHUB_OUTPUT
           else
             echo "changes=true" >> $GITHUB_OUTPUT
@@ -54,7 +57,6 @@ jobs:
       - name: Commit and push
         if: steps.check.outputs.changes == 'true'
         run: |
-          git add -u
           git commit -m "Update PATH ridership data"
           git push
 

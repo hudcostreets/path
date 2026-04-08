@@ -1,0 +1,8 @@
+outs:
+- md5: b57b3d81185f328ca56a9dab24966fc3
+  size: 3770
+  hash: md5
+  path: 2026-day-types.pqt
+meta:
+  computation:
+    cmd: juq papermill run monthly.ipynb -o out/monthly-2026.ipynb -p year=2026

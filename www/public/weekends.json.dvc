@@ -1,12 +1,12 @@
 outs:
-- md5: bdb87413ec645acc3b623436355adc0f
-  size: 81875
+- md5: c91a445291984bfc60e8b4364fff3660
+  size: 91599
   hash: md5
   path: weekends.json
 meta:
   computation:
-    cmd: juq papermill run months.ipynb -i && cp data/all.pqt www/public/all.pqt
-      && cp img/weekdays.json www/public/weekdays.json && cp img/weekends.json www/public/weekends.json
+    cmd: juq papermill run months.ipynb -i && cp data/all.pqt www/public/all.pqt &&
+      cp img/weekdays.json www/public/weekdays.json && cp img/weekends.json www/public/weekends.json
       && cp img/avg_weekday_month_grouped.json www/public/avg_weekday_month_grouped.json
       && cp img/avg_weekend_month_grouped.json www/public/avg_weekend_month_grouped.json
     deps:
