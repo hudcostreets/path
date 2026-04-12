@@ -5,7 +5,7 @@ outs:
   path: 2018.pqt
 meta:
   computation:
-    cmd: juq papermill run monthly.ipynb -o out/monthly-2018.ipynb -p year=2018
+    cmd: path-data monthly -y 2018
     git_deps:
       data/2018-PATH-Monthly-Ridership-Report.pdf: 66937f7df61f8d371e20a3b4b83a8fbc55cba06c
       monthly.ipynb: 9762d56544fd608da8a7ca271f80463f4582a2f3

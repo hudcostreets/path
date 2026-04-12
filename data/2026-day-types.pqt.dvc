@@ -5,4 +5,4 @@ outs:
   path: 2026-day-types.pqt
 meta:
   computation:
-    cmd: juq papermill run monthly.ipynb -o out/monthly-2026.ipynb -p year=2026
+    cmd: path-data monthly -y 2026

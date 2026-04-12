@@ -46,7 +46,7 @@ def ensure_year_pipeline(year: int):
                 'outs': [{'path': out_path}],
                 'meta': {
                     'computation': {
-                        'cmd': f'juq papermill run monthly.ipynb -o out/monthly-{year}.ipynb -p year={year}',
+                        'cmd': f'path-data monthly -y {year}',
                     }
                 },
             }
