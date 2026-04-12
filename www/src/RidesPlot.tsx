@@ -88,6 +88,13 @@ const DEFAULT_EXCLUSIONS: Exclusion[] = [
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
+type Preset = { label: string, metric: Metric, groupBy: GroupBy }
+const PRESETS: Preset[] = [
+  { label: "recovery by day type", metric: "pct2019", groupBy: "daytype" },
+  { label: "monthly totals by station", metric: "total", groupBy: "station" },
+  { label: "avg daily by day type", metric: "avg", groupBy: "daytype" },
+]
+
 function formatExclusion(e: Exclusion): string {
   const abbrev = STATION_ABBREVS[e.station] ?? e.station
   const [y, m] = e.month.split('-')
@@ -1200,6 +1207,28 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
           </div>
         )}
         {metric === "pct2019" && groupBy === "daytype" && <p>Weekend ridership has surpassed pre-COVID levels (2017–2019 avg baseline), though service remains degraded.</p>}
+        <div className="plot-presets">
+          Try:{" "}
+          {PRESETS.map((p, i) => {
+            const active = p.metric === metric && p.groupBy === groupBy
+            return (
+              <span key={p.label}>
+                {i > 0 && " · "}
+                <a
+                  href="#"
+                  className={active ? "active" : ""}
+                  onClick={e => {
+                    e.preventDefault()
+                    setMetric(p.metric)
+                    setGroupBy(p.groupBy)
+                  }}
+                >
+                  {p.label}
+                </a>
+              </span>
+            )
+          })}
+        </div>
         <hr/>
         <div>
           {processed ?

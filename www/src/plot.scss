@@ -23,6 +23,37 @@
   align-items: center;
 }
 
+.plot-presets {
+  font-size: 0.8rem;
+  color: #888;
+  margin: 0.3em 0;
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: #666;
+    text-underline-offset: 2px;
+    &:hover {
+      color: #ccc;
+    }
+    &.active {
+      color: #ccc;
+      font-weight: 500;
+      text-decoration-color: #ccc;
+    }
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .plot-presets {
+    color: #777;
+    a {
+      text-decoration-color: #aaa;
+      &:hover { color: #333; }
+      &.active { color: #222; text-decoration-color: #333; }
+    }
+  }
+}
+
 .station-dropdown {
   position: relative;
   display: inline-block;
