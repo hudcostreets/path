@@ -110,6 +110,43 @@ def _latest_out_notebook_error() -> str | None:
     return None
 
 
+def _papermill_direct_cmd(juq_cmd: str) -> list[str] | None:
+    """Translate `juq papermill run <nb> -o <out> -p year=<y>` into a bare
+    `papermill --log-output <nb> <out> -p year <y>` argv."""
+    import shlex
+    try:
+        toks = shlex.split(juq_cmd)
+    except ValueError:
+        return None
+    if toks[:3] != ['juq', 'papermill', 'run']:
+        return None
+    nb_path = None
+    out_path = None
+    params: list[tuple[str, str]] = []
+    i = 3
+    while i < len(toks):
+        t = toks[i]
+        if t in ('-o', '--out-path'):
+            out_path = toks[i + 1]
+            i += 2
+        elif t in ('-p', '--parameter'):
+            k, _, v = toks[i + 1].partition('=')
+            params.append((k, v))
+            i += 2
+        elif nb_path is None and not t.startswith('-'):
+            nb_path = t
+            i += 1
+        else:
+            i += 1
+    if not (nb_path and out_path):
+        return None
+    argv = ['papermill', '--log-output', '--request-save-on-cell-execute',
+            '--autosave-cell-every', '5', nb_path, out_path]
+    for k, v in params:
+        argv += ['-p', k, v]
+    return argv
+
+
 def _rerun_failing_dvc() -> str | None:
     """On failure, find the most-recently-touched yearly .dvc and re-run its cmd
     directly with captured stderr, so we get the actual papermill error that
@@ -131,8 +168,16 @@ def _rerun_failing_dvc() -> str | None:
         return None
     if not cmd:
         return None
-    err(f"_rerun_failing_dvc: re-running `{cmd}` to capture stderr")
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
+    # Bypass the juq wrapper and use papermill directly with --log-output so
+    # cell stderr streams out as cells run. Extract the .ipynb + -p args from
+    # the stored cmd.
+    direct = _papermill_direct_cmd(cmd)
+    if direct:
+        err(f"_rerun_failing_dvc: direct papermill: {direct}")
+        result = subprocess.run(direct, capture_output=True, text=True, timeout=600)
+    else:
+        err(f"_rerun_failing_dvc: re-running `{cmd}` to capture stderr")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
     # Papermill writes cell errors to the output notebook even on failure;
     # parse that first.
     nb_out = glob('out/*.ipynb')
