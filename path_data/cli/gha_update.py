@@ -133,10 +133,20 @@ def _rerun_failing_dvc() -> str | None:
         return None
     err(f"_rerun_failing_dvc: re-running `{cmd}` to capture stderr")
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
+    # Papermill writes cell errors to the output notebook even on failure;
+    # parse that first.
+    nb_out = glob('out/*.ipynb')
+    if nb_out:
+        nb_out.sort(key=getmtime, reverse=True)
+        for nb in nb_out:
+            cell_err = _notebook_errors(nb)
+            if cell_err:
+                return f"**{nb}**\n\n{cell_err}"
+    # Fallback: show captured stderr/stdout tails
     tail_err = result.stderr[-3000:] if result.stderr else '(empty stderr)'
     tail_out = result.stdout[-1000:] if result.stdout else '(empty stdout)'
     return dedent(f"""\
-        Re-ran `{cmd}` directly to capture stderr (exit {result.returncode}):
+        Re-ran `{cmd}` directly (exit {result.returncode}); no cell-error in `out/*.ipynb`.
 
         ### stderr (tail)
 
