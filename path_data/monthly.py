@@ -110,7 +110,10 @@ def run_monthly(year: int, last_month: int | None = None, template_path: str | N
     err(f"Wrote {relpath(pqt_path)}")
 
     day_types_path = year_day_types_pqt(year)
-    nums.to_parquet(day_types_path, engine='fastparquet')
+    # Store `month` as a regular column so it roundtrips deterministically
+    # across pandas versions (pandas 3.0's default parquet index handling
+    # doesn't always preserve named indexes like `month`).
+    nums.reset_index().to_parquet(day_types_path, engine='fastparquet', index=False)
     err(f"Wrote {relpath(day_types_path)}")
 
 

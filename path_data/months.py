@@ -72,18 +72,13 @@ def _load_day_type_histograms() -> pd.DataFrame:
         # faithfully; pandas 3.0's default `pyarrow` read of a fastparquet-
         # written file loses the index name/values and ends up with month=0.
         frames.append(pd.read_parquet(p, engine='fastparquet').assign(year=year))
-    out = concat(frames).reset_index()
-    err(f"_load_day_type_histograms: columns={list(out.columns)}, month sample={out['month'].head(3).to_list() if 'month' in out else 'MISSING'}")
+    out = concat(frames).reset_index(drop=True)
     out['year'] = out['year'].astype('int64')
     out['month'] = out['month'].astype('int64')
     return out.set_index(['year', 'month'])
 
 
 def _merge_and_recompute(df: pd.DataFrame, day_hists: pd.DataFrame) -> pd.DataFrame:
-    err(f"_merge: df.dtypes[year,month_idx]=({df['year'].dtype}, {df['month_idx'].dtype})")
-    err(f"_merge: day_hists.index.names={day_hists.index.names}, dtypes=[{day_hists.index.get_level_values(0).dtype}, {day_hists.index.get_level_values(1).dtype}]")
-    err(f"_merge: df head: {df[['year', 'month_idx']].head(2).to_dict('records')}")
-    err(f"_merge: day_hists head: {list(day_hists.index[:2])}")
     m = (
         df.merge(
             day_hists,
@@ -94,8 +89,6 @@ def _merge_and_recompute(df: pd.DataFrame, day_hists: pd.DataFrame) -> pd.DataFr
         .rename(columns={'saturdays': 'sats', 'sundays': 'suns'})
         .drop(columns=['year', 'month_idx', 'dt', 'avg daily', 'total'])
     )
-    nan_rows = m['weekdays'].isna().sum()
-    err(f"_merge: merged shape={m.shape}, NaN weekdays rows={nan_rows}")
     for k in ['weekday', 'sat', 'sun', 'holiday']:
         tk = f'total {k}'
         ak = f'avg {k}'
