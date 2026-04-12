@@ -1,6 +1,7 @@
+import json
 from glob import glob
 from os import environ
-from os.path import basename, exists
+from os.path import basename, exists, getmtime
 from subprocess import CalledProcessError
 from sys import exit
 from textwrap import dedent
@@ -58,6 +59,51 @@ def _staged_paths(path_filter: str | None = None) -> list[str]:
     if path_filter:
         paths = [p for p in paths if path_filter in p]
     return paths
+
+
+ANSI_RE = None
+
+
+def _strip_ansi(s: str) -> str:
+    global ANSI_RE
+    if ANSI_RE is None:
+        import re
+        ANSI_RE = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]')
+    return ANSI_RE.sub('', s)
+
+
+def _notebook_errors(nb_path: str) -> str | None:
+    """Return a formatted traceback from the first errored cell in nb_path."""
+    if not exists(nb_path):
+        return None
+    try:
+        with open(nb_path) as f:
+            nb = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+    for i, cell in enumerate(nb.get('cells', []) or []):
+        for output in cell.get('outputs', []) or []:
+            if output.get('output_type') != 'error':
+                continue
+            ename = output.get('ename', 'Error')
+            evalue = output.get('evalue', '')
+            tb = '\n'.join(_strip_ansi(line) for line in (output.get('traceback') or []))
+            src = ''.join(cell.get('source', []) or [])
+            return f"Cell {i} raised `{ename}: {evalue}`\n\n```python\n{src}\n```\n\n```\n{tb}\n```"
+    return None
+
+
+def _latest_out_notebook_error() -> str | None:
+    """Find the most recently modified `out/*.ipynb` and extract its first error cell."""
+    candidates = glob('out/*.ipynb')
+    if not candidates:
+        return None
+    candidates.sort(key=getmtime, reverse=True)
+    for nb in candidates:
+        msg = _notebook_errors(nb)
+        if msg:
+            return f"**{nb}**\n\n{msg}"
+    return None
 
 
 def _pdf_last_modified(dvc_path: str) -> str | None:
@@ -148,6 +194,8 @@ def gha_update():
         tb = format_exc()
         err(tb)
         prog = e.cmd[0] if hasattr(e, 'cmd') and e.cmd else '?'
+        nb_err = _latest_out_notebook_error()
+        nb_section = f"\n\n### Notebook cell error\n\n{nb_err}" if nb_err else ""
         _append_summary(dedent(f"""\
             ## :rotating_light: Pipeline error
 
@@ -156,12 +204,13 @@ def gha_update():
 
             ```
             {tb[-1500:]}
-            ```
+            ```{nb_section}
 
             {md_link}
             """))
+        slack_nb = f"\n```\n{nb_err[:500]}\n```" if nb_err else ""
         _slack(
-            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}",
+            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}{slack_nb}",
             emoji=':rotating_light:',
         )
         exit(e.returncode or 1)
