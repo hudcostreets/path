@@ -171,13 +171,17 @@ def _rerun_failing_dvc() -> str | None:
     # Bypass the juq wrapper and use papermill directly with --log-output so
     # cell stderr streams out as cells run. Extract the .ipynb + -p args from
     # the stored cmd.
+    from os import makedirs
+    makedirs('out', exist_ok=True)
+    run_env = {**environ, 'PYTHONUNBUFFERED': '1'}
     direct = _papermill_direct_cmd(cmd)
     if direct:
         err(f"_rerun_failing_dvc: direct papermill: {direct}")
-        result = subprocess.run(direct, capture_output=True, text=True, timeout=600)
+        result = subprocess.run(direct, capture_output=True, text=True, timeout=600, env=run_env)
     else:
         err(f"_rerun_failing_dvc: re-running `{cmd}` to capture stderr")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600, env=run_env)
+    err(f"_rerun_failing_dvc: exit={result.returncode} stdout_len={len(result.stdout or '')} stderr_len={len(result.stderr or '')}")
     # Papermill writes cell errors to the output notebook even on failure;
     # parse that first.
     nb_out = glob('out/*.ipynb')
