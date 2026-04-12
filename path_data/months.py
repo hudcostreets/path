@@ -69,7 +69,12 @@ def _load_day_type_histograms() -> pd.DataFrame:
             continue
         year = int(m['y'])
         frames.append(pd.read_parquet(p).assign(year=year))
-    return concat(frames).reset_index().set_index(['year', 'month'])
+    out = concat(frames).reset_index()
+    # Ensure merge-key dtypes are int64 — matches `_load_yearly_parquets`
+    # (pandas 3.0 won't silently coerce across int widths).
+    out['year'] = out['year'].astype('int64')
+    out['month'] = out['month'].astype('int64')
+    return out.set_index(['year', 'month'])
 
 
 def _merge_and_recompute(df: pd.DataFrame, day_hists: pd.DataFrame) -> pd.DataFrame:
