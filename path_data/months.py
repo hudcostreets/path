@@ -373,8 +373,8 @@ def run_months(*, force: bool = True, end_month: str | None = None, publish: boo
 
 
 @path_data.command('months')
-@option('-F', '--no-force', 'force', flag_value=False, default=True, help="Skip rewriting all.pqt/all.xlsx if they exist.")
-@option('-P', '--no-publish', 'publish', flag_value=False, default=True, help="Skip copying outputs into www/public/.")
+@option('--force/--no-force', default=True, help="Rewrite all.pqt/all.xlsx even if they exist (default: force).")
+@option('--publish/--no-publish', default=True, help="Copy outputs into www/public/ (default: publish).")
 @option('-e', '--end-month', help="Override plot end-month (default: inferred from data).")
 def months(force: bool, publish: bool, end_month: str | None):
     """Combine per-year parquets → all.pqt/all.xlsx + plot JSONs/PNGs."""
