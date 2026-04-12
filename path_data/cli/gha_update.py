@@ -263,7 +263,15 @@ def gha_update():
         updated_pdfs = [p for p in pdf_paths if p.endswith('.pdf')]
 
         err('=== dvx run ===')
-        dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('www/public/*.dvc'))
+        # TODO(hourly): re-include `*-hourly*.dvc` once `parse-hourly.ipynb`
+        # is ported to a script (specs/hourly-data-pipeline.md). Currently
+        # those stages fail on clean checkouts due to a dtype check in cell 10
+        # against strings like "1,234" that tabula hasn't stripped commas from.
+        all_dvc = sorted(glob('data/*.dvc')) + sorted(glob('www/public/*.dvc'))
+        dvc_targets = [t for t in all_dvc if 'hourly' not in basename(t)]
+        skipped = [t for t in all_dvc if 'hourly' in basename(t)]
+        if skipped:
+            err(f'Skipping {len(skipped)} hourly targets (pending port): {skipped[:3]}…')
         # Capture output so the failure handler can parse `✗ <path>: failed`
         # lines. Echo it live so the step log still reflects progress.
         dvx_res = subprocess.run(
