@@ -187,22 +187,28 @@ def _rerun_failing_dvc() -> str | None:
             cell_err = _notebook_errors(nb)
             if cell_err:
                 return f"**{nb}**\n\n{cell_err}"
-    # Fallback: show captured stderr/stdout tails
-    tail_err = result.stderr[-3000:] if result.stderr else '(empty stderr)'
-    tail_out = result.stdout[-1000:] if result.stdout else '(empty stdout)'
+    # Fallback: show captured stderr/stdout. Errors usually appear at the TOP of
+    # stderr (traceback header + cause), so prefer showing head + tail over just tail.
+    def _head_tail(s: str | None, head_n: int = 4000, tail_n: int = 2000) -> str:
+        if not s:
+            return '(empty)'
+        if len(s) <= head_n + tail_n + 100:
+            return s
+        return s[:head_n] + f'\n\n…[{len(s) - head_n - tail_n} chars omitted]…\n\n' + s[-tail_n:]
+
     return dedent(f"""\
-        Re-ran `{cmd}` directly (exit {result.returncode}); no cell-error in `out/*.ipynb`.
+        Re-ran `{' '.join(direct) if direct else cmd}` directly (exit {result.returncode}); no cell-error in `out/*.ipynb`.
 
-        ### stderr (tail)
-
-        ```
-        {tail_err}
-        ```
-
-        ### stdout (tail)
+        ### stderr
 
         ```
-        {tail_out}
+        {_head_tail(result.stderr)}
+        ```
+
+        ### stdout
+
+        ```
+        {_head_tail(result.stdout, head_n=1500, tail_n=500)}
         ```
         """)
 
