@@ -115,43 +115,6 @@ def _latest_out_notebook_error() -> str | None:
     return None
 
 
-def _papermill_direct_cmd(juq_cmd: str) -> list[str] | None:
-    """Translate `juq papermill run <nb> -o <out> -p year=<y>` into a bare
-    `papermill --log-output <nb> <out> -p year <y>` argv."""
-    import shlex
-    try:
-        toks = shlex.split(juq_cmd)
-    except ValueError:
-        return None
-    if toks[:3] != ['juq', 'papermill', 'run']:
-        return None
-    nb_path = None
-    out_path = None
-    params: list[tuple[str, str]] = []
-    i = 3
-    while i < len(toks):
-        t = toks[i]
-        if t in ('-o', '--out-path'):
-            out_path = toks[i + 1]
-            i += 2
-        elif t in ('-p', '--parameter'):
-            k, _, v = toks[i + 1].partition('=')
-            params.append((k, v))
-            i += 2
-        elif nb_path is None and not t.startswith('-'):
-            nb_path = t
-            i += 1
-        else:
-            i += 1
-    if not (nb_path and out_path):
-        return None
-    argv = ['papermill', '--log-output', '--request-save-on-cell-execute',
-            '--autosave-cell-every', '5', nb_path, out_path]
-    for k, v in params:
-        argv += ['-p', k, v]
-    return argv
-
-
 def _rerun_failing_dvc() -> str | None:
     """On failure, find the most-recently-touched yearly .dvc and re-run its cmd
     directly with captured stderr, so we get the actual papermill error that
@@ -203,7 +166,7 @@ def _rerun_failing_dvc() -> str | None:
         return s[:head_n] + f'\n\n…[{len(s) - head_n - tail_n} chars omitted]…\n\n' + s[-tail_n:]
 
     return dedent(f"""\
-        Re-ran `{' '.join(direct) if direct else cmd}` directly (exit {result.returncode}); no cell-error in `out/*.ipynb`.
+        Re-ran `{cmd}` directly (exit {result.returncode}); no cell-error in `out/*.ipynb`.
 
         ### stderr
 
