@@ -1105,7 +1105,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     <div className="plot-container">
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
       <Plot
-        key={groupBy}
+        key={`${groupBy}-${metric}`}
         id="rides"
         title={title}
         subtitle={subtitle}
