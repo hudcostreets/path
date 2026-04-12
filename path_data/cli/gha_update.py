@@ -26,9 +26,14 @@ def _run_url() -> str | None:
 
 
 def _append_summary(md: str) -> None:
+    # Always echo to stderr so the step log has the full content too (the
+    # Summary tab only shows on the run page, whereas logs can be searched +
+    # piped).
+    err('---- summary ----')
+    err(md)
+    err('---- /summary ----')
     path = environ.get('GITHUB_STEP_SUMMARY')
     if not path:
-        err(md)
         return
     with open(path, 'a') as f:
         f.write(md.rstrip() + '\n')
@@ -168,19 +173,16 @@ def _rerun_failing_dvc() -> str | None:
         return None
     if not cmd:
         return None
-    # Bypass the juq wrapper and use papermill directly with --log-output so
-    # cell stderr streams out as cells run. Extract the .ipynb + -p args from
-    # the stored cmd.
+    # Re-run the EXACT stored cmd (e.g. `juq papermill run ...`) so we capture
+    # any wrapper-level errors (e.g. juq's AlignmentError in its post-papermill
+    # validation) that the original invocation produced. juq uses a temp dir
+    # internally, so if it fails, the `-o` path is never written — we have to
+    # rely on captured stderr.
     from os import makedirs
     makedirs('out', exist_ok=True)
     run_env = {**environ, 'PYTHONUNBUFFERED': '1'}
-    direct = _papermill_direct_cmd(cmd)
-    if direct:
-        err(f"_rerun_failing_dvc: direct papermill: {direct}")
-        result = subprocess.run(direct, capture_output=True, text=True, timeout=600, env=run_env)
-    else:
-        err(f"_rerun_failing_dvc: re-running `{cmd}` to capture stderr")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600, env=run_env)
+    err(f"_rerun_failing_dvc: re-running `{cmd}`")
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600, env=run_env)
     err(f"_rerun_failing_dvc: exit={result.returncode} stdout_len={len(result.stdout or '')} stderr_len={len(result.stderr or '')}")
     # Papermill writes cell errors to the output notebook even on failure;
     # parse that first.
