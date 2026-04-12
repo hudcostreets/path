@@ -1,5 +1,5 @@
 from path_data.cli.base import path_data
-from . import combine, refresh, slack, update
+from . import combine, gha_update, refresh, slack, update
 
 def main():
     path_data()

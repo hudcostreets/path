@@ -10,6 +10,11 @@ env:
   GIT_AUTHOR_EMAIL: "path-ridership-data@hudcostreets.org"
   GIT_COMMITTER_NAME: "GitHub Actions"
   GIT_COMMITTER_EMAIL: "path-ridership-data@hudcostreets.org"
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: us-east-1
+  SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+  SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
 
 jobs:
   update-data:
@@ -28,63 +33,14 @@ jobs:
 
       - run: pip install -e .
 
-      - name: Check for new PDFs
-        run: path-data refresh
+      - name: Run daily update
+        run: path-data gha-update
 
-      - name: Run pipeline
-        run: dvx run data/*.dvc www/public/*.dvc
-
-      - name: Stage all data changes
-        run: git add data/ www/public/ img/
-
-      - name: Check for changes
-        id: check
-        run: |
-          if git diff --cached --quiet; then
-            echo "changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "changes=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Push data to S3
-        if: steps.check.outputs.changes == 'true'
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: dvx push
-
-      - name: Commit and push
-        if: steps.check.outputs.changes == 'true'
-        run: |
-          git commit -m "Update PATH ridership data"
-          git push
-
-      - name: Get job URL
-        id: job
-        run: |
-          job_id=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" --jq '.jobs[0].id')
-          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/$job_id" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Notify Slack (new data)
-        if: steps.check.outputs.changes == 'true'
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+      - name: Notify Slack (unhandled failure)
+        if: failure()
+        continue-on-error: true
         run: >-
           path-data slack
-          ":train: *New PATH ridership data* published and deployed
-          <${{ steps.job.outputs.url }}|View GHA run>
-          · <https://path.hudcostreets.org|View site>"
-
-      - name: Notify Slack (no changes)
-        if: steps.check.outputs.changes == 'false' && github.event_name == 'workflow_dispatch'
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
-        run: >-
-          path-data slack
-          ":white_check_mark: PATH data check: no new data found
-          <${{ steps.job.outputs.url }}|View GHA run>"
+          ":rotating_light: *PATH pipeline crashed* (uncaught)
+          <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>"
+          --icon-emoji :rotating_light:
