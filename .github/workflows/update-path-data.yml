@@ -35,12 +35,3 @@ jobs:
 
       - name: Run daily update
         run: path-data gha-update
-
-      - name: Notify Slack (unhandled failure)
-        if: failure()
-        continue-on-error: true
-        run: >-
-          path-data slack
-          ":rotating_light: *PATH pipeline crashed* (uncaught)
-          <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View GHA run>"
-          --icon-emoji :rotating_light:

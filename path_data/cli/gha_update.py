@@ -112,7 +112,7 @@ def gha_update():
 
         err('=== dvx run ===')
         dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('www/public/*.dvc'))
-        run('dvx', 'run', *dvc_targets)
+        run('dvx', 'run', '-v', *dvc_targets)
 
         run('git', 'add', 'data/', 'www/public/', 'img/')
 
@@ -144,24 +144,21 @@ def gha_update():
     except CalledProcessError as e:
         tb = format_exc()
         err(tb)
-        cmd = ' '.join(e.cmd) if hasattr(e, 'cmd') and e.cmd else '?'
+        prog = e.cmd[0] if hasattr(e, 'cmd') and e.cmd else '?'
         _append_summary(dedent(f"""\
             ## :rotating_light: Pipeline error
 
-            Command failed with exit {e.returncode}:
+            `{prog}` exited with status {e.returncode}. See the GHA run log
+            for the underlying command's output.
 
             ```
-            {cmd}
-            ```
-
-            ```
-            {tb[-2000:]}
+            {tb[-1500:]}
             ```
 
             {md_link}
             """))
         _slack(
-            f":rotating_light: *PATH pipeline failed* (`{cmd}` exit {e.returncode})\n{slack_link}",
+            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}",
             emoji=':rotating_light:',
         )
         exit(e.returncode or 1)
