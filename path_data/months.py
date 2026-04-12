@@ -171,6 +171,16 @@ def _save_json(fig, name: str, dir: str = IMG) -> None:
     err(f"Saved {relpath(path)}")
 
 
+def _save_png(fig, name: str, dir: str = IMG, width: int = PLOT_W, height: int = PLOT_H) -> None:
+    """PNG writes require kaleido + a working browser; treat as best-effort."""
+    path = join(dir, f'{name}.png')
+    try:
+        fig.write_image(path, width=width, height=height)
+        err(f"Saved {relpath(path)}")
+    except Exception as e:
+        err(f"PNG skip ({relpath(path)}): {type(e).__name__}: {e}")
+
+
 def _stations_stack(m: pd.DataFrame, *, y: str, title: str, name: str | None = None,
                     start=None, end=None, dtick=None, end_month: str | None = None) -> None:
     if isinstance(start, str):
@@ -191,10 +201,8 @@ def _stations_stack(m: pd.DataFrame, *, y: str, title: str, name: str | None = N
         )
     ).update_xaxes(range=[start, end], dtick=dtick).update_layout(width=PLOT_W, height=PLOT_H)
     if name:
-        png = join(IMG, f'{name}.png')
-        fig.write_image(png, width=PLOT_W, height=PLOT_H)
-        err(f"Saved {relpath(png)}")
         _save_json(fig, name)
+        _save_png(fig, name)
 
 
 def _grouped_month_plot(mt: pd.DataFrame, *, y: str, title: str, colors: list[str],
@@ -217,12 +225,9 @@ def _grouped_month_plot(mt: pd.DataFrame, *, y: str, title: str, colors: list[st
         width=PLOT_W,
         height=PLOT_H,
     )
-    png_name = f'{y}_month_grouped.png'
-    png = join(IMG, png_name)
-    fig.write_image(png, width=PLOT_W, height=PLOT_H)
-    err(f"Saved {relpath(png)}")
     json_name = y.replace(' ', '_') + '_month_grouped'
     _save_json(fig, json_name)
+    _save_png(fig, json_name)
 
 
 def _lines_plot(df: pd.DataFrame, *, name: str, xname: str, y_fmt: str,
@@ -250,17 +255,22 @@ def _lines_plot(df: pd.DataFrame, *, name: str, xname: str, y_fmt: str,
         fig.add_hline(y=h_line, line=dict(color='#777', width=1))
     legend = dict(yanchor='bottom', y=0.03, xanchor='right', x=0.99) if legend_lr else \
              dict(yanchor='top', y=0.99, xanchor='right', x=0.99)
-    fig = plots.save(
-        fig,
-        name=name,
-        x=dict(dtick=xtick),
-        y=dict(tickformat=ytickformat),
-        legend=legend,
-        hoverx=True,
-        dir=IMG,
-        w=w, h=h,
-        hovertemplate=hovertemplate,
-    )
+    # Apply utz.plots styling but swallow PNG-write errors (kaleido may fail in
+    # sandboxes without a browser).
+    try:
+        fig = plots.save(
+            fig,
+            name=name,
+            x=dict(dtick=xtick),
+            y=dict(tickformat=ytickformat),
+            legend=legend,
+            hoverx=True,
+            dir=IMG,
+            w=w, h=h,
+            hovertemplate=hovertemplate,
+        )
+    except Exception as e:
+        err(f"plots.save PNG skip ({name}): {type(e).__name__}: {e}")
     _save_json(fig, name)
 
 

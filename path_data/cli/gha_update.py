@@ -119,11 +119,13 @@ _FAILED_TARGET_RE = None
 
 
 def _parse_failing_targets(dvx_output: str) -> list[str]:
-    """Parse DVX's `✗ <path>: failed` lines out of combined stdout/stderr."""
+    """Parse DVX's `✗ <path>: …` lines (any failure reason) out of
+    combined stdout/stderr. DVX emits multiple failure phrases, e.g.:
+    `✗ data/X: failed`, `✗ data/X: co-output not produced`."""
     global _FAILED_TARGET_RE
     if _FAILED_TARGET_RE is None:
         import re
-        _FAILED_TARGET_RE = re.compile(r'✗\s+(\S+?):\s+failed', re.MULTILINE)
+        _FAILED_TARGET_RE = re.compile(r'✗\s+(\S+?):\s', re.MULTILINE)
     return _FAILED_TARGET_RE.findall(dvx_output or '')
 
 
