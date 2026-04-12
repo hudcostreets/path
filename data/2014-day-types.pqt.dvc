@@ -1,6 +1,6 @@
 outs:
-- md5: 83a3269379d2ba67e72c5a2dd94ed0b8
-  size: 1718
+- md5: 4444ca6d6fb1adee07e39fadd4ee5b21
+  size: 1708
   hash: md5
   path: 2014-day-types.pqt
 meta:

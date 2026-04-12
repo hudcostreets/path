@@ -1,6 +1,6 @@
 outs:
-- md5: 3edcc89dbcfeb9373ac0f57725f36fcd
-  size: 1724
+- md5: 7eafac4994dd9e0c7611159a3f347c51
+  size: 1714
   hash: md5
   path: 2023-day-types.pqt
 meta:

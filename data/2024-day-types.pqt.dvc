@@ -1,6 +1,6 @@
 outs:
-- md5: d023912a97188f1284a7936ba3abe990
-  size: 1726
+- md5: 207067160aedaef8143e9dce9f853dd6
+  size: 1716
   hash: md5
   path: 2024-day-types.pqt
 meta:

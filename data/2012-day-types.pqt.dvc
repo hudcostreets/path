@@ -1,6 +1,6 @@
 outs:
-- md5: ef32657bd1a7a481de87deda30e89fac
-  size: 1721
+- md5: 72050d4e3b2440cdff9d361b22279dea
+  size: 1711
   hash: md5
   path: 2012-day-types.pqt
 meta:

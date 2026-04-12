@@ -1,6 +1,6 @@
 outs:
-- md5: f49670a3b16db1715d2049aa8cde130b
-  size: 1732
+- md5: 4ab52b460458523c1418d8f378695311
+  size: 1722
   hash: md5
   path: 2021-day-types.pqt
 meta:

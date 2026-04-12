@@ -1,6 +1,6 @@
 outs:
-- md5: b7efc5cb616d8b1572688a09795fd8c9
-  size: 1726
+- md5: 0aa34eec2779be1ca9debe2c1d096c91
+  size: 1716
   hash: md5
   path: 2020-day-types.pqt
 meta:
