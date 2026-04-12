@@ -1,7 +1,8 @@
 import json
+import subprocess
 from glob import glob
-from os import environ
-from os.path import basename, exists, getmtime
+from os import environ, listdir
+from os.path import basename, exists, getmtime, isdir
 from subprocess import CalledProcessError
 from sys import exit
 from textwrap import dedent
@@ -95,15 +96,60 @@ def _notebook_errors(nb_path: str) -> str | None:
 
 def _latest_out_notebook_error() -> str | None:
     """Find the most recently modified `out/*.ipynb` and extract its first error cell."""
+    out_listing = listdir('out') if isdir('out') else '(no out/ dir)'
+    err(f"_latest_out_notebook_error: out/ contents = {out_listing}")
     candidates = glob('out/*.ipynb')
     if not candidates:
         return None
     candidates.sort(key=getmtime, reverse=True)
     for nb in candidates:
         msg = _notebook_errors(nb)
+        err(f"_notebook_errors({nb}): {'error cell found' if msg else 'no error cell'}")
         if msg:
             return f"**{nb}**\n\n{msg}"
     return None
+
+
+def _rerun_failing_dvc() -> str | None:
+    """On failure, find the most-recently-touched yearly .dvc and re-run its cmd
+    directly with captured stderr, so we get the actual papermill error that
+    DVX is hiding behind its '✗ failed' summary."""
+    # Heuristic: the newest PDF in data/ is likely the one that triggered the rerun
+    pdfs = sorted(glob('data/*-PATH-Monthly-Ridership-Report.pdf'), key=getmtime, reverse=True)
+    if not pdfs:
+        return None
+    newest_pdf = pdfs[0]
+    year = basename(newest_pdf)[:4]
+    dvc_path = f'data/{year}-day-types.pqt.dvc'
+    if not exists(dvc_path):
+        return None
+    try:
+        with open(dvc_path) as f:
+            dvc_data = yaml.safe_load(f)
+        cmd = dvc_data.get('meta', {}).get('computation', {}).get('cmd')
+    except (yaml.YAMLError, OSError):
+        return None
+    if not cmd:
+        return None
+    err(f"_rerun_failing_dvc: re-running `{cmd}` to capture stderr")
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600)
+    tail_err = result.stderr[-3000:] if result.stderr else '(empty stderr)'
+    tail_out = result.stdout[-1000:] if result.stdout else '(empty stdout)'
+    return dedent(f"""\
+        Re-ran `{cmd}` directly to capture stderr (exit {result.returncode}):
+
+        ### stderr (tail)
+
+        ```
+        {tail_err}
+        ```
+
+        ### stdout (tail)
+
+        ```
+        {tail_out}
+        ```
+        """)
 
 
 def _pdf_last_modified(dvc_path: str) -> str | None:
@@ -195,7 +241,17 @@ def gha_update():
         err(tb)
         prog = e.cmd[0] if hasattr(e, 'cmd') and e.cmd else '?'
         nb_err = _latest_out_notebook_error()
-        nb_section = f"\n\n### Notebook cell error\n\n{nb_err}" if nb_err else ""
+        rerun_err = None
+        if not nb_err:
+            try:
+                rerun_err = _rerun_failing_dvc()
+            except Exception as ex:
+                err(f"_rerun_failing_dvc failed: {ex}")
+        diag_section = ""
+        if nb_err:
+            diag_section = f"\n\n### Notebook cell error\n\n{nb_err}"
+        elif rerun_err:
+            diag_section = f"\n\n### Direct command re-run\n\n{rerun_err}"
         _append_summary(dedent(f"""\
             ## :rotating_light: Pipeline error
 
@@ -204,13 +260,17 @@ def gha_update():
 
             ```
             {tb[-1500:]}
-            ```{nb_section}
+            ```{diag_section}
 
             {md_link}
             """))
-        slack_nb = f"\n```\n{nb_err[:500]}\n```" if nb_err else ""
+        slack_snip = ''
+        if nb_err:
+            slack_snip = f"\n```\n{nb_err[:500]}\n```"
+        elif rerun_err:
+            slack_snip = f"\n```\n{rerun_err[:500]}\n```"
         _slack(
-            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}{slack_nb}",
+            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}{slack_snip}",
             emoji=':rotating_light:',
         )
         exit(e.returncode or 1)
