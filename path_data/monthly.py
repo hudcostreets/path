@@ -106,11 +106,11 @@ def run_monthly(year: int, last_month: int | None = None, template_path: str | N
     df = df[[COLS_SUM[1]] + COLS_AVG[2:] + [COLS_AVG[1]] + COLS_SUM[2:]]
 
     pqt_path = year_pqt(year)
-    df.to_parquet(pqt_path)
+    df.to_parquet(pqt_path, engine='fastparquet')
     err(f"Wrote {relpath(pqt_path)}")
 
     day_types_path = year_day_types_pqt(year)
-    nums.to_parquet(day_types_path)
+    nums.to_parquet(day_types_path, engine='fastparquet')
     err(f"Wrote {relpath(day_types_path)}")
 
 

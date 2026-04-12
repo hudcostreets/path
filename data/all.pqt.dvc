@@ -5,10 +5,7 @@ outs:
   path: all.pqt
 meta:
   computation:
-    cmd: juq papermill run months.ipynb -i && cp data/all.pqt www/public/all.pqt &&
-      cp img/weekdays.json www/public/weekdays.json && cp img/weekends.json www/public/weekends.json
-      && cp img/avg_weekday_month_grouped.json www/public/avg_weekday_month_grouped.json
-      && cp img/avg_weekend_month_grouped.json www/public/avg_weekend_month_grouped.json
+    cmd: path-data months
     deps:
       data/2012.pqt: ee659c5767e40adcf02d2ee18914fd10
       data/2013.pqt: 722a5ed4c1f1abe79a73dc1a46e546c7
@@ -26,4 +23,4 @@ meta:
       data/2025.pqt: 7f134c2dfdb069b80dff5036cc4ac7f8
       data/2026.pqt: c76b584a35a9b4265dc472965715bcbd
     git_deps:
-      months.ipynb: 17a15b8b48fc46bdf78bce81f9feb444d0672879
+      path_data/months.py: 17a15b8b48fc46bdf78bce81f9feb444d0672879
