@@ -3,7 +3,6 @@ from os.path import dirname, join
 PKG = dirname(__file__)
 ROOT = dirname(PKG)
 
-MONTHLY_NB = join(ROOT, "monthly.ipynb")
 MONTHS_NB = join(ROOT, "months.ipynb")
 
 DATA = join(ROOT, 'data')
