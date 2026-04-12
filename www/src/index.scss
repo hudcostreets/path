@@ -61,14 +61,88 @@ hr {
 .error {
   background-color: #fcc;
 }
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400..800&display=swap');
+
 .abp-header {
   display: block;
   text-align: center;
   margin: 1em 0 0.5em;
+  // Let subway bars extend to full viewport width
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  // Clip horizontal overflow at viewport edges, but allow vertical overflow
+  // so the top green vertical can extend up to top of page and bottom green can fade below
+  overflow-x: clip;
+  overflow-y: visible;
+}
+.abp-banner-wrap {
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+  container-type: inline-size;
 }
 .abp-banner {
-  max-width: min(100%, 600px);
+  max-width: 100%;
   height: auto;
+}
+.abp-banner-inline svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+// Text overlay: matches SVG viewBox 432×144.
+// The overlay is position:absolute over the banner image (same dimensions).
+// padding-top as % is relative to container width → useful for aspect-ratio math.
+// font-size as % is relative to parent font-size (not useful), so use vw with clamp.
+// Banner max-width is min(100%, 600px), so at full size: width=600px, height=200px.
+.abp-banner-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  // Cap-top at y=54/144=37.5% of height. Box starts above caps by ascender gap
+  // (15% of font-size = 15% of 33.7px = 5.1px at 600px wide).
+  // height = width/3 (SVG aspect 432:144), so 37.5% of height = 12.5% of width.
+  // Subtract ascender: (54/432 - 0.15 * 33.7/600) = 0.1250 - 0.0084 = 0.1166
+  padding-top: 11.64%;
+  // Text center-x is at 49.61% of width, not 50%.
+  pointer-events: auto;
+  user-select: text;
+}
+.abp-banner-heading {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 650;
+  font-size: 6cqw;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.abp-banner-subtitle {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+  // Sized to match both cap-height (6.0 SVG units) AND width (184.8 SVG units).
+  // At font-size 100px, width=984px. To fit 42.8% of banner:
+  // font-size = W*0.428/9.84 = W*0.04350 → at 600px = 26.1px.
+  // But cap-height at 26.1px = 26.1*0.71 = 18.5px — way too tall (target 6.0/144*height = 8px).
+  // Solution: size by cap-height, then scaleX to match width.
+  // font-size by cap: 1.956vw (11.7px at 600px). Natural width at that size: 984*11.7/100 = 115px.
+  // Target width: 42.8% of 576 = 246.5px. scaleX = 246.5/115 = 2.14 — too extreme.
+  // The paths are clearly NOT Montserrat for subtitle. Use cap-height sizing + modest letter-spacing.
+  font-size: 1.956cqw;
+  letter-spacing: 0.02em;
+  strong {
+    font-weight: 700;
+  }
+  line-height: 1;
+  // Gap from heading baseline to subtitle cap-top = 7.5 SVG units → 7.5/432 = 1.74%
+  // But also subtract heading descender gap (14% of heading font-size)
+  // and subtitle ascender gap (15% of subtitle font-size):
+  // net CSS margin-top = (7.5/432)*W - 0.14*heading_fs - 0.15*sub_fs
+  // ≈ 10.4 - 4.7 - 1.8 = 3.9px at 600px → 3.9/600 = 0.65vw
+  margin-top: 0.65cqw;
+  white-space: nowrap;
 }
 .abp-footer {
   text-align: center;

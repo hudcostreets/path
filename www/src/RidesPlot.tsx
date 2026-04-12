@@ -136,6 +136,14 @@ const exclusionsParam: Param<Exclusion[]> = {
   },
 }
 
+const STATION_DISPLAY: Record<string, string> = {
+  "Christopher Street": "Christopher St",
+}
+
+function displayName(station: string): string {
+  return STATION_DISPLAY[station] ?? station
+}
+
 const STATION_ABBREVS: Record<string, string> = {
   "Christopher Street": "CHR",
   "9th Street": "9TH",
@@ -535,7 +543,7 @@ function buildByStation(
           return base > 0 ? cur / base : null
         })
         return {
-          name: station,
+          name: displayName(station),
           x: vs2019Months,
           y: pcts,
           type: "scatter",
@@ -577,7 +585,7 @@ function buildByStation(
         ? sd.months.map(m => m.getFullYear() === yearNum ? 1 : 0.15)
         : undefined
       return {
-        name: station,
+        name: displayName(station),
         type: "bar",
         x: sd.months,
         y: ys,
@@ -638,7 +646,7 @@ function buildByStation(
       if (!sd) return null
       const ys = sd.months.map((_, i) => sumAcrossDayTypes(sd, "avg", dayTypes, i))
       return {
-        name: station,
+        name: displayName(station),
         x: sd.months,
         y: ys,
         type: "scatter",

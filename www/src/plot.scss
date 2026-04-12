@@ -200,8 +200,12 @@ html.clean {
 }
 
 // Speed dial dark mode fix
-.kbd-speed-dial {
-  color: #eee;
+@media (prefers-color-scheme: dark) {
+  .kbd-speed-dial {
+    color: #eee;
+    --kbd-bg: #2a2a3e;
+    --kbd-border: #555;
+  }
 }
 
 // Floating UI tooltips

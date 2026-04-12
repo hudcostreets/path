@@ -15,6 +15,7 @@ import Body from './Body.mdx'
 import { HccsIcon, GhIcon } from './speed-dial-icons'
 
 const BridgeTunnel = lazy(() => import('./BridgeTunnel'))
+const BannerPage = lazy(() => import('./ABPBanner').then(m => ({ default: m.BannerPage })))
 
 const components = {
   a: A,
@@ -51,6 +52,11 @@ createRoot(document.getElementById('root')!).render(
         <HotkeysProvider>
           <BrowserRouter>
             <Routes>
+              <Route path="/banner" element={
+                <Suspense fallback={null}>
+                  <BannerPage />
+                </Suspense>
+              } />
               <Route path="/bt" element={
                 <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
                   <BridgeTunnel />
