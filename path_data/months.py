@@ -44,7 +44,7 @@ GRIDCOLOR = '#ddd'
 def _load_yearly_parquets() -> pd.DataFrame:
     """Concat all `data/<YYYY>.pqt` files into a single DataFrame."""
     frames = [
-        pd.read_parquet(p)
+        pd.read_parquet(p, engine='fastparquet')
         for p in sorted(glob.glob(f'{DATA}/2*.pqt'))
         if re.fullmatch(r'\d{4}\.pqt', basename(p))
     ]
@@ -68,10 +68,12 @@ def _load_day_type_histograms() -> pd.DataFrame:
         if not m:
             continue
         year = int(m['y'])
-        frames.append(pd.read_parquet(p).assign(year=year))
+        # Match the write engine (fastparquet) so the int index roundtrips
+        # faithfully; pandas 3.0's default `pyarrow` read of a fastparquet-
+        # written file loses the index name/values and ends up with month=0.
+        frames.append(pd.read_parquet(p, engine='fastparquet').assign(year=year))
     out = concat(frames).reset_index()
-    # Ensure merge-key dtypes are int64 — matches `_load_yearly_parquets`
-    # (pandas 3.0 won't silently coerce across int widths).
+    err(f"_load_day_type_histograms: columns={list(out.columns)}, month sample={out['month'].head(3).to_list() if 'month' in out else 'MISSING'}")
     out['year'] = out['year'].astype('int64')
     out['month'] = out['month'].astype('int64')
     return out.set_index(['year', 'month'])
