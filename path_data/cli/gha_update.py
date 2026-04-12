@@ -274,10 +274,13 @@ def gha_update():
         skipped = [t for t in all_dvc if 'hourly' in basename(t)]
         if skipped:
             err(f'Skipping {len(skipped)} hourly targets (pending port): {skipped[:3]}…')
+        # `--push end` caches outputs AND uploads to S3 as the run finishes; a
+        # plain `dvx run` leaves outputs out of `.dvc/cache/`, so a follow-up
+        # `dvx push` has nothing to upload.
         # Capture output so the failure handler can parse `✗ <path>: failed`
         # lines. Echo it live so the step log still reflects progress.
         dvx_res = subprocess.run(
-            ['dvx', 'run', '-v', *dvc_targets],
+            ['dvx', 'run', '-v', '--push', 'end', *dvc_targets],
             capture_output=True, text=True,
         )
         err(dvx_res.stdout)
@@ -304,8 +307,7 @@ def gha_update():
             )
             return
 
-        err('=== dvx push ===')
-        run('dvx', 'push')
+        # `dvx push` already happened as part of `dvx run --push end` above.
 
         run('git', 'commit', '-m', 'Update PATH ridership data')
         run('git', 'push')
