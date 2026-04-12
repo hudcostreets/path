@@ -5,7 +5,7 @@ outs:
   path: 2018-hourly-total.pqt
 meta:
   computation:
-    cmd: juq papermill run analyze-hourly.ipynb -o out/analyze-hourly-2018.ipynb -p year=2018
+    cmd: juq papermill run parse-hourly.ipynb -o out/parse-hourly-2018.ipynb -p year=2018
     deps:
       data/2018-PATH-Hourly-Ridership-Report.pdf: 6859a4478ec72d4acfc7d00c8b595b7b
-      analyze-hourly.ipynb: 9fc08256c3149e06396e7f34f4c21361
+      parse-hourly.ipynb: 9fc08256c3149e06396e7f34f4c21361
