@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 10 * * *'  # Daily at 10am UTC
   workflow_dispatch:
+    inputs:
+      skip_slack:
+        type: boolean
+        description: "Skip posting to Slack (for testing)"
+        default: false
 
 env:
   GIT_AUTHOR_NAME: "GitHub Actions"
@@ -34,4 +39,6 @@ jobs:
       - run: pip install -e .
 
       - name: Run daily update
+        env:
+          PATH_DATA_SKIP_SLACK: ${{ inputs.skip_slack && '1' || '' }}
         run: path-data gha-update

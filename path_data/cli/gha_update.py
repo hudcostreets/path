@@ -33,6 +33,9 @@ def _append_summary(md: str) -> None:
 
 
 def _slack(text: str, emoji: str = ':train:') -> None:
+    if environ.get('PATH_DATA_SKIP_SLACK'):
+        err(f"Slack skipped ($PATH_DATA_SKIP_SLACK): {text}")
+        return
     token = environ.get('SLACK_BOT_TOKEN')
     channel = environ.get('SLACK_CHANNEL_ID')
     if not (token and channel):
