@@ -159,6 +159,24 @@ hr {
   height: auto;
 }
 
+.more-plots {
+  text-align: center;
+  font-size: 0.95rem;
+  margin: 2em 0 1em;
+  padding: 0.8em 1em;
+  border: 1px solid #444;
+  border-radius: 6px;
+  a {
+    font-weight: 500;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .more-plots {
+    border-color: #ccc;
+  }
+}
+
 button {
   border-radius: 8px;
   border: 1px solid transparent;
