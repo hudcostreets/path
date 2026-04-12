@@ -52,8 +52,10 @@ def _load_yearly_parquets() -> pd.DataFrame:
     df['station'] = df.station.apply(lambda s: RENAME_STATIONS.get(s, s))
     df = df[~df.station.str.contains('TOTAL')].reset_index(drop=True)
     df['dt'] = df['month']
-    df['year'] = df.dt.dt.year
-    df['month_idx'] = df.dt.dt.month
+    # Cast to int64: the day_hists index is int64 and pandas 3.0 no longer
+    # auto-coerces int32↔int64 in merge/join, silently producing NaN.
+    df['year'] = df.dt.dt.year.astype('int64')
+    df['month_idx'] = df.dt.dt.month.astype('int64')
     return df
 
 
