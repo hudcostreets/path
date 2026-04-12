@@ -22,4 +22,4 @@ meta:
       data/2024.pqt: 5cf774d5cb9c7bd4bd24435cd7b5376a
       data/2025.pqt: 7f134c2dfdb069b80dff5036cc4ac7f8
     git_deps:
-      path_data/months.py: 17a15b8b48fc46bdf78bce81f9feb444d0672879
+      path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089
