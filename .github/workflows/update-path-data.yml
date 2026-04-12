@@ -27,6 +27,7 @@ jobs:
 
     permissions:
       contents: write
+      actions: write  # dispatch www.yml after data update
 
     steps:
       - uses: actions/checkout@v4
@@ -41,4 +42,5 @@ jobs:
       - name: Run daily update
         env:
           PATH_DATA_SKIP_SLACK: ${{ inputs.skip_slack && '1' || '' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: path-data gha-update

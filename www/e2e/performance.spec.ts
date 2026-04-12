@@ -26,16 +26,20 @@ test.describe('Bundle size budgets', () => {
   })
 
   test('CSS bundle size', () => {
+    // Only budget app-owned CSS; plotly's CSS (`index-basic-*.css`) is
+    // exogenous — it tracks upstream plotly.js/basic and shouldn't gate our
+    // bundle checks.
     let totalSize = 0
     try {
-      const cssFiles = readdirSync(assetsDir).filter(f => f.endsWith('.css'))
+      const cssFiles = readdirSync(assetsDir)
+        .filter(f => f.endsWith('.css') && !f.startsWith('index-basic-'))
       totalSize = cssFiles.reduce((sum, f) => sum + statSync(join(assetsDir, f)).size, 0)
     } catch {
       test.skip(true, 'dist/ not built')
       return
     }
     const kb = Math.round(totalSize / 1024)
-    console.log(`  CSS bundle: ${kb}KB (budget: ${budgets.css_bundle_kb}KB)`)
+    console.log(`  CSS bundle (app-only): ${kb}KB (budget: ${budgets.css_bundle_kb}KB)`)
     expect(kb).toBeLessThan(budgets.css_bundle_kb)
   })
 })

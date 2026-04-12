@@ -310,6 +310,15 @@ def gha_update():
         run('git', 'commit', '-m', 'Update PATH ridership data')
         run('git', 'push')
 
+        # GITHUB_TOKEN pushes don't trigger other workflows (GH loop-prevention),
+        # so www.yml won't auto-deploy the new data. Kick it off explicitly.
+        if environ.get('GITHUB_RUN_ID'):
+            try:
+                run('gh', 'workflow', 'run', 'www.yml')
+                err('=== dispatched www.yml ===')
+            except CalledProcessError as e:
+                err(f"Failed to dispatch www.yml: {e}")
+
         _append_summary(_summarize_new_data(updated_pdfs) + f'\n\n{md_link}\n')
         _slack(
             f":train: *New PATH ridership data* published and deployed\n"

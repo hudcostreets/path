@@ -11,8 +11,21 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      - run: pip install -e .
+      # Pull www/public/* DVX artifacts from S3 so the built SPA has data files
+      # at the content-addressed URLs that `vite-plugin-dvc` resolves to.
+      - name: Pull www/public DVX artifacts
+        run: dvx pull www/public
       - uses: pnpm/action-setup@v4
         with:
           version: 9
