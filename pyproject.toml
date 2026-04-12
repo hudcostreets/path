@@ -18,6 +18,7 @@ dependencies = [
     "tabula-py",
     "tornado<=6.1",
     "utz",
+    "xlsxwriter",
 ]
 requires-python = ">=3.10"
 
