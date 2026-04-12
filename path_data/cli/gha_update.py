@@ -115,18 +115,45 @@ def _latest_out_notebook_error() -> str | None:
     return None
 
 
-def _rerun_failing_dvc() -> str | None:
-    """On failure, find the most-recently-touched yearly .dvc and re-run its cmd
-    directly with captured stderr, so we get the actual papermill error that
-    DVX is hiding behind its '✗ failed' summary."""
-    # Heuristic: the newest PDF in data/ is likely the one that triggered the rerun
-    pdfs = sorted(glob('data/*-PATH-Monthly-Ridership-Report.pdf'), key=getmtime, reverse=True)
-    if not pdfs:
-        return None
-    newest_pdf = pdfs[0]
-    year = basename(newest_pdf)[:4]
-    dvc_path = f'data/{year}-day-types.pqt.dvc'
-    if not exists(dvc_path):
+_FAILED_TARGET_RE = None
+
+
+def _parse_failing_targets(dvx_output: str) -> list[str]:
+    """Parse DVX's `✗ <path>: failed` lines out of combined stdout/stderr."""
+    global _FAILED_TARGET_RE
+    if _FAILED_TARGET_RE is None:
+        import re
+        _FAILED_TARGET_RE = re.compile(r'✗\s+(\S+?):\s+failed', re.MULTILINE)
+    return _FAILED_TARGET_RE.findall(dvx_output or '')
+
+
+def _dvc_for_output(out_path: str) -> str | None:
+    """Given an output path like `data/2017-hourly-system.pqt`, return its .dvc."""
+    candidate = f'{out_path}.dvc'
+    if exists(candidate):
+        return candidate
+    return None
+
+
+def _rerun_failing_dvc(captured_output: str = '') -> str | None:
+    """On failure, re-run the first failing target's stored cmd directly with
+    captured stderr. Identifies the failing target by parsing `✗ … failed`
+    lines out of the DVX output (not by heuristic on newest PDF, which is
+    wrong when the failure is in a downstream stage like hourly)."""
+    failed = _parse_failing_targets(captured_output)
+    if failed:
+        out_path = failed[0]
+        dvc_path = _dvc_for_output(out_path)
+    else:
+        # No `✗ … failed` parsed — fall back to newest-monthly heuristic
+        pdfs = sorted(glob('data/*-PATH-Monthly-Ridership-Report.pdf'), key=getmtime, reverse=True)
+        if not pdfs:
+            return None
+        year = basename(pdfs[0])[:4]
+        dvc_path = f'data/{year}-day-types.pqt.dvc'
+        if not exists(dvc_path):
+            return None
+    if not dvc_path:
         return None
     try:
         with open(dvc_path) as f:
@@ -237,7 +264,19 @@ def gha_update():
 
         err('=== dvx run ===')
         dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('www/public/*.dvc'))
-        run('dvx', 'run', '-v', *dvc_targets)
+        # Capture output so the failure handler can parse `✗ <path>: failed`
+        # lines. Echo it live so the step log still reflects progress.
+        dvx_res = subprocess.run(
+            ['dvx', 'run', '-v', *dvc_targets],
+            capture_output=True, text=True,
+        )
+        err(dvx_res.stdout)
+        err(dvx_res.stderr)
+        if dvx_res.returncode != 0:
+            e = CalledProcessError(dvx_res.returncode, ['dvx', 'run', '-v', '…'])
+            e.stdout = dvx_res.stdout
+            e.stderr = dvx_res.stderr
+            raise e
 
         run('git', 'add', 'data/', 'www/public/', 'img/')
 
@@ -274,7 +313,8 @@ def gha_update():
         rerun_err = None
         if not nb_err:
             try:
-                rerun_err = _rerun_failing_dvc()
+                captured = (e.stdout or '') + '\n' + (e.stderr or '')
+                rerun_err = _rerun_failing_dvc(captured_output=captured)
             except Exception as ex:
                 err(f"_rerun_failing_dvc failed: {ex}")
         diag_section = ""
