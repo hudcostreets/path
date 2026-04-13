@@ -306,11 +306,29 @@ def gha_update():
 
         err('=== dvx add + push ===')
         # `dvx run` produces outputs in the workspace but doesn't cache them,
-        # so a plain `dvx push` uploads nothing. Explicit `dvx add` populates
-        # `.dvc/cache/` first.
-        non_import_targets = [t for t in dvc_targets if not t.endswith('.pdf.dvc')]
-        if non_import_targets:
-            run('dvx', 'add', *non_import_targets)
+        # so a plain `dvx push` uploads nothing. Explicit `dvx add -f` on each
+        # stage's output populates `.dvc/cache/` before push. Pass the output
+        # file paths (not `.dvc` paths — dvx would re-track those as regular
+        # files, causing "DVC file cannot be an output" on push).
+        to_cache: list[str] = []
+        for t in dvc_targets:
+            if t.endswith('.pdf.dvc'):
+                continue  # `import-url` PDFs already handled by `dvx update`
+            try:
+                with open(t) as f:
+                    d = yaml.safe_load(f) or {}
+            except (OSError, yaml.YAMLError):
+                continue
+            for o in d.get('outs') or []:
+                p = o.get('path')
+                if not p:
+                    continue
+                # .dvc `outs.path` is relative to the .dvc file's dir
+                from os.path import dirname, join as pjoin
+                to_cache.append(pjoin(dirname(t), p))
+        existing = [p for p in to_cache if exists(p)]
+        if existing:
+            run('dvx', 'add', '-f', *existing)
         run('dvx', 'push')
 
         run('git', 'commit', '-m', 'Update PATH ridership data')
