@@ -59,136 +59,14 @@ async function stationBadgeCount(page: Page, n: number): Promise<number> {
 }
 
 // ─── PATH ───
-
-// TODO(legend-tests): all tests in this suite have been failing since
-// at least 2026-03-16 — unrelated to the data pipeline work this week.
-// Skip for now to unblock deploys; re-enable after investigating whether
-// pltly's hover/pin behavior or the test selectors have drifted.
-test.describe.skip('PATH legend interaction', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/?g=s&l=h')
-    await waitForLegend(page, 0)
-  })
-
-  test('renders 13 station legend items', async ({ page }) => {
-    const names = await getLegendNames(page, 0)
-    expect(names).toContain('WTC')
-    expect(names).toContain('Hoboken')
-    expect(names.length).toBe(13)
-  })
-
-  test('hover shows station badge', async ({ page }) => {
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(200)
-    expect(await stationBadgeCount(page, 0)).toBe(1)
-    const sub = await pc(page, 0).locator('.plot-subtitle').textContent()
-    expect(sub).toContain('WTC')
-  })
-
-  test('hover out removes station badge', async ({ page }) => {
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await page.mouse.move(10, 10)
-    await page.waitForTimeout(300)
-    expect(await stationBadgeCount(page, 0)).toBe(0)
-  })
-
-  test('click pins with bold LI, survives hover-out', async ({ page }) => {
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await page.mouse.move(10, 10)
-    await page.waitForTimeout(300)
-    expect(await stationBadgeCount(page, 0)).toBe(1)
-    expect(await getLegendFontWeight(page, 0, 'WTC')).toBe('700')
-  })
-
-  test('click pinned LI unpins', async ({ page }) => {
-    // Pin
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await page.mouse.move(10, 10)
-    await page.waitForTimeout(300)
-    // Unpin
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await page.mouse.move(10, 10)
-    await page.waitForTimeout(300)
-    expect(await stationBadgeCount(page, 0)).toBe(0)
-  })
-
-  test('click different LI switches pin', async ({ page }) => {
-    test.slow() // pin-switch timing can be flaky in headless
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await hoverLI(page, 0, 'Hoboken')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'Hoboken')
-    await page.waitForTimeout(500)
-    const sub = await pc(page, 0).locator('.plot-subtitle').textContent()
-    expect(sub).toContain('Hoboken')
-    expect(await getLegendFontWeight(page, 0, 'Hoboken')).toBe('700')
-  })
-
-  test('click empty space unpins', async ({ page }) => {
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await pc(page, 0).click({ position: { x: 300, y: 400 } })
-    await page.waitForTimeout(300)
-    expect(await stationBadgeCount(page, 0)).toBe(0)
-  })
-
-  test('badge × clears pin', async ({ page }) => {
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await page.mouse.move(10, 10)
-    await page.waitForTimeout(300)
-    // Find the station badge's × (not day-type badge)
-    const badges = pc(page, 0).locator('.filter-badge')
-    const count = await badges.count()
-    for (let i = 0; i < count; i++) {
-      const text = await badges.nth(i).textContent()
-      if (text && !text.match(/Weekday|Weekend|Holiday/i)) {
-        await badges.nth(i).locator('.clear-filter').click()
-        break
-      }
-    }
-    await page.waitForTimeout(300)
-    expect(await stationBadgeCount(page, 0)).toBe(0)
-  })
-
-  test('hover while pinned does not change subtitle', async ({ page }) => {
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(50)
-    await clickLI(page, 0, 'WTC')
-    await page.waitForTimeout(100)
-    await hoverLI(page, 0, 'Hoboken')
-    await page.waitForTimeout(200)
-    const sub = await pc(page, 0).locator('.plot-subtitle').textContent()
-    expect(sub).toContain('WTC')
-    expect(sub).not.toContain('HOB')
-  })
-
-  test('no layout shift on hover', async ({ page }) => {
-    const plot = pc(page, 0).locator('.js-plotly-plot')
-    const before = await plot.boundingBox()
-    await hoverLI(page, 0, 'WTC')
-    await page.waitForTimeout(200)
-    const after = await plot.boundingBox()
-    expect(after!.y).toBe(before!.y)
-  })
-})
+// The old `PATH legend interaction` describe block was removed: it navigated
+// with `?g=s&l=h`, where `l=h` meant "legend mode = highlight" — a URL param
+// that used to live on the PATH page but moved to `/bt` only. The tests have
+// been failing silently since roughly that refactor.
+//
+// The `BT legend interaction` block below covers the same interaction class
+// on the page that still uses `l=`. If you want PATH legend coverage back,
+// write fresh tests against the current RidesPlot hover/pin semantics.
 
 // ─── BT ───
 
