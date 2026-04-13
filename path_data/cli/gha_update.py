@@ -13,7 +13,7 @@ from utz import err, lines, run
 
 from path_data.cli.base import path_data
 from path_data.cli.slack import post_message
-from path_data.utils import git_has_staged_changes
+from path_data.utils import git_has_staged_changes, last_month
 
 
 def _run_url() -> str | None:
@@ -230,8 +230,35 @@ def _run_link_slack(url: str | None) -> str:
     return f'<{url}|View GHA run>' if url else 'GHA run'
 
 
-def _summarize_new_data(updated_pdfs: list[str]) -> str:
-    lines = ['## :train: New PATH ridership data', '']
+def _ym_label(ym) -> str | None:
+    """Render a `utz.YM` as `YYYY-MM`, tolerant of None / exceptions."""
+    if ym is None:
+        return None
+    try:
+        return f'{ym.year}-{ym.month:02d}'
+    except Exception:
+        return None
+
+
+def _safe_last_month():
+    """Return `last_month()` or None if the refresh/PDF state doesn't yet
+    allow inferring one (e.g. no PDFs locally)."""
+    try:
+        return last_month()
+    except Exception as e:
+        err(f"_safe_last_month: {type(e).__name__}: {e}")
+        return None
+
+
+def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> str:
+    curr_label = _ym_label(curr_ym)
+    prev_label = _ym_label(prev_ym)
+    heading = '## :train: New PATH ridership data'
+    if curr_label:
+        heading += f' — through {curr_label}'
+        if prev_label and prev_label != curr_label:
+            heading += f' (was {prev_label})'
+    lines = [heading, '']
     if updated_pdfs:
         lines.append('### Upstream PDFs updated')
         lines.append('')
@@ -258,8 +285,14 @@ def gha_update():
     md_link = _run_link_md(url)
 
     try:
+        # Snapshot `last_month()` BEFORE refresh so we can report
+        # "through YYYY-MM (was YYYY-MM)" in Slack + summary.
+        prev_ym = _safe_last_month()
+
         err('=== path-data refresh ===')
         run('path-data', 'refresh')
+
+        curr_ym = _safe_last_month()
 
         pdf_paths = _staged_paths(path_filter='data/')
         updated_pdfs = [p for p in pdf_paths if p.endswith('.pdf')]
@@ -291,15 +324,18 @@ def gha_update():
         run('git', 'add', 'data/', 'www/public/', 'img/')
 
         if not git_has_staged_changes():
+            curr_label = _ym_label(curr_ym) or '—'
             _append_summary(dedent(f"""\
                 ## :white_check_mark: No new data
 
                 Upstream PDFs unchanged since last check.
+                Data currently through **{curr_label}**.
 
                 {md_link}
                 """))
             _slack(
-                f":white_check_mark: PATH data check: no new data found\n{slack_link}",
+                f":white_check_mark: PATH data check: no new data found "
+                f"(through {curr_label})\n{slack_link}",
                 emoji=':white_check_mark:',
             )
             return
@@ -343,9 +379,16 @@ def gha_update():
             except CalledProcessError as e:
                 err(f"Failed to dispatch www.yml: {e}")
 
-        _append_summary(_summarize_new_data(updated_pdfs) + f'\n\n{md_link}\n')
+        _append_summary(_summarize_new_data(updated_pdfs, prev_ym, curr_ym) + f'\n\n{md_link}\n')
+        curr_label = _ym_label(curr_ym)
+        prev_label = _ym_label(prev_ym)
+        through = f' (through {curr_label}' if curr_label else ''
+        if curr_label and prev_label and prev_label != curr_label:
+            through += f', was {prev_label})'
+        elif curr_label:
+            through += ')'
         _slack(
-            f":train: *New PATH ridership data* published and deployed\n"
+            f":train: *New PATH ridership data*{through} published and deployed\n"
             f"{slack_link} · <https://path.hudcostreets.org|View site>",
         )
     except CalledProcessError as e:

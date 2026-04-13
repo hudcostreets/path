@@ -36,6 +36,10 @@ WWW_JSONS = [
     'avg_weekend_month_grouped.json',
 ]
 
+WWW_IMAGES = [
+    'og.png',  # social-card preview (1200×630)
+]
+
 PLOT_W = 1200
 PLOT_H = 600
 GRIDCOLOR = '#ddd'
@@ -281,6 +285,33 @@ def _publish_to_www_public() -> None:
         copy2(join(IMG, name), join(WWW_PUBLIC, name))
 
 
+def _generate_og_image(m: pd.DataFrame, end_month: str, last_ym_label: str | None = None) -> None:
+    """Write a 1200×630 social-card PNG to `www/public/og.png`.
+
+    Station-stacked weekday ridership — same shape as the homepage hero,
+    but dedicated dimensions (no header/footer bleed) and a subtitle that
+    reports the data's latest-covered month."""
+    start = to_dt('2012') - timedelta(days=15)
+    end = to_dt(end_month) - timedelta(days=15)
+    title = 'PATH Ridership'
+    if last_ym_label:
+        title += f' — through {last_ym_label}'
+    fig = _default_plot(
+        px.bar(
+            m.reset_index(),
+            x='month', y='avg weekday', color='station',
+            title=title,
+            labels={'station': 'Station', 'avg weekday': 'Avg weekday ridership', 'month': ''},
+        )
+    ).update_xaxes(range=[start, end], dtick='M12').update_layout(width=1200, height=630)
+    og_path = join(WWW_PUBLIC, 'og.png')
+    try:
+        fig.write_image(og_path, width=1200, height=630)
+        err(f"Wrote {relpath(og_path)}")
+    except Exception as e:
+        err(f"og.png skip: {type(e).__name__}: {e}")
+
+
 def run_months(*, force: bool = True, end_month: str | None = None, publish: bool = True) -> None:
     df = _load_yearly_parquets()
     day_hists = _load_day_type_histograms()
@@ -367,6 +398,11 @@ def run_months(*, force: bool = True, end_month: str | None = None, publish: boo
     # Station × month matrix for webapp
     df.set_index(['month', 'station']).to_parquet(join(IMG, 'path.parquet'))
     err(f"Wrote {relpath(join(IMG, 'path.parquet'))}")
+
+    # Social-card OG image; label it with the latest data month for shareability.
+    last_ym = df.month.max()
+    last_ym_label = last_ym.strftime("%b %Y") if hasattr(last_ym, 'strftime') else str(last_ym)
+    _generate_og_image(m, end_month=end_month, last_ym_label=last_ym_label)
 
     if publish:
         _publish_to_www_public()
