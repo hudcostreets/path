@@ -1,0 +1,17 @@
+# Project-specific ignores. Global excludes (tmp, node_modules, .venv*, etc.)
+# live in `core.excludesfile` (~/.gitignore_global or similar).
+
+# Playwright e2e artifacts
+www/test-results/
+www/screenshots/
+
+# Local design assets / drafts (committed via separate channels, not the repo)
+_ABP_Final-Logo_Native*
+abp-logos/
+www/abp-logos/
+
+# Local debugging scratch
+kaleido-bug/
+
+# Slide decks / docs that aren't part of the source
+*.pptx

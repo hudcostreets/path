@@ -2,25 +2,33 @@
 name = "path-data"
 version = "0.0.1"
 description = "PATH ridership data analysis and visualization"
+requires-python = ">=3.10"
 dependencies = [
     "dvx[s3] @ git+https://github.com/runsascoded/dvx@28c6b9aad",
     "fastparquet==2024.11.0",
+    "ipython",  # required by `utz.plots` (imports `IPython.display.Image`)
     "joblib",
-    "jupyter",
-    "juq.py>=0.5.1",
     "kaleido",
     "numpy>=2",
     "openpyxl==3.1.5",
-    "pandas",
-    "papermill",
+    "pandas>=3",
     "plotly",
     "PyPDF2",
     "tabula-py",
-    "tornado<=6.1",
     "utz",
     "xlsxwriter",
 ]
-requires-python = ">=3.10"
+
+# Optional EDA-only deps. The pipeline runs without these — they're only
+# needed for running the legacy `*.ipynb` notebooks interactively as
+# reference/exploration.
+[project.optional-dependencies]
+eda = [
+    "jupyter",
+    "juq.py>=0.5.1",
+    "papermill",
+    "tornado<=6.1",
+]
 
 [project.scripts]
 path-data = "path_data.cli.main:main"
