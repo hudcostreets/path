@@ -35,18 +35,28 @@ def update_pdf(name: str) -> bool:
 
 def ensure_year_pipeline(year: int):
     """Create computation .dvc stubs for a new year, and add the year to all.pqt deps."""
-    pqt_dvc = f'data/{year}.pqt.dvc'
-    day_types_dvc = f'data/{year}-day-types.pqt.dvc'
     files_created = []
 
-    for dvc_path, out_path in [(pqt_dvc, f'{year}.pqt'), (day_types_dvc, f'{year}-day-types.pqt')]:
+    monthly_stubs = [
+        (f'data/{year}.pqt.dvc',           f'{year}.pqt',            f'path-data monthly -y {year}'),
+        (f'data/{year}-day-types.pqt.dvc', f'{year}-day-types.pqt',  f'path-data monthly -y {year}'),
+    ]
+    hourly_stubs = [
+        (f'data/{year}-hourly.pqt.dvc',        f'{year}-hourly.pqt',        f'path-data parse-hourly -y {year}'),
+        (f'data/{year}-hourly-total.pqt.dvc',  f'{year}-hourly-total.pqt',  f'path-data parse-hourly -y {year}'),
+        (f'data/{year}-hourly-system.pqt.dvc', f'{year}-hourly-system.pqt', f'path-data parse-hourly -y {year}'),
+    ]
+    # Hourly PDFs are only published from 2017 onward.
+    stubs = monthly_stubs + (hourly_stubs if year >= 2017 else [])
+
+    for dvc_path, out_path, cmd in stubs:
         if not exists(dvc_path):
             err(f'\tcreating computation stub: {dvc_path}')
             stub = {
                 'outs': [{'path': out_path}],
                 'meta': {
                     'computation': {
-                        'cmd': f'path-data monthly -y {year}',
+                        'cmd': cmd,
                     }
                 },
             }
