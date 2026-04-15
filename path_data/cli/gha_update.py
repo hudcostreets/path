@@ -380,14 +380,19 @@ def gha_update():
         _append_summary(_summarize_new_data(updated_pdfs, prev_ym, curr_ym) + f'\n\n{md_link}\n')
         curr_label = _ym_label(curr_ym)
         prev_label = _ym_label(prev_ym)
-        through = f' (through {curr_label}' if curr_label else ''
-        if curr_label and prev_label and prev_label != curr_label:
-            through += f', was {prev_label})'
+        # Distinguish "actual new upstream month" from "artifacts regenerated"
+        # (e.g. format/engine changes that update .dvc md5s without bringing in
+        # a new month of PDF data).
+        new_month = bool(curr_label and prev_label and prev_label != curr_label)
+        if new_month:
+            headline = f":train: *New PATH ridership data* (through {curr_label}, was {prev_label}) published and deployed"
         elif curr_label:
-            through += ')'
+            headline = f":wrench: *PATH pipeline regenerated* (through {curr_label}) — no new upstream data"
+        else:
+            headline = ":wrench: *PATH pipeline regenerated*"
         _slack(
-            f":train: *New PATH ridership data*{through} published and deployed\n"
-            f"{slack_link} · <https://path.hudcostreets.org|View site>",
+            f"{headline}\n{slack_link} · <https://path.hudcostreets.org|View site>",
+            emoji=':train:' if new_month else ':wrench:',
         )
     except CalledProcessError as e:
         tb = format_exc()
