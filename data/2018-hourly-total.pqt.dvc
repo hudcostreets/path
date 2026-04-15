@@ -1,6 +1,6 @@
 outs:
-- md5: 312f3da39c5018587206c83063c69d80
-  size: 9661
+- md5: e77d92f173af580316c77136c42f95ab
+  size: 9619
   hash: md5
   path: 2018-hourly-total.pqt
 meta:

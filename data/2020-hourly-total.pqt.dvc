@@ -1,6 +1,6 @@
 outs:
-- md5: b4248883a8807a4a182824054bb33d52
-  size: 9545
+- md5: 59503ec8e0101ba115dcd1ba412569bb
+  size: 9503
   hash: md5
   path: 2020-hourly-total.pqt
 meta:
