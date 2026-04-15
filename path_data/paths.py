@@ -32,4 +32,13 @@ def monthly_pdf(year: int) -> str:
     return join(DATA, f'{year}-PATH-Monthly-Ridership-Report.pdf')
 
 def hourly_pdf(year: int) -> str:
-    return join(DATA, f'{year}-PATH-Hourly-Ridership-Report.pdf')
+    """Return the on-disk hourly PDF path for `year`. PANYNJ used lowercase
+    `hourly` for 2017–2022 reports and capitalized `Hourly` starting 2023.
+    Return the one that actually exists; fall back to the capitalized form
+    (post-2023 is the long-term convention)."""
+    from os.path import exists
+    lower = join(DATA, f'{year}-PATH-hourly-Ridership-Report.pdf')
+    upper = join(DATA, f'{year}-PATH-Hourly-Ridership-Report.pdf')
+    if exists(lower) and not exists(upper):
+        return lower
+    return upper

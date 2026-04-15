@@ -230,12 +230,31 @@ html.clean {
   }
 }
 
-// Speed dial dark mode fix
+// Speed dial dark mode fix — use-kbd's SpeedDial wraps MUI's floating action
+// buttons. Without overrides the FABs render near-transparent against the
+// dark body bg (see screenshot in chat: 4 faint circles).
 @media (prefers-color-scheme: dark) {
   .kbd-speed-dial {
     color: #eee;
     --kbd-bg: #2a2a3e;
     --kbd-border: #555;
+    // Main FAB + action FABs: dark surface with visible border
+    .MuiSpeedDial-fab,
+    .MuiSpeedDialAction-fab {
+      background-color: #2a2a3e;
+      color: #e4e4e4;
+      border: 1px solid #555;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      &:hover {
+        background-color: #3a3a5a;
+      }
+    }
+    // Action tooltip chips ("Open command palette", etc.)
+    .MuiSpeedDialAction-staticTooltipLabel {
+      background-color: #2a2a3e;
+      color: #e4e4e4;
+      border: 1px solid #555;
+    }
   }
 }
 
