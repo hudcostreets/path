@@ -16,13 +16,17 @@ def post_message(
     token: str,
     username: str | None = None,
     icon_emoji: str | None = None,
+    thread_ts: str | None = None,
 ):
-    """Post a message to Slack via the Bot API."""
+    """Post a message to Slack via the Bot API. Pass `thread_ts` to reply
+    in an existing thread (use the `ts` of the parent message)."""
     payload = dict(channel=channel, text=text)
     if username:
         payload['username'] = username
     if icon_emoji:
         payload['icon_emoji'] = icon_emoji
+    if thread_ts:
+        payload['thread_ts'] = thread_ts
 
     data = dumps(payload).encode()
     req = Request(

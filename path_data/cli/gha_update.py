@@ -39,25 +39,31 @@ def _append_summary(md: str) -> None:
         f.write(md.rstrip() + '\n')
 
 
-def _slack(text: str, emoji: str = ':train:') -> None:
+def _slack(text: str, emoji: str = ':train:', thread_ts: str | None = None) -> str | None:
+    """Post a Slack message; return the message's `ts` (for threading
+    follow-ups), or None if posting was skipped/failed."""
     if environ.get('PATH_DATA_SKIP_SLACK'):
-        err(f"Slack skipped ($PATH_DATA_SKIP_SLACK): {text}")
-        return
+        suffix = f" [thread reply to {thread_ts}]" if thread_ts else ""
+        err(f"Slack skipped ($PATH_DATA_SKIP_SLACK){suffix}: {text}")
+        return None
     token = environ.get('SLACK_BOT_TOKEN')
     channel = environ.get('SLACK_CHANNEL_ID')
     if not (token and channel):
         err(f"Slack skipped (no token/channel): {text}")
-        return
+        return None
     try:
-        post_message(
+        result = post_message(
             text=text,
             channel=channel,
             token=token,
             icon_emoji=emoji,
             username='PATH Data',
+            thread_ts=thread_ts,
         )
+        return result.get('ts')
     except Exception as e:
         err(f"Slack post failed: {e}")
+        return None
 
 
 def _staged_paths(path_filter: str | None = None) -> list[str]:
@@ -412,15 +418,20 @@ def gha_update():
 
             {md_link}
             """))
-        slack_snip = ''
-        if nb_err:
-            slack_snip = f"\n```\n{nb_err[:500]}\n```"
-        elif rerun_err:
-            slack_snip = f"\n```\n{rerun_err[:500]}\n```"
-        _slack(
-            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}{slack_snip}",
+        # Main message stays short; the full diagnostic (cell error or
+        # re-run output) lands as a thread reply so the channel isn't
+        # spammed with stack traces.
+        ts = _slack(
+            f":rotating_light: *PATH pipeline failed* (`{prog}` exit {e.returncode})\n{slack_link}",
             emoji=':rotating_light:',
         )
+        details = nb_err or rerun_err
+        if ts and details:
+            _slack(
+                f"```\n{details[:2800]}\n```",
+                emoji=':rotating_light:',
+                thread_ts=ts,
+            )
         exit(e.returncode or 1)
     except Exception:
         tb = format_exc()
@@ -434,8 +445,10 @@ def gha_update():
 
             {md_link}
             """))
-        _slack(
+        ts = _slack(
             f":rotating_light: *PATH pipeline crashed* (see run log)\n{slack_link}",
             emoji=':rotating_light:',
         )
+        if ts:
+            _slack(f"```\n{tb[-2800:]}\n```", emoji=':rotating_light:', thread_ts=ts)
         exit(1)
