@@ -230,12 +230,29 @@ html.clean {
   }
 }
 
-// (`.kbd-speed-dial` honors use-kbd's own light/dark theming via its
-// `--kbd-*` CSS custom properties. Earlier project-side overrides were
-// targeting MUI selectors that don't exist here AND tried to override
-// `--kbd-bg` on the dial wrapper, which doesn't propagate because the
-// downstream `--kbd-speed-dial-primary-bg` is resolved at `:root`. Trust
-// the library's defaults.)
+// use-kbd's dark `--kbd-bg` default (#1f2937) is too close to this page's
+// bg (#1a1a2e) — the dial reads as invisible against it.
+//
+// Match use-kbd's own selector specificity (it uses
+// `:root:not([data-theme="light"]):not(.light)` = 0,2,1) so our override
+// actually wins.
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(.light) {
+    --kbd-bg: #3a3a5a;
+    --kbd-bg-secondary: #4a4a6a;
+    --kbd-border: #6a6a8a;
+  }
+}
+
+// SVG icons inside the SpeedDial buttons (which use `display: flex`) get
+// shrunk to width 0 by the default `flex-shrink: 1` — `width: 1em` (or any
+// CSS width) is silently ignored. Force them to keep their intrinsic 1em
+// box.
+.kbd-speed-dial-primary > svg,
+.kbd-speed-dial-action > svg,
+.kbd-speed-dial-chevron > svg {
+  flex-shrink: 0;
+}
 
 // Floating UI tooltips
 .fui-tooltip {
