@@ -1,0 +1,8 @@
+outs:
+- md5: e0e76fda51216592b4e019e142a4bc4d
+  size: 182772
+  hash: md5
+  path: og.png
+meta:
+  computation:
+    cmd: path-data months
