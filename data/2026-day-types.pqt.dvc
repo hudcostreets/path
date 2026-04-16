@@ -1,6 +1,6 @@
 outs:
-- md5: 5d0cf91dd6009a29e61c2d585efb8b40
-  size: 1579
+- md5: 6bb388b16c1d1d974826c3973e680f58
+  size: 1586
   hash: md5
   path: 2026-day-types.pqt
 meta:
