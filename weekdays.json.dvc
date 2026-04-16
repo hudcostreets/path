@@ -1,6 +1,6 @@
 outs:
-- md5: 8a2109157111814d15df49ed8dca16e7
-  size: 83299
+- md5: 306e5b39601be0b623b95fa67a6c61b1
+  size: 83689
   hash: md5
   path: weekdays.json
 meta:
