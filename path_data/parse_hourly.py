@@ -12,6 +12,7 @@ from os.path import basename, dirname, exists, join, relpath
 import pandas as pd
 from click import option
 from joblib import Parallel, delayed
+from PyPDF2 import PdfReader
 from tabula import read_pdf
 from utz import err, to_dt
 
@@ -38,10 +39,26 @@ STATIONS = [
 STATION_OFFSETS = {station: idx for idx, station in enumerate(STATIONS)}
 SECTION_PAGES = len(STATIONS) + 1  # stations + title page
 
-BASED_ON_RE = re.compile(r'\(Based on (?P<month>\w+) (?P<year>\d{4}) Turnstile Count\)')
-CROSS_HONOR_RE = re.compile(r'\(Cross[‐\-]honor (?:Entry )?Count not Included\)')
+# 2017–2023 PDFs say "(Based on <Month> <Year> Turnstile Count)".
+# 2024+ rephrased to "(Based on <Month> <Year> Legacy and TAPP Faregates Count)"
+# to reflect the faregate hardware migration.
+BASED_ON_RE = re.compile(
+    r'\(Based on (?P<month>\w+) (?P<year>\d{4}) (?:Turnstile|Legacy and TAPP Faregates) Count\)'
+)
+# 2024+ rephrased "Cross-honor Entry Count not Included" → "Cross-honor and
+# Freewheeled Entry Counts not Included" (also "Counts" pluralized).
+CROSS_HONOR_RE = re.compile(
+    r'\(Cross[‐\-]honor (?:and Freewheeled )?(?:Entry )?Counts? not Included\)'
+)
 
 TEMPLATE_PATH = join(TEMPLATES, '2022-PATH-hourly-Ridership-Report.tabula-template.json')
+
+EXPECTED_HEADERS = [
+    'Hour',
+    'Avg Weekday Entry', 'Avg Saturday Entry', 'Avg Sunday Entry',
+    'Avg Weekday Exit', 'Avg Saturday Exit', 'Avg Sunday Exit',
+    'Avg Holiday Entries', 'Avg Holiday Exits',
+]
 
 
 def _month_page_range(month: int) -> tuple[int, int]:
@@ -52,6 +69,87 @@ def _month_page_range(month: int) -> tuple[int, int]:
 def _clean(s: str) -> str:
     """Normalize U+2010 (‐, 8210) → ASCII hyphen. Appears in various titles."""
     return s.replace('‐', '-')
+
+
+def _realign_columns(raw: pd.DataFrame) -> pd.DataFrame:
+    """Fix tabula's column-splitting artifacts.
+
+    When data is sparse (e.g. all zeros), tabula sometimes puts headers and
+    data into adjacent columns instead of one. Detect this and merge by
+    walking left-to-right, pairing "header-only" cols with adjacent
+    "data-only" cols, then validating against ``EXPECTED_HEADERS``.
+    """
+    hrs = raw.dropna(axis=1, how='all')
+    n = len(hrs.columns)
+    header_rows = hrs.iloc[:2]
+    data_rows = hrs.iloc[2:]
+    has_hdr = [header_rows.iloc[:, i].notna().any() for i in range(n)]
+    has_data = [data_rows.iloc[:, i].notna().any() for i in range(n)]
+
+    # Walk columns, grouping header-only + data-only pairs
+    groups: list[list[int]] = []
+    i = 0
+    while i < n:
+        if has_hdr[i] and has_data[i]:
+            groups.append([i])
+            i += 1
+        elif has_hdr[i] and not has_data[i]:
+            if i + 1 < n and has_data[i + 1] and not has_hdr[i + 1]:
+                groups.append([i, i + 1])
+                i += 2
+            else:
+                groups.append([i])
+                i += 1
+        elif has_data[i] and not has_hdr[i]:
+            groups.append([i])
+            i += 1
+        else:
+            i += 1
+
+    # Merge each group: combine_first so non-NaN values win
+    merged = pd.DataFrame()
+    for gi, g in enumerate(groups):
+        col = hrs.iloc[:, g[0]].copy()
+        for idx in g[1:]:
+            col = col.combine_first(hrs.iloc[:, idx])
+        merged[gi] = col
+
+    # Compute candidate headers, normalizing missing spaces before Entry/Exit
+    hdrs = (merged.iloc[0].fillna('') + ' ' + merged.iloc[1].fillna('')).str.strip()
+    hdrs = hdrs.str.replace(r'(?<=[a-z])(Entry|Exit|Entries|Exits)', r' \1', regex=True)
+
+    # Greedy merge of adjacent partial headers against EXPECTED_HEADERS
+    cols = list(merged.columns)
+    hdr_list = list(hdrs.values)
+    final_groups: list[list[int]] = []
+    ci = 0
+    for expected in EXPECTED_HEADERS:
+        if ci >= len(cols):
+            raise RuntimeError(f'Ran out of columns matching {expected!r}')
+        if hdr_list[ci] == expected:
+            final_groups.append([cols[ci]])
+            ci += 1
+        elif ci + 1 < len(cols):
+            combined = (hdr_list[ci] + ' ' + hdr_list[ci + 1]).strip()
+            if combined == expected:
+                final_groups.append([cols[ci], cols[ci + 1]])
+                ci += 2
+            else:
+                raise RuntimeError(
+                    f'Cannot match expected header {expected!r}; '
+                    f'got {hdr_list[ci]!r} (or combined {combined!r})'
+                )
+        else:
+            raise RuntimeError(f'Cannot match expected header {expected!r} at col {ci}')
+
+    # Build final DataFrame
+    out = pd.DataFrame()
+    for header, fg in zip(EXPECTED_HEADERS, final_groups):
+        col = merged[fg[0]].copy()
+        for c in fg[1:]:
+            col = col.combine_first(merged[c])
+        out[header] = col
+    return out
 
 
 def _read_station_month_tables(pdf: str, rects: list[dict], year: int, month: int, station: str) -> list:
@@ -83,7 +181,7 @@ def _coerce_numeric(hrs: pd.DataFrame) -> pd.DataFrame:
         col = hrs[k]
         dt = col.dtype
         if pd.api.types.is_object_dtype(dt) or pd.api.types.is_string_dtype(dt):
-            hrs[k] = col.astype(str).str.replace(',', '').astype(int)
+            hrs[k] = col.astype(str).str.replace(',', '').astype(float).astype(int)
         elif pd.api.types.is_float_dtype(dt):
             hrs[k] = col.astype(int)
         elif pd.api.types.is_integer_dtype(dt):
@@ -112,23 +210,22 @@ def parse_station_month(pdf: str, rects: list[dict], year: int, month: int, stat
     if year != parsed_year:
         raise RuntimeError(f"Parsed year {parsed_year} != {year}")
     parsed_month = m['month']
-    month_name = to_dt(f'{year:d}-{month:02d}').strftime('%B')
-    if parsed_month != month_name:
-        raise RuntimeError(f"Parsed month {parsed_month!r} != {month}")
+    dt = to_dt(f'{year:d}-{month:02d}')
+    month_full = dt.strftime('%B')
+    month_abbr = dt.strftime('%b')
+    if parsed_month not in (month_full, month_abbr):
+        raise RuntimeError(f"Parsed month {parsed_month!r} != {month_full!r} or {month_abbr!r}")
 
     if not CROSS_HONOR_RE.fullmatch(cross_msg):
         raise RuntimeError(f'Unexpected cross-honor message: {cross_msg!r}')
 
-    hrs = hrs.dropna(axis=1, how='all')
-    headers = (hrs.iloc[0].fillna('') + ' ' + hrs.iloc[1]).str.strip()
-    hrs = hrs.copy().iloc[2:]
-    hrs = hrs.dropna(axis=1, how='all')
-    headers = headers.dropna()
-    hrs.columns = headers
+    hrs = _realign_columns(hrs)
+    headers = list(hrs.columns)
+    hrs = hrs.iloc[2:].copy()
     hrs['Year'] = year
     hrs['Month'] = month
     hrs['Station'] = station
-    hrs = hrs[['Year', 'Month', 'Station'] + headers.tolist()]
+    hrs = hrs[['Year', 'Month', 'Station'] + headers]
     hrs = _coerce_numeric(hrs)
 
     total_rows = hrs.Hour == 'Total'
@@ -172,9 +269,19 @@ def run_parse_hourly(year: int, last_month: int | None = None, n_jobs: int = 4, 
     with open(TEMPLATE_PATH) as f:
         rects = json.load(f)
 
-    # 2022's PDF only has data through October (historical quirk).
-    if year == 2022 and last_month is None:
-        last_month = 10
+    if last_month is None:
+        # 2022's PDF only has data through October (historical quirk).
+        if year == 2022:
+            last_month = 10
+        else:
+            # Infer from PDF page count: 4 title pages + (last_month) sections,
+            # each section = num_stations + 1 page. So last_month = (pages - 4) / SECTION_PAGES.
+            n_pages = len(PdfReader(pdf).pages)
+            inferred = (n_pages - 4) // SECTION_PAGES
+            if inferred < 1 or inferred > 12:
+                raise RuntimeError(f'Unexpected page count {n_pages} for {pdf}; cannot infer last_month')
+            last_month = inferred
+            err(f'Inferred last_month={last_month} from {n_pages} PDF pages')
 
     suffixes = ['', '-total', '-system']
     paths = [join(DATA, f'{year}-hourly{s}.pqt') for s in suffixes]
