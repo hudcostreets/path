@@ -1,13 +1,17 @@
-from json import dumps
-from os import environ
+from json import dumps, loads
 from urllib.request import Request, urlopen
 
 from click import argument, option
+from thrds import SlackClient, Thread
 from utz import err
 
 from path_data.cli.base import path_data
 
-SLACK_API_URL = 'https://slack.com/api/chat.postMessage'
+BOT_USERNAME = 'PATH Data'
+
+
+def get_client(token: str, channel: str) -> SlackClient:
+    return SlackClient(token=token, channel=channel)
 
 
 def post_message(
@@ -30,7 +34,7 @@ def post_message(
 
     data = dumps(payload).encode()
     req = Request(
-        SLACK_API_URL,
+        'https://slack.com/api/chat.postMessage',
         data=data,
         headers={
             'Authorization': f'Bearer {token}',
@@ -40,11 +44,26 @@ def post_message(
     with urlopen(req) as resp:
         body = resp.read().decode()
 
-    from json import loads
     result = loads(body)
     if not result.get('ok'):
         raise RuntimeError(f"Slack API error: {result.get('error', body)}")
     return result
+
+
+def latest_bot_message(
+    client: SlackClient,
+    username: str = BOT_USERNAME,
+    limit: int = 20,
+) -> dict | None:
+    """Return the most recent top-level message posted by our bot."""
+    result = client._request("conversations.history", {
+        "channel": client.channel,
+        "limit": limit,
+    }, method="GET")
+    for msg in result.get('messages', []):
+        if msg.get('username') == username:
+            return msg
+    return None
 
 
 @path_data.command('slack')

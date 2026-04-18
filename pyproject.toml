@@ -2,7 +2,7 @@
 name = "path-data"
 version = "0.0.1"
 description = "PATH ridership data analysis and visualization"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "dvx[s3] @ git+https://github.com/runsascoded/dvx@28c6b9aad",
     "fastparquet==2024.11.0",
@@ -15,6 +15,7 @@ dependencies = [
     "plotly",
     "PyPDF2",
     "tabula-py",
+    "thrds @ git+https://github.com/runsascoded/thrds@41ca769",
     "utz",
     "xlsxwriter",
 ]

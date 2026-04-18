@@ -1,5 +1,7 @@
 import json
+import re
 import subprocess
+from datetime import datetime, timezone
 from glob import glob
 from os import environ, listdir
 from os.path import basename, exists, getmtime, isdir
@@ -12,7 +14,7 @@ import yaml
 from utz import err, lines, run
 
 from path_data.cli.base import path_data
-from path_data.cli.slack import post_message
+from path_data.cli.slack import get_client, latest_bot_message, post_message
 from path_data.utils import git_has_staged_changes, last_month
 
 
@@ -279,6 +281,92 @@ def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> 
     return '\n'.join(lines)
 
 
+NO_DATA_EMOJI = ':hourglass_flowing_sand:'
+# Matches OP format: "Latest data: Mar '26. Polled Nx for Apr '26 🧵"
+_NO_DATA_OP_RE = re.compile(
+    r"Latest data: .+\. Polled (\d+)x for .+ \U0001f9f5"
+)
+
+
+def _data_label(ym_label: str) -> str:
+    """Format '2026-03' → "Mar '26"."""
+    try:
+        from utz import to_dt
+        return to_dt(ym_label).strftime("%b '%y")
+    except Exception:
+        return ym_label
+
+
+def _next_month_label(ym_label: str) -> str:
+    """Format '2026-03' → "Apr '26" (the next expected month)."""
+    try:
+        from utz import to_dt
+        dt = to_dt(ym_label)
+        if dt.month == 12:
+            nxt = dt.replace(year=dt.year + 1, month=1)
+        else:
+            nxt = dt.replace(month=dt.month + 1)
+        return nxt.strftime("%b '%y")
+    except Exception:
+        return ym_label
+
+
+def _post_no_new_data(curr_label: str, slack_link: str) -> None:
+    """Post or update a "no new data" thread in Slack using thrds.
+
+    Builds the desired thread state (OP + all replies) and calls ``sync()``
+    which diffs against existing messages — editing the OP and appending
+    the new reply with minimal API calls.
+    """
+    token = environ.get('SLACK_BOT_TOKEN')
+    channel = environ.get('SLACK_CHANNEL_ID')
+    if not (token and channel):
+        err("Slack skipped (no token/channel)")
+        return
+    if environ.get('PATH_DATA_SKIP_SLACK'):
+        err("Slack skipped ($PATH_DATA_SKIP_SLACK)")
+        return
+
+    from thrds import Thread
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(timezone.utc)
+    now_et = now.astimezone(ZoneInfo('America/New_York'))
+    timestamp_et = now_et.strftime('%b %-d, %-I:%M %p')
+
+    latest_label = _data_label(curr_label)
+    next_label = _next_month_label(curr_label)
+
+    # Build new reply text
+    run_url = _run_url()
+    if run_url:
+        new_reply = f"<{run_url}|{timestamp_et}> \u00b7 No new data (latest: {latest_label})"
+    else:
+        new_reply = f"{timestamp_et} \u00b7 No new data (latest: {latest_label})"
+
+    client = get_client(token=token, channel=channel)
+    latest = latest_bot_message(client)
+    latest_text = (latest or {}).get('text', '')
+    m = _NO_DATA_OP_RE.match(latest_text) if latest else None
+
+    try:
+        if m and latest:
+            # Existing "no new data" thread — read replies, build desired state
+            thread_ts = latest['ts']
+            existing = client.list_messages(thread_ts)
+            existing_replies = [msg.content for msg in existing[1:]]
+            poll_count = len(existing_replies) + 1
+            op = f"Latest data: {latest_label}. Polled {poll_count}x for {next_label} \U0001f9f5"
+            desired = [op] + existing_replies + [new_reply]
+            client.sync(Thread(messages=desired), thread_ts=thread_ts)
+        else:
+            # Start a new "no new data" thread
+            op = f"Latest data: {latest_label}. Polled 1x for {next_label} \U0001f9f5"
+            client.sync(Thread(messages=[op, new_reply]))
+    except Exception as e:
+        err(f"No-data thread sync failed: {e}")
+
+
 @path_data.command('gha-update')
 def gha_update():
     """End-to-end daily update: refresh, run pipeline, push, commit, notify.
@@ -324,18 +412,14 @@ def gha_update():
         if not git_has_staged_changes():
             curr_label = _ym_label(curr_ym) or '—'
             _append_summary(dedent(f"""\
-                ## :white_check_mark: No new data
+                ## No new data
 
                 Upstream PDFs unchanged since last check.
                 Data currently through **{curr_label}**.
 
                 {md_link}
                 """))
-            _slack(
-                f":white_check_mark: PATH data check: no new data found "
-                f"(through {curr_label})\n{slack_link}",
-                emoji=':white_check_mark:',
-            )
+            _post_no_new_data(curr_label, slack_link)
             return
 
         err('=== dvx add + push ===')
@@ -385,15 +469,15 @@ def gha_update():
         # a new month of PDF data).
         new_month = bool(curr_label and prev_label and prev_label != curr_label)
         if new_month:
-            headline = f":train: *New PATH ridership data* (through {curr_label}, was {prev_label}) published and deployed"
-        elif curr_label:
-            headline = f":wrench: *PATH pipeline regenerated* (through {curr_label}) — no new upstream data"
+            headline = f":white_check_mark: *New PATH ridership data* (through {curr_label}, was {prev_label}) published and deployed"
+            _slack(
+                f"{headline}\n{slack_link} · <https://path.hudcostreets.org|View site>",
+                emoji=':white_check_mark:',
+            )
         else:
-            headline = ":wrench: *PATH pipeline regenerated*"
-        _slack(
-            f"{headline}\n{slack_link} · <https://path.hudcostreets.org|View site>",
-            emoji=':train:' if new_month else ':wrench:',
-        )
+            # Artifacts regenerated but no new upstream month — treat like
+            # "no new data" (thread onto existing OP or create new one).
+            _post_no_new_data(curr_label or '—', slack_link)
     except CalledProcessError as e:
         tb = format_exc()
         err(tb)
