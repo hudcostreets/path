@@ -93,6 +93,8 @@ export function StationDropdown({
   lineGroups,
   regionGroups,
   label = "Stations",
+  lineGroupsLabel = "Lines",
+  regionGroupsLabel = "Regions",
   nameMap,
 }: {
   stations: string[]
@@ -103,6 +105,8 @@ export function StationDropdown({
   lineGroups?: StationGroup[]
   regionGroups?: StationGroup[]
   label?: string
+  lineGroupsLabel?: string
+  regionGroupsLabel?: string
   nameMap?: Record<string, string>
 }) {
   const displayName = (s: string) => nameMap?.[s] ?? s
@@ -169,7 +173,7 @@ export function StationDropdown({
         </label>
         {lineGroups && lineGroups.length > 0 && (
           <div className="group-section">
-            <div className="group-heading">Lines</div>
+            <div className="group-heading">{lineGroupsLabel}</div>
             {lineGroups.map(g => (
               <GroupCheckbox key={g.label} group={g} selected={selected} onChange={onChange} />
             ))}
@@ -177,7 +181,7 @@ export function StationDropdown({
         )}
         {regionGroups && regionGroups.length > 0 && (
           <div className="group-section">
-            <div className="group-heading">Regions</div>
+            <div className="group-heading">{regionGroupsLabel}</div>
             {regionGroups.map(g => (
               <GroupCheckbox key={g.label} group={g} selected={selected} onChange={onChange} />
             ))}
@@ -185,7 +189,11 @@ export function StationDropdown({
         )}
         <div className="group-section">
           <div className="group-heading">{label}</div>
-          {stations.map(station => (
+          {stations.filter(s => {
+            // Hide items already shown as single-item lineGroups
+            if (!lineGroups) return true
+            return !lineGroups.some(g => g.stations.length === 1 && g.stations[0] === s)
+          }).map(station => (
             <StationRow
               key={station}
               station={displayName(station)}

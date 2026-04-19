@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react"
 import RidesPlot, { stationSubtitle } from "./RidesPlot"
 import type { Metric } from "./RidesPlot"
 import MonthlyPlots from "./MonthlyPlots"
+import HourlyPlot from "./HourlyPlot"
 
 export default function PathPlots() {
   const [effectiveStations, setEffectiveStations] = useState<string[]>([])
@@ -30,5 +31,6 @@ export default function PathPlots() {
       subtitle={stationSubtitle(effectiveStations)}
       onActiveYearChange={setActiveYear}
     />
+    <HourlyPlot stations={effectiveStations} />
   </>
 }
