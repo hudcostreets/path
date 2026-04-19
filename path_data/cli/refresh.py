@@ -10,23 +10,25 @@ from path_data.paths import hourly_pdf, monthly_pdf
 from path_data.utils import last_month, git_has_staged_changes, pdf_pages, verify_no_staged_changes
 
 BASE_URL = 'https://www.panynj.gov/content/dam/path/about/statistics'
+BT_BASE_URL = 'https://www.panynj.gov/content/dam/bridges-tunnels/pdfs'
 
 
-def update_pdf(name: str) -> bool:
+def update_pdf(name: str, base_url: str = BASE_URL, data_dir: str = 'data') -> bool:
     """Update or import a PDF via DVX, return True if content changed."""
-    dvc_path = f'data/{name}.dvc'
-    url = f'{BASE_URL}/{name}'
+    dvc_path = f'{data_dir}/{name}.dvc'
+    out_path = f'{data_dir}/{name}'
+    url = f'{base_url}/{name}'
     err(f'\tchecking {name}')
     if exists(dvc_path):
         # Existing import — check for updates
         run('dvx', 'update', dvc_path)
-        run('git', 'add', f'data/{name}', dvc_path)
+        run('git', 'add', out_path, dvc_path)
         return True
     else:
         # New PDF — try to import (404 = doesn't exist yet)
-        if check('dvx', 'import-url', '-G', url, '-o', f'data/{name}'):
+        if check('dvx', 'import-url', '-G', url, '-o', out_path):
             err(f'\t  imported (new)')
-            run('git', 'add', f'data/{name}', dvc_path)
+            run('git', 'add', out_path, dvc_path)
             return True
         else:
             err(f'\t  not found')
@@ -64,16 +66,32 @@ def ensure_year_pipeline(year: int):
                 yaml.dump(stub, f, default_flow_style=False, sort_keys=False)
             files_created.append(dvc_path)
 
-    # Add new year to deps in all .dvc files that depend on per-year parquets
-    dep_key = f'data/{year}.pqt'
+    # Add new year to deps in all .dvc files that depend on per-year parquets.
+    # Monthly .dvc files get `data/{year}.pqt`; hourly gets `data/{year}-hourly.pqt`.
     dvc_files = ['data/all.pqt.dvc'] + sorted(glob('www/public/*.dvc'))
     for dvc_path in dvc_files:
         with open(dvc_path) as f:
             dvc_data = yaml.safe_load(f)
         deps = dvc_data.get('meta', {}).get('computation', {}).get('deps', {})
-        if deps is not None and dep_key not in deps and any(k.startswith('data/') and k.endswith('.pqt') for k in deps):
-            err(f'\tadding {dep_key} to {dvc_path} deps')
-            deps[dep_key] = None
+        if deps is None:
+            continue
+        # Detect whether this .dvc depends on monthly or hourly parquets
+        has_monthly = any(k.endswith('.pqt') and '-hourly' not in k for k in deps)
+        has_hourly = any('-hourly.pqt' in k for k in deps)
+        added = False
+        if has_monthly:
+            dep_key = f'data/{year}.pqt'
+            if dep_key not in deps:
+                err(f'\tadding {dep_key} to {dvc_path} deps')
+                deps[dep_key] = None
+                added = True
+        if has_hourly and year >= 2017:
+            dep_key = f'data/{year}-hourly.pqt'
+            if dep_key not in deps:
+                err(f'\tadding {dep_key} to {dvc_path} deps')
+                deps[dep_key] = None
+                added = True
+        if added:
             with open(dvc_path, 'w') as f:
                 yaml.dump(dvc_data, f, default_flow_style=False, sort_keys=False)
             files_created.append(dvc_path)
@@ -108,6 +126,12 @@ def refresh(commit: int, year: int | None):
             update_pdf(hourly_name)
         if is_new and exists(f'data/{monthly_name}'):
             new_years.append(year)
+
+    # Bridge & Tunnel PDFs (2011–present)
+    err('=== Bridge & Tunnel PDFs ===')
+    for bt_year in years:
+        bt_name = f'traffic-e-zpass-usage-{bt_year}.pdf'
+        update_pdf(bt_name, base_url=BT_BASE_URL)
 
     # Create pipeline stages for any newly imported years
     for y in new_years:

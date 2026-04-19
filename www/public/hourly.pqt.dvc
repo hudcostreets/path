@@ -3,3 +3,13 @@ outs:
   size: 782525
   hash: md5
   path: hourly.pqt
+meta:
+  computation:
+    cmd: path-data combine-hourly
+    deps:
+      data/2017-hourly.pqt: e15e6bf1d07b45fb55594b5be5077d98
+      data/2018-hourly.pqt: 904ff7b72841e40574ad1a0187b2eaf4
+      data/2019-hourly.pqt: 1f6739ca2dd35d8559f938cb8ee61e38
+      data/2020-hourly.pqt: c94a026d8833b42776321f98ed9ee985
+      data/2021-hourly.pqt: 442c8a5e80a37973606bfdf2507164e6
+      data/2022-hourly.pqt: d088b6ede354ff65067ba911a78aba65

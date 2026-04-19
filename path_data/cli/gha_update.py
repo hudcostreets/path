@@ -258,6 +258,46 @@ def _safe_last_month():
         return None
 
 
+def _bt_latest_month() -> str | None:
+    """Return the latest B&T data month as "Mon 'YY", or None."""
+    try:
+        import pandas as pd
+        df = pd.read_parquet('data/bt/traffic.pqt')
+        months_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        total = df[(df['Type'] == 'Total Vehicles') &
+                   (df['Crossing'] == 'All Crossings') &
+                   (df['Month'].isin(months_order)) &
+                   (df['Count'] > 0)]
+        if total.empty:
+            return None
+        # Find latest year, then latest month within it
+        max_year = int(total['Year'].max())
+        year_data = total[total['Year'] == max_year]
+        month_indices = year_data['Month'].map(lambda m: months_order.index(m))
+        max_month_idx = int(month_indices.max())
+        return f"{months_order[max_month_idx]} '{max_year % 100:02d}"
+    except Exception as e:
+        err(f"_bt_latest_month: {type(e).__name__}: {e}")
+        return None
+
+
+def _classify_updated_pdfs(staged: list[str]) -> dict[str, list[str]]:
+    """Classify staged PDF paths by source type."""
+    result: dict[str, list[str]] = {'path_monthly': [], 'path_hourly': [], 'bt': []}
+    for p in staged:
+        if not p.endswith('.pdf'):
+            continue
+        name = basename(p)
+        if 'traffic-e-zpass' in name:
+            result['bt'].append(p)
+        elif 'Hourly' in name or 'hourly' in name:
+            result['path_hourly'].append(p)
+        elif 'Monthly' in name:
+            result['path_monthly'].append(p)
+    return result
+
+
 def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> str:
     curr_label = _ym_label(curr_ym)
     prev_label = _ym_label(prev_ym)
@@ -282,9 +322,9 @@ def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> 
 
 
 NO_DATA_EMOJI = ':hourglass_flowing_sand:'
-# Matches OP format: "Latest data: Mar '26. Polled Nx for Apr '26 🧵"
+# Matches OP format: "Latest: PATH Mar '26, B&T Dec '25. Polled Nx 🧵"
 _NO_DATA_OP_RE = re.compile(
-    r"Latest data: .+\. Polled (\d+)x for .+ \U0001f9f5"
+    r"Latest: .+\. Polled (\d+)x \U0001f9f5"
 )
 
 
@@ -311,7 +351,19 @@ def _next_month_label(ym_label: str) -> str:
         return ym_label
 
 
-def _post_no_new_data(curr_label: str, slack_link: str) -> None:
+def _latest_summary() -> str:
+    """Build a "Latest: PATH Mar '26, B&T Dec '25" string from current data."""
+    parts = []
+    path_ym = _safe_last_month()
+    if path_ym:
+        parts.append(f"PATH {_data_label(_ym_label(path_ym))}")
+    bt = _bt_latest_month()
+    if bt:
+        parts.append(f"B&T {bt}")
+    return ', '.join(parts) if parts else '—'
+
+
+def _post_no_new_data(slack_link: str) -> None:
     """Post or update a "no new data" thread in Slack using thrds.
 
     Builds the desired thread state (OP + all replies) and calls ``sync()``
@@ -334,15 +386,14 @@ def _post_no_new_data(curr_label: str, slack_link: str) -> None:
     now_et = now.astimezone(ZoneInfo('America/New_York'))
     timestamp_et = now_et.strftime('%b %-d, %-I:%M %p')
 
-    latest_label = _data_label(curr_label)
-    next_label = _next_month_label(curr_label)
+    summary = _latest_summary()
 
     # Build new reply text
     run_url = _run_url()
     if run_url:
-        new_reply = f"<{run_url}|{timestamp_et}> \u00b7 No new data (latest: {latest_label})"
+        new_reply = f"<{run_url}|{timestamp_et}> \u00b7 No new data ({summary})"
     else:
-        new_reply = f"{timestamp_et} \u00b7 No new data (latest: {latest_label})"
+        new_reply = f"{timestamp_et} \u00b7 No new data ({summary})"
 
     client = get_client(token=token, channel=channel)
     latest = latest_bot_message(client)
@@ -356,12 +407,12 @@ def _post_no_new_data(curr_label: str, slack_link: str) -> None:
             existing = client.list_messages(thread_ts)
             existing_replies = [msg.content for msg in existing[1:]]
             poll_count = len(existing_replies) + 1
-            op = f"Latest data: {latest_label}. Polled {poll_count}x for {next_label} \U0001f9f5"
+            op = f"Latest: {summary}. Polled {poll_count}x \U0001f9f5"
             desired = [op] + existing_replies + [new_reply]
             client.sync(Thread(messages=desired), thread_ts=thread_ts)
         else:
             # Start a new "no new data" thread
-            op = f"Latest data: {latest_label}. Polled 1x for {next_label} \U0001f9f5"
+            op = f"Latest: {summary}. Polled 1x \U0001f9f5"
             client.sync(Thread(messages=[op, new_reply]))
     except Exception as e:
         err(f"No-data thread sync failed: {e}")
@@ -392,7 +443,7 @@ def gha_update():
         updated_pdfs = [p for p in pdf_paths if p.endswith('.pdf')]
 
         err('=== dvx run ===')
-        dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('www/public/*.dvc'))
+        dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('data/bt/*.dvc')) + sorted(glob('www/public/*.dvc'))
         # Capture output so the failure handler can parse `✗ <path>: failed`
         # lines. Echo it live so the step log still reflects progress.
         dvx_res = subprocess.run(
@@ -410,16 +461,16 @@ def gha_update():
         run('git', 'add', 'data/', 'www/public/', 'img/')
 
         if not git_has_staged_changes():
-            curr_label = _ym_label(curr_ym) or '—'
+            summary = _latest_summary()
             _append_summary(dedent(f"""\
                 ## No new data
 
                 Upstream PDFs unchanged since last check.
-                Data currently through **{curr_label}**.
+                Latest: **{summary}**.
 
                 {md_link}
                 """))
-            _post_no_new_data(curr_label, slack_link)
+            _post_no_new_data(slack_link)
             return
 
         err('=== dvx add + push ===')
@@ -464,20 +515,28 @@ def gha_update():
         _append_summary(_summarize_new_data(updated_pdfs, prev_ym, curr_ym) + f'\n\n{md_link}\n')
         curr_label = _ym_label(curr_ym)
         prev_label = _ym_label(prev_ym)
-        # Distinguish "actual new upstream month" from "artifacts regenerated"
-        # (e.g. format/engine changes that update .dvc md5s without bringing in
-        # a new month of PDF data).
-        new_month = bool(curr_label and prev_label and prev_label != curr_label)
-        if new_month:
-            headline = f":white_check_mark: *New PATH ridership data* (through {curr_label}, was {prev_label}) published and deployed"
+
+        # Classify what actually changed upstream
+        by_source = _classify_updated_pdfs(updated_pdfs)
+        new_path = bool(curr_label and prev_label and prev_label != curr_label)
+        new_bt = bool(by_source['bt'])
+        prev_bt = _bt_latest_month()  # already reflects new data if parsed
+
+        if new_path or new_bt:
+            # At least one source has genuinely new upstream data
+            parts = []
+            if new_path:
+                parts.append(f"PATH through {curr_label} (was {prev_label})")
+            if new_bt and prev_bt:
+                parts.append(f"B&T through {prev_bt}")
+            headline = ":white_check_mark: *New data:* " + ", ".join(parts) + " — published and deployed"
             _slack(
                 f"{headline}\n{slack_link} · <https://path.hudcostreets.org|View site>",
                 emoji=':white_check_mark:',
             )
         else:
-            # Artifacts regenerated but no new upstream month — treat like
-            # "no new data" (thread onto existing OP or create new one).
-            _post_no_new_data(curr_label or '—', slack_link)
+            # Artifacts regenerated but no new upstream data — thread
+            _post_no_new_data(slack_link)
     except CalledProcessError as e:
         tb = format_exc()
         err(tb)

@@ -306,3 +306,24 @@ def run_parse_hourly(year: int, last_month: int | None = None, n_jobs: int = 4, 
 def parse_hourly(n_jobs: int, last_month: int | None, overwrite: bool, year: int):
     """Parse PATH hourly ridership PDF into per-station parquets."""
     run_parse_hourly(year, last_month=last_month, n_jobs=n_jobs, overwrite=overwrite)
+
+
+def run_combine_hourly() -> None:
+    """Concatenate all per-year hourly parquets into www/public/hourly.pqt."""
+    from glob import glob
+    from path_data.paths import WWW_HOURLY_PQT
+    frames = []
+    for f in sorted(glob(join(DATA, '*-hourly.pqt'))):
+        frames.append(pd.read_parquet(f))
+        err(f'  {basename(f)}: {len(frames[-1])} rows')
+    if not frames:
+        raise RuntimeError('No hourly parquets found in data/')
+    combined = pd.concat(frames, ignore_index=True)
+    combined.to_parquet(WWW_HOURLY_PQT, index=False, engine='fastparquet')
+    err(f'Wrote {relpath(WWW_HOURLY_PQT)} ({len(combined)} rows)')
+
+
+@path_data.command('combine-hourly')
+def combine_hourly():
+    """Combine per-year hourly parquets into www/public/hourly.pqt."""
+    run_combine_hourly()
