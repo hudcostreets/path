@@ -26,7 +26,7 @@
     "hyparquet": "^1.25.1",
     "plotly.js": "https://github.com/runsascoded/plotly.js#61e90c2ead90aa3c4a3e4bdc68b1a2c1f86ff101",
     "plotly.js-dist-min": "^3.4.0",
-    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/345da237b69645116bb310d2f9ab7f7f064bcee9/pltly-345da237b69645116bb310d2f9ab7f7f064bcee9.tar.gz",
+    "pltly": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.13.1",

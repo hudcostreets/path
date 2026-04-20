@@ -436,6 +436,7 @@ function TrafficPlot({
     selectedItems: stackedSelected,
     setSelectedItems: setStackedSelected,
     nameMap: stackedNameMap,
+    soloMode: legendMode === "solo" ? "hide" : "fade",
   })
 
   // Effective selections: use legend.effectiveItems for the stacked dimension
@@ -508,20 +509,9 @@ function TrafficPlot({
     const recentRange = ['2019-12-01', '2026-01-01']
 
     if (isVs2019) {
-      // Build ALL traces, use isFaded to style non-selected
       const rawTraces = buildVs2019Traces(allRows, [...CROSSINGS], [...VEHICLE_TYPES], stackBy)
-      const isSolo = legendMode === "solo"
-      const traces = rawTraces.map(trace => {
-        if ((trace as any).showlegend === false) return trace // baseline line
-        const faded = legend.isFaded(trace.name!)
-        return {
-          ...trace,
-          line: { ...(trace as any).line, width: !faded && legend.activeItem ? 5 : 2 },
-          zorder: faded ? 1 : 100,
-          ...(faded && isSolo ? { visible: 'legendonly' as const } : {}),
-          ...(faded && !isSolo ? { opacity: 0.4 } : {}),
-        } as Data
-      })
+      // Opacity/fading is handled by usePinnedLegend's restyleFade (Plotly.restyle)
+      const traces = rawTraces
       return {
         data: traces,
         layout: {
@@ -541,63 +531,23 @@ function TrafficPlot({
       ? buildStackedByVehicle(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
       : buildStackedByCrossing(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
 
-    const isSolo = legendMode === "solo"
     const yearNum = activeYear && !legend.activeItem ? parseInt(activeYear) : null
     const traces = rawTraces.map(trace => {
-      const faded = legend.isFaded(trace.name!)
       const dates = (trace as any).x as Date[]
-      const ys = (trace as any).y as number[]
       const yearOpacity = yearNum
         ? dates.map(d => d.getFullYear() === yearNum ? 1 : 0.15)
         : undefined
       return {
         ...trace,
-        y: faded && isSolo ? ys.map(() => 0) : ys,
         marker: {
           ...(trace as any).marker,
           ...(yearOpacity ? { opacity: yearOpacity } : {}),
         },
-        ...(faded && isSolo ? { hoverinfo: "skip" as const } : {}),
-        ...(faded ? { opacity: 0.4 } : {}),
       } as Data
     })
 
-    // 12mo rolling average line
-    const allDates: Date[] = rawTraces.length > 0 ? (rawTraces[0] as any).x : []
-    const activeTraceName = legend.activeItem ? (typeof legend.activeItem === 'string' ? legend.activeItem : null) : null
-    const avgSource: number[] = (() => {
-      if (activeTraceName) {
-        const trace = rawTraces.find(t => t.name === activeTraceName)
-        return trace ? (trace as any).y as number[] : []
-      }
-      return allDates.map((_, i) => {
-        let sum = 0
-        for (const t of rawTraces) sum += ((t as any).y as number[])[i] ?? 0
-        return sum
-      })
-    })()
-    const avg12 = rollingAvg(avgSource, 12)
-    const avgColor = (() => {
-      if (legend.activeItem) {
-        const colors = stackBy === "crossing" ? CROSSING_COLORS : VEHICLE_TYPE_COLORS
-        if (colors[legend.activeItem!]) return blendAvgColor(colors[legend.activeItem!], 0.5)
-      }
-      return dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
-    })()
-    const avgTrace: Data = {
-      name: "12mo avg",
-      x: allDates,
-      y: avg12,
-      type: "scatter",
-      mode: "lines",
-      line: { color: avgColor, width: 4 },
-      hovertemplate,
-      showlegend: false,
-      connectgaps: false,
-    }
-
     return {
-      data: [...traces, avgTrace],
+      data: traces,
       layout: {
         barmode: "stack",
         yaxis: { fixedrange: true },
@@ -612,7 +562,36 @@ function TrafficPlot({
         legend: { entrywidth: 80, traceorder: "reversed" } as Partial<Legend>,
       } as Partial<Layout>,
     }
-  }, [allRows, ezpassRows, mode, stackBy, timeRange, activeCrossings, activeTypes, isEZPass, isVs2019, legend.activeItem, legend.isFaded, legend.isAllSelected, activeYear, stackedNameMap, legendMode])
+  }, [allRows, ezpassRows, mode, stackBy, timeRange, activeCrossings, activeTypes, isEZPass, isVs2019, activeYear, stackedNameMap, legendMode])
+
+  const colors = stackBy === "crossing" ? CROSSING_COLORS : VEHICLE_TYPE_COLORS
+  const buildLinkedTraces = useCallback((active: Data | null, all: Data[]): Data[] => {
+    if (isEZPass) return []
+    const allDates: Date[] = all.length > 0 ? (all[0] as any).x : []
+    if (!allDates.length) return []
+    const avgSource: number[] = active
+      ? ((active as any).y as number[])
+      : allDates.map((_, i) => {
+          let sum = 0
+          for (const t of all) sum += ((t as any).y as number[])[i] ?? 0
+          return sum
+        })
+    const avg12 = rollingAvg(avgSource, 12)
+    const avgColor = active
+      ? blendAvgColor((active as any).marker?.color ?? '#888', 0.5)
+      : (dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
+    return [{
+      name: "12mo avg",
+      x: allDates,
+      y: avg12,
+      type: "scatter",
+      mode: "lines",
+      line: { color: avgColor, width: 4 },
+      hovertemplate,
+      showlegend: false,
+      connectgaps: false,
+    } as Data]
+  }, [isEZPass])
 
   const stackLabel = stackBy === "vehicle" ? "vehicle type" : "crossing"
   const baseTitle = isEZPass
@@ -638,6 +617,7 @@ function TrafficPlot({
         } : {
           soloMode: "hide" as const,
         })}
+        linkedTraces={buildLinkedTraces}
         {...plotProps}
       />
       <div className="plot-toggles">
