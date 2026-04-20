@@ -1,6 +1,6 @@
 outs:
-- md5: f3b3e88061c1bc8334c6a361caa0bf61
-  size: 782525
+- md5: 507c6262a18826ac5b88c7e4c252a037
+  size: 500856
   hash: md5
   path: hourly.pqt
 meta:
