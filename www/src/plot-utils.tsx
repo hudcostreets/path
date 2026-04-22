@@ -1,4 +1,5 @@
 import { Headings } from "@rdub/base/heading"
+import { useMemo } from "react"
 import { Annotations, Data, Layout } from "plotly.js"
 
 import { Plot as PltlyPlot, type PlotProps as PltlyPlotProps } from 'pltly/react'
@@ -81,15 +82,27 @@ export function Plot(
   }
   const {
     data,
-    layout: { xaxis: xaxisIn = {}, yaxis: yaxisIn = {}, legend: legendIn = {}, ...layout } = {},
+    layout: userLayout,
     ...plotProps
   } = props as { data: Data[], layout?: Partial<Layout> } & Omit<PltlyPlotProps, 'style' | 'data' | 'layout'>
-  let xaxis = { fixedrange: true, ...xaxisIn }
-  let yaxis = { fixedrange: true, ...yaxisIn }
-  let legend = { ...legendIn }
-  if (narrow) {
-    legend = { ...legend, orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
-  }
+  // Memoize the computed layout so its identity depends only on `userLayout`.
+  // Otherwise every re-render of this wrapper would create a new layout object,
+  // causing pltly's Plot to fire a redundant Plotly.react on every hover.
+  const mergedLayout = useMemo(() => {
+    const { xaxis: xaxisIn, yaxis: yaxisIn, legend: legendIn, ...rest } = userLayout ?? {}
+    return {
+      autosize: true,
+      margin,
+      hovermode: "x unified" as const,
+      hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
+      xaxis: { fixedrange: true, ...xaxisIn },
+      yaxis: { fixedrange: true, ...yaxisIn },
+      legend: narrow
+        ? { ...legendIn, orientation: "h" as const, x: 0.5, xanchor: "center" as const, y: -0.08, yanchor: "top" as const }
+        : { ...legendIn },
+      ...rest,
+    }
+  }, [narrow, userLayout])
   return <>
     {h2}
     {sub}
@@ -97,15 +110,7 @@ export function Plot(
       data={data}
       {...plotProps}
       style={{ width: '100%', height: `${height}px` }}
-      layout={{
-        autosize: true,
-        margin,
-        hovermode: "x unified",
-        hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
-        xaxis, yaxis,
-        legend,
-        ...layout,
-      }}
+      layout={mergedLayout}
     />
   </>
 }

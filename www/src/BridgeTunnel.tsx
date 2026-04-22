@@ -3,7 +3,6 @@ import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { usePinnedLegend } from "pltly/react"
 import { Data, Layout, Legend } from "plotly.js"
 import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
@@ -420,36 +419,18 @@ function TrafficPlot({
 
   // Unified legend: click → URL state, hover → transient highlight
   // Hook manages whichever dimension is currently stacked by
-  const stackedItems = useMemo(
-    () => (stackBy === "crossing" ? [...CROSSINGS] : [...VEHICLE_TYPES]) as string[],
-    [stackBy],
-  )
   const stackedNameMap = useMemo(
     () => stackBy === "crossing" ? CROSSING_ABBREV : VEHICLE_TYPE_ABBREV,
     [stackBy],
   )
-  const stackedSelected = stackBy === "crossing" ? selectedCrossings : selectedTypes
-  const setStackedSelected = stackBy === "crossing" ? setSelectedCrossings : setSelectedTypes
 
-  const legend = usePinnedLegend({
-    allItems: stackedItems,
-    selectedItems: stackedSelected,
-    setSelectedItems: setStackedSelected,
-    nameMap: stackedNameMap,
-    soloMode: legendMode === "solo" ? "hide" : "fade",
-  })
-
-  // Effective selections: use legend.effectiveItems for the stacked dimension
   const activeCrossings = selectedCrossings.length > 0 ? selectedCrossings : [...CROSSINGS]
   const activeTypes = selectedTypes.length > 0 ? selectedTypes : [...VEHICLE_TYPES]
 
-  const effectiveCrossings = useMemo(() => {
-    return stackBy === "crossing" ? legend.effectiveItems : activeCrossings
-  }, [stackBy, legend.effectiveItems, activeCrossings])
+  const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
 
-  const effectiveTypes = useMemo(() => {
-    return stackBy === "vehicle" ? legend.effectiveItems : activeTypes
-  }, [stackBy, legend.effectiveItems, activeTypes])
+  const effectiveCrossings = activeCrossings
+  const effectiveTypes = activeTypes
 
   useEffect(() => {
     onEffectiveChange?.({ crossings: effectiveCrossings, types: effectiveTypes })
@@ -462,13 +443,7 @@ function TrafficPlot({
       badges.push(
         <span key="crossings" className="filter-badge">
           {subtitle}
-          <span className="clear-filter" onClick={() => {
-            if (stackBy === "crossing") {
-              legend.clearPin()
-            } else {
-              setSelectedCrossings([...CROSSINGS])
-            }
-          }}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedCrossings([...CROSSINGS])}>&times;</span>
         </span>
       )
     }
@@ -476,19 +451,20 @@ function TrafficPlot({
       badges.push(
         <span key="types" className="filter-badge">
           {typeSuffix}
-          <span className="clear-filter" onClick={() => {
-            if (stackBy === "vehicle") {
-              legend.clearPin()
-            } else {
-              setSelectedTypes([...VEHICLE_TYPES])
-            }
-          }}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedTypes([...VEHICLE_TYPES])}>&times;</span>
+        </span>
+      )
+    }
+    if (activeTraceName) {
+      badges.push(
+        <span key="active" className="filter-badge">
+          {activeTraceName}
         </span>
       )
     }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [subtitle, typeSuffix, stackBy, legend.clearPin, setSelectedCrossings, setSelectedTypes])
+  }, [subtitle, typeSuffix, stackBy, setSelectedCrossings, setSelectedTypes, activeTraceName])
 
   const plotProps = useMemo(() => {
     if (isEZPass) {
@@ -531,7 +507,17 @@ function TrafficPlot({
       ? buildStackedByVehicle(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
       : buildStackedByCrossing(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
 
-    const yearNum = activeYear && !legend.activeItem ? parseInt(activeYear) : null
+    // Compute stack max so we can pin y-axis range (prevents autorange shifts
+    // when the linked avg line changes to a per-trace value).
+    const nPoints = rawTraces.length > 0 ? ((rawTraces[0] as any).y as number[]).length : 0
+    let stackMax = 0
+    for (let i = 0; i < nPoints; i++) {
+      let sum = 0
+      for (const t of rawTraces) sum += ((t as any).y as number[])[i] ?? 0
+      if (sum > stackMax) stackMax = sum
+    }
+
+    const yearNum = activeYear ? parseInt(activeYear) : null
     const traces = rawTraces.map(trace => {
       const dates = (trace as any).x as Date[]
       const yearOpacity = yearNum
@@ -550,7 +536,7 @@ function TrafficPlot({
       data: traces,
       layout: {
         barmode: "stack",
-        yaxis: { fixedrange: true },
+        yaxis: { fixedrange: true, automargin: false, autorange: false, range: [0, stackMax * 1.05] },
         xaxis: {
           fixedrange: true,
           range: isRecent ? recentRange : allTimeRange,
@@ -558,6 +544,7 @@ function TrafficPlot({
           tickformat: isRecent ? "%b '%y" : "'%y",
           hoverformat: "%b '%y",
           tickangle: -45,
+          automargin: false,
         },
         legend: { entrywidth: 80, traceorder: "reversed" } as Partial<Legend>,
       } as Partial<Layout>,
@@ -602,23 +589,16 @@ function TrafficPlot({
   const title = typeSuffix ? `${baseTitle} — ${typeSuffix}` : baseTitle
 
   return (
-    <div className="plot-container" ref={legend.containerRef} onClick={legend.onContainerClick}>
+    <div className="plot-container">
       <Plot
         id="bt-traffic"
         title={title}
         subtitle={subtitleNode}
-        {...((isTraffic || isVs2019) ? {
-          disableLegendHover: true,
-          disableSoloTrace: true,
-          onLegendClick: legend.onLegendClick,
-          onLegendDoubleClick: legend.onLegendDoubleClick,
-          onAfterPlot: legend.onAfterPlot,
-          traceNames: legend.traceNames,
-        } : {
-          soloMode: "hide" as const,
-        })}
+        soloMode={legendMode === "solo" ? "hide" : "fade"}
+        fadeOpacity={0.4}
         linkedTraces={buildLinkedTraces}
-        {...plotProps}
+        onActiveTraceChange={setActiveTraceName}
+        {...plotProps as any}
       />
       <div className="plot-toggles">
         <ToggleButtonGroup
@@ -672,7 +652,7 @@ function TrafficPlot({
           stations={[...CROSSINGS]}
           colors={CROSSING_COLORS}
           selected={effectiveCrossings}
-          onChange={stackBy === "crossing" ? legend.onPickerChange : setSelectedCrossings}
+          onChange={setSelectedCrossings}
           regionGroups={REGION_GROUPS}
           label="Crossings"
         />
@@ -681,7 +661,7 @@ function TrafficPlot({
             stations={[...VEHICLE_TYPES]}
             colors={VEHICLE_TYPE_COLORS}
             selected={effectiveTypes}
-            onChange={stackBy === "vehicle" ? legend.onPickerChange : setSelectedTypes}
+            onChange={setSelectedTypes}
             label="Vehicle Types"
           />
         )}
