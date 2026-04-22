@@ -272,18 +272,21 @@ test.describe('Bidirectional pin brushing on /', () => {
   })
 
   test('plot1 pin → plot3 also bolds that station', async ({ page }) => {
-    await clickLIByIdWithWait(page, 'rides', 'Newark')
-    await page.waitForTimeout(300)
-    // Plot1 shows Newark bold. In HourlyPlot, the trace name is identical.
-    expect(await legendFontWeightById(page, 'rides', 'Newark')).not.toBe('')
-    expect(await legendFontWeightById(page, 'hourly', 'Newark')).not.toBe('')
+    // Wait for both origin AND target legends — the cross-plot bold can't
+    // apply until the target plot's DOM is live (CI preview mount is slower).
+    await expect.poll(async () => (await getLegendNamesById(page, 'rides')).includes('Newark'), { timeout: 20_000 }).toBe(true)
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Newark'), { timeout: 20_000 }).toBe(true)
+    await clickLIById(page, 'rides', 'Newark')
+    await expect.poll(() => legendFontWeightById(page, 'rides', 'Newark'), { timeout: 5000 }).not.toBe('')
+    await expect.poll(() => legendFontWeightById(page, 'hourly', 'Newark'), { timeout: 5000 }).not.toBe('')
   })
 
   test('plot3 pin → plot1 also bolds that station', async ({ page }) => {
-    await clickLIByIdWithWait(page, 'hourly', 'Hoboken')
-    await page.waitForTimeout(300)
-    expect(await legendFontWeightById(page, 'hourly', 'Hoboken')).not.toBe('')
-    expect(await legendFontWeightById(page, 'rides', 'Hoboken')).not.toBe('')
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Hoboken'), { timeout: 20_000 }).toBe(true)
+    await expect.poll(async () => (await getLegendNamesById(page, 'rides')).includes('Hoboken'), { timeout: 20_000 }).toBe(true)
+    await clickLIById(page, 'hourly', 'Hoboken')
+    await expect.poll(() => legendFontWeightById(page, 'hourly', 'Hoboken'), { timeout: 5000 }).not.toBe('')
+    await expect.poll(() => legendFontWeightById(page, 'rides', 'Hoboken'), { timeout: 5000 }).not.toBe('')
   })
 
   test('plot3 pin → plot2 filters to that station', async ({ page }) => {
