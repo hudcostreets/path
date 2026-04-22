@@ -1085,15 +1085,20 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     onEffectiveDayTypesChange?.(brushedDayTypes)
   }, [brushedDayTypes, onEffectiveDayTypesChange])
 
-  // Subtitle: badge-style facets with individual × clear buttons
+  // Subtitle: badge-style facets with individual × clear buttons.
+  // Station badge reflects brushedStations (picker ∪ active legend trace), so
+  // hovering/pinning a LI shows that station in the badge.
   const subtitle = useMemo(() => {
     const badges: React.ReactNode[] = []
-    const stSub = stationSubtitle(selectedStations)
+    const stSub = stationSubtitle(brushedStations)
     if (stSub) {
       badges.push(
         <span key="stations" className="filter-badge">
           {stSub}
-          <span className="clear-filter" onClick={() => setSelectedStations([...STATIONS])}>&times;</span>
+          <span className="clear-filter" onClick={() => {
+            setSelectedStations([...STATIONS])
+            onSoloStationChange?.(null)
+          }}>&times;</span>
         </span>
       )
     }
@@ -1108,7 +1113,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [selectedStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes])
+  }, [brushedStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes, onSoloStationChange])
 
   const baselines = useMemo(
     () => processed ? computeBaselines(processed.stations, baselineYears, exclusions) : new Map<string, StationBaseline>(),

@@ -241,23 +241,11 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   const groupLabel = groupBy === "station" ? "by station" : "by day type"
   const titleText = `Avg hourly ${dirLabel} ${groupLabel}`
 
-  // Build subtitle from filters
-  const dtSubtitleParts: string[] = []
-  if (selectedDayTypes.length < DAY_TYPES.length) {
-    const hasSat = selectedDayTypes.includes("saturday")
-    const hasSun = selectedDayTypes.includes("sunday")
-    if (hasSat && hasSun) {
-      if (selectedDayTypes.includes("weekday")) dtSubtitleParts.push("Weekday")
-      dtSubtitleParts.push("Weekend")
-      if (selectedDayTypes.includes("holiday")) dtSubtitleParts.push("Holiday")
-    } else {
-      for (const dt of selectedDayTypes) dtSubtitleParts.push(DAY_TYPE_LABELS[dt])
-    }
-  }
-  const dtSubtitle = dtSubtitleParts.join(", ")
-  const subtitle = [dtSubtitle, "all months averaged (2017–present)"].filter(Boolean).join(" · ")
+  // Track active (hover OR pin) trace for the subtitle badge.
+  const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
 
   const handleActiveTrace = useCallback((name: string | null) => {
+    setActiveTraceName(name)
     if (!onActiveStationChange) return
     if (!name || groupBy !== "station") {
       onActiveStationChange(null)
@@ -266,6 +254,40 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     // Map legend name ("Christopher St." abbreviation) back to canonical station.
     onActiveStationChange(name === "Christopher St." ? "Christopher Street" : name)
   }, [onActiveStationChange, groupBy])
+
+  // Build subtitle with filter badges (station active, day types) + static text.
+  const subtitle: React.ReactNode = useMemo(() => {
+    const badges: React.ReactNode[] = []
+    if (activeTraceName && groupBy === "station") {
+      badges.push(
+        <span key="station" className="filter-badge">
+          {activeTraceName}
+          <span className="clear-filter" onClick={() => onSoloStationChange?.(null)}>&times;</span>
+        </span>
+      )
+    }
+    if (selectedDayTypes.length < DAY_TYPES.length) {
+      const hasSat = selectedDayTypes.includes("saturday")
+      const hasSun = selectedDayTypes.includes("sunday")
+      const parts: string[] = []
+      if (hasSat && hasSun) {
+        if (selectedDayTypes.includes("weekday")) parts.push("Weekday")
+        parts.push("Weekend")
+        if (selectedDayTypes.includes("holiday")) parts.push("Holiday")
+      } else {
+        for (const dt of selectedDayTypes) parts.push(DAY_TYPE_LABELS[dt])
+      }
+      badges.push(
+        <span key="daytypes" className="filter-badge">
+          {parts.join(", ")}
+          <span className="clear-filter" onClick={() => setSelectedDayTypes([...DAY_TYPES])}>&times;</span>
+        </span>
+      )
+    }
+    const staticText = "all months averaged (2017–present)"
+    if (badges.length === 0) return staticText
+    return <>{badges} · {staticText}</>
+  }, [activeTraceName, groupBy, selectedDayTypes, onSoloStationChange])
 
   // Controlled solo: map full station name <-> trace name (with period abbreviation).
   const soloTraceName = useMemo(() => {

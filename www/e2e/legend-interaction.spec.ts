@@ -261,6 +261,50 @@ test.describe('Bidirectional pin brushing on /', () => {
   })
 })
 
+// ─── Filter badges on plot1 & plot3 ───
+//
+// Hovering/pinning a LI on plot1 or plot3 should produce a filter badge in
+// that plot's own subtitle (matching plot2's existing behavior on `/bt`).
+
+async function subtitleText(page: Page, id: string): Promise<string> {
+  return (await plotById(page, id).locator('.plot-subtitle').textContent()) ?? ''
+}
+
+async function hasBadge(page: Page, id: string, text: string): Promise<boolean> {
+  const badges = await plotById(page, id).locator('.filter-badge').allTextContents()
+  return badges.some(b => b.includes(text))
+}
+
+test.describe('Filter badges on /', () => {
+  test.beforeEach(async ({ page }) => { await page.goto('/') })
+
+  test('plot1 pin station → plot1 subtitle shows badge', async ({ page }) => {
+    await clickLIByIdWithWait(page, 'rides', 'Hoboken')
+    await page.waitForTimeout(300)
+    expect(await hasBadge(page, 'rides', 'Hoboken')).toBe(true)
+  })
+
+  test('plot3 hover station → plot3 subtitle shows badge', async ({ page }) => {
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Newark'),
+      { timeout: 20_000 }).toBe(true)
+    await hoverLIById(page, 'hourly', 'Newark')
+    await page.waitForTimeout(300)
+    expect(await hasBadge(page, 'hourly', 'Newark')).toBe(true)
+  })
+
+  test('plot3 badge × clears the pin', async ({ page }) => {
+    await clickLIByIdWithWait(page, 'hourly', 'WTC')
+    await page.waitForTimeout(300)
+    expect(await hasBadge(page, 'hourly', 'WTC')).toBe(true)
+    // Click × on plot3's subtitle badge
+    await plotById(page, 'hourly').locator('.filter-badge', { hasText: 'WTC' }).locator('.clear-filter').click()
+    await page.waitForTimeout(300)
+    expect(await hasBadge(page, 'hourly', 'WTC')).toBe(false)
+    // plot1 should also un-bold
+    expect(await legendFontWeightById(page, 'rides', 'WTC')).toBe('')
+  })
+})
+
 // ─── No render loops ───
 
 test.describe('No render loops', () => {
