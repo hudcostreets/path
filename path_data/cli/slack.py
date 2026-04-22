@@ -11,7 +11,15 @@ BOT_USERNAME = 'PATH Data'
 
 
 def get_client(token: str, channel: str) -> SlackClient:
-    return SlackClient(token=token, channel=channel)
+    return SlackClient(
+        token=token,
+        channel=channel,
+        username=BOT_USERNAME,
+        icon_emoji=NO_DATA_EMOJI,
+    )
+
+
+NO_DATA_EMOJI = ':hourglass_flowing_sand:'
 
 
 def post_message(
