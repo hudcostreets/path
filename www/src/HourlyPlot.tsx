@@ -1,12 +1,11 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { Data, Legend } from "plotly.js"
-import { Plot as PltlyPlot } from "pltly/react"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { codeParam, useUrlState } from "use-prms"
-import { H2, Loading, dark, hovertemplate } from "./plot-utils"
+import { Plot, hovertemplate } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import type { StationGroup } from "./RidesPlot"
 
@@ -119,12 +118,14 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   const [selectedStations, setSelectedStations] = useState<string[]>([...STATIONS])
   const [selectedDayTypes, setSelectedDayTypes] = useState<DayType[]>([...DAY_TYPES])
 
-  const activeStations = externalStations && externalStations.length > 0
-    ? externalStations.map(s => {
-        if (s === "Christopher Street") return "Christopher St."
-        return s
-      }).filter(s => (STATIONS as readonly string[]).includes(s))
-    : selectedStations
+  const activeStations = useMemo(() => {
+    if (externalStations && externalStations.length > 0) {
+      return externalStations
+        .map(s => s === "Christopher Street" ? "Christopher St." : s)
+        .filter(s => (STATIONS as readonly string[]).includes(s))
+    }
+    return selectedStations
+  }, [externalStations, selectedStations])
 
   const { data: allRows } = useQuery({
     queryKey: ['hourly-by-station', hourlyUrl],
@@ -232,12 +233,6 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     }
   }, [allRows, activeStations, selectedDayTypes, groupBy, direction])
 
-  const narrow = typeof window !== 'undefined' && window.innerWidth < 600
-  const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
-  const legendBase: Partial<Legend> = narrow
-    ? { orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
-    : {}
-
   const dirLabel = direction === "entry" ? "entries" : "exits"
   const groupLabel = groupBy === "station" ? "by station" : "by day type"
   const titleText = `Avg hourly ${dirLabel} ${groupLabel}`
@@ -258,7 +253,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   const dtSubtitle = dtSubtitleParts.join(", ")
   const subtitle = [dtSubtitle, "all months averaged (2017–present)"].filter(Boolean).join(" · ")
 
-  const handleActiveTrace = (name: string | null) => {
+  const handleActiveTrace = useCallback((name: string | null) => {
     if (!onActiveStationChange) return
     if (!name || groupBy !== "station") {
       onActiveStationChange(null)
@@ -266,36 +261,30 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     }
     // Map legend name ("Christopher St." abbreviation) back to canonical station.
     onActiveStationChange(name === "Christopher St." ? "Christopher Street" : name)
-  }
+  }, [onActiveStationChange, groupBy])
+
+  const layout = useMemo(() => ({
+    barmode: "stack" as const,
+    xaxis: {
+      tickmode: "array" as const,
+      tickvals: hours24,
+      ticktext: HOUR_LABELS,
+    },
+    legend: { traceorder: "reversed" } as Partial<Legend>,
+  }), [])
 
   return (
     <div className="plot-container">
-      <H2 id="hourly">{titleText}</H2>
-      <div className="plot-subtitle">{subtitle}</div>
-      {!plotData ? <Loading /> : (
-        <PltlyPlot
-          data={plotData}
-          soloMode={legendMode === "solo" ? "hide" : "fade"}
-          fadeOpacity={0.15}
-          onActiveTraceChange={handleActiveTrace}
-          style={{ width: '100%', height: `${height}px` }}
-          layout={{
-            autosize: true,
-            margin,
-            hovermode: "x unified",
-            hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
-            barmode: "stack",
-            xaxis: {
-              fixedrange: true,
-              tickmode: "array" as const,
-              tickvals: hours24,
-              ticktext: HOUR_LABELS,
-            },
-            yaxis: { fixedrange: true },
-            legend: { ...legendBase, traceorder: "reversed" } as Partial<Legend>,
-          }}
-        />
-      )}
+      <Plot
+        id="hourly"
+        title={titleText}
+        subtitle={subtitle}
+        data={plotData ?? undefined}
+        soloMode={legendMode === "solo" ? "hide" : "fade"}
+        fadeOpacity={0.15}
+        onActiveTraceChange={handleActiveTrace}
+        layout={layout}
+      />
       <div className="plot-toggles">
         <ToggleButtonGroup size="small" exclusive value={direction} onChange={(_, v) => v && setDirection(v)}>
           <ToggleButton value="entry">Entry</ToggleButton>
