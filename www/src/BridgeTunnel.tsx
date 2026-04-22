@@ -429,8 +429,23 @@ function TrafficPlot({
 
   const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
 
-  const effectiveCrossings = activeCrossings
-  const effectiveTypes = activeTypes
+  // When a legend item is hovered/pinned, narrow the "effective" set to just
+  // that dimension so plot2 (BTMonthlyPlot) brushes to match.
+  const effectiveCrossings = useMemo(() => {
+    if (activeTraceName && stackBy === "crossing") {
+      const full = ABBREV_TO_CROSSING[activeTraceName]
+      if (full) return [full]
+    }
+    return activeCrossings
+  }, [activeTraceName, stackBy, activeCrossings])
+
+  const effectiveTypes = useMemo(() => {
+    if (activeTraceName && stackBy === "vehicle") {
+      const full = ABBREV_TO_TYPE[activeTraceName]
+      if (full) return [full]
+    }
+    return activeTypes
+  }, [activeTraceName, stackBy, activeTypes])
 
   useEffect(() => {
     onEffectiveChange?.({ crossings: effectiveCrossings, types: effectiveTypes })
@@ -455,16 +470,9 @@ function TrafficPlot({
         </span>
       )
     }
-    if (activeTraceName) {
-      badges.push(
-        <span key="active" className="filter-badge">
-          {activeTraceName}
-        </span>
-      )
-    }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [subtitle, typeSuffix, stackBy, setSelectedCrossings, setSelectedTypes, activeTraceName])
+  }, [subtitle, typeSuffix, setSelectedCrossings, setSelectedTypes])
 
   const plotProps = useMemo(() => {
     if (isEZPass) {

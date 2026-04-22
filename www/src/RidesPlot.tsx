@@ -151,6 +151,11 @@ function displayName(station: string): string {
   return STATION_DISPLAY[station] ?? station
 }
 
+const STATION_FROM_DISPLAY: Record<string, string> = {
+  ...Object.fromEntries((STATIONS as readonly string[]).map(s => [s, s])),
+  ...Object.fromEntries(Object.entries(STATION_DISPLAY).map(([k, v]) => [v, k])),
+}
+
 const STATION_ABBREVS: Record<string, string> = {
   "Christopher Street": "CHR",
   "9th Street": "9TH",
@@ -221,6 +226,10 @@ const DAY_TYPE_LABELS: Record<string, string> = {
   weekend: "Weekend",
   holiday: "Holiday",
 }
+
+const DAY_TYPE_FROM_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(DAY_TYPE_LABELS).map(([k, v]) => [v, k])
+)
 
 const DAY_TYPE_CODES: Record<string, string> = {
   weekday: "w",
@@ -1041,17 +1050,36 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     },
   })
 
+  // Legend hover/pin → brush plot2 to the matching dimension.
+  const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
+
+  const brushedStations = useMemo(() => {
+    if (activeTraceName && groupBy === "station") {
+      const full = STATION_FROM_DISPLAY[activeTraceName]
+      if (full) return [full]
+    }
+    return selectedStations
+  }, [activeTraceName, groupBy, selectedStations])
+
+  const brushedDayTypes = useMemo(() => {
+    if (activeTraceName && groupBy === "daytype") {
+      const dt = DAY_TYPE_FROM_LABEL[activeTraceName]
+      if (dt) return [dt]
+    }
+    return selectedDayTypes
+  }, [activeTraceName, groupBy, selectedDayTypes])
+
   useEffect(() => {
-    onEffectiveStationsChange?.(selectedStations)
-  }, [selectedStations, onEffectiveStationsChange])
+    onEffectiveStationsChange?.(brushedStations)
+  }, [brushedStations, onEffectiveStationsChange])
 
   useEffect(() => {
     onMetricChange?.(metric)
   }, [metric, onMetricChange])
 
   useEffect(() => {
-    onEffectiveDayTypesChange?.(selectedDayTypes)
-  }, [selectedDayTypes, onEffectiveDayTypesChange])
+    onEffectiveDayTypesChange?.(brushedDayTypes)
+  }, [brushedDayTypes, onEffectiveDayTypesChange])
 
   // Subtitle: badge-style facets with individual × clear buttons
   const subtitle = useMemo(() => {
@@ -1110,6 +1138,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         title={title}
         subtitle={subtitle}
         fadeOpacity={0.4}
+        onActiveTraceChange={setActiveTraceName}
         {...plotProps}
       />
       {!clean && <>
