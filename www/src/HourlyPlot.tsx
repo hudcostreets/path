@@ -108,9 +108,13 @@ function colKey(dayType: DayType, direction: Direction): keyof HourlyRow {
   return `avg_${dayType}_${direction}` as keyof HourlyRow
 }
 
-export default function HourlyPlot({ stations: externalStations, onActiveStationChange }: {
+export default function HourlyPlot({ stations: externalStations, onActiveStationChange, soloStation, onSoloStationChange }: {
   stations?: string[]
   onActiveStationChange?: (station: string | null) => void
+  /** Controlled solo/pin (full station name). Pair with `onSoloStationChange`
+   *  to share pin state across plots. */
+  soloStation?: string | null
+  onSoloStationChange?: (station: string | null) => void
 }) {
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("hg", groupByParam)
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
@@ -263,6 +267,21 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     onActiveStationChange(name === "Christopher St." ? "Christopher Street" : name)
   }, [onActiveStationChange, groupBy])
 
+  // Controlled solo: map full station name <-> trace name (with period abbreviation).
+  const soloTraceName = useMemo(() => {
+    if (soloStation === undefined) return undefined
+    if (!soloStation || groupBy !== "station") return null
+    const mapped = soloStation === "Christopher Street" ? "Christopher St." : soloStation
+    return (STATIONS as readonly string[]).includes(mapped) ? mapped : null
+  }, [soloStation, groupBy])
+
+  const handleSoloTraceChange = useCallback((name: string | null) => {
+    if (!onSoloStationChange) return
+    if (!name) { onSoloStationChange(null); return }
+    if (groupBy !== "station") return
+    onSoloStationChange(name === "Christopher St." ? "Christopher Street" : name)
+  }, [onSoloStationChange, groupBy])
+
   const layout = useMemo(() => ({
     barmode: "stack" as const,
     xaxis: {
@@ -283,6 +302,8 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         soloMode={legendMode === "solo" ? "hide" : "fade"}
         fadeOpacity={0.15}
         onActiveTraceChange={handleActiveTrace}
+        soloTrace={soloTraceName}
+        onSoloTraceChange={handleSoloTraceChange}
         layout={layout}
       />
       <div className="plot-toggles">

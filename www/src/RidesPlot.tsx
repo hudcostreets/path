@@ -887,11 +887,15 @@ function buildByDayType(
   }
 }
 
-export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTypesChange, onMetricChange, activeYear }: {
+export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTypesChange, onMetricChange, activeYear, soloStation, onSoloStationChange }: {
   onEffectiveStationsChange?: (stations: string[]) => void
   onEffectiveDayTypesChange?: (dayTypes: string[]) => void
   onMetricChange?: (metric: Metric) => void
   activeYear?: string | null
+  /** Controlled solo/pin (full station name like "Newark"). Pair with
+   *  `onSoloStationChange` to share pin state across plots. */
+  soloStation?: string | null
+  onSoloStationChange?: (station: string | null) => void
 } = {}) {
   const [metric, setMetric] = useUrlState<Metric>("m", metricParam)
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("g", groupByParam)
@@ -1129,6 +1133,20 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     return `${metricLabel} ${groupLabel}`
   }, [metric, groupBy, baselineYears])
 
+  // Controlled solo: map full station name <-> pltly trace display name.
+  const soloTraceName = useMemo(() => {
+    if (soloStation === undefined) return undefined
+    if (!soloStation || groupBy !== "station") return null
+    return displayName(soloStation)
+  }, [soloStation, groupBy])
+
+  const handleSoloTraceChange = useCallback((name: string | null) => {
+    if (!onSoloStationChange) return
+    if (!name) { onSoloStationChange(null); return }
+    if (groupBy !== "station") return
+    onSoloStationChange(STATION_FROM_DISPLAY[name] ?? null)
+  }, [onSoloStationChange, groupBy])
+
   return (
     <div className="plot-container">
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
@@ -1139,6 +1157,8 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         subtitle={subtitle}
         fadeOpacity={0.4}
         onActiveTraceChange={setActiveTraceName}
+        soloTrace={soloTraceName}
+        onSoloTraceChange={handleSoloTraceChange}
         {...plotProps}
       />
       {!clean && <>

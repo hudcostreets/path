@@ -196,6 +196,71 @@ test.describe('Plot position stable on hover/pin', () => {
   }
 })
 
+// ─── Bidirectional pin brushing ───
+//
+// Pinning a station on `/` plot1 (RidesPlot) or plot3 (HourlyPlot) should
+// bold that station's LI on BOTH plots (via pltly's controlled soloTrace)
+// AND filter plot2 (MonthlyPlots) to that station.
+
+async function legendFontWeightById(page: Page, id: string, name: string): Promise<string> {
+  return plotById(page, id).evaluate((el, n) => {
+    for (const t of el.querySelectorAll('.legend .traces')) {
+      const text = t.querySelector('.legendtext') as SVGTextElement | null
+      if (text?.textContent?.trim() === n) return text.style.fontWeight || ''
+    }
+    return ''
+  }, name)
+}
+
+async function clickLIByIdWithWait(page: Page, id: string, name: string) {
+  await expect.poll(async () => {
+    const names = await plotById(page, id).locator('.legend .traces .legendtext').allTextContents()
+    return names.map(s => s.trim()).includes(name)
+  }, { timeout: 20_000 }).toBe(true)
+  await clickLIById(page, id, name)
+}
+
+test.describe('Bidirectional pin brushing on /', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+  })
+
+  test('plot1 pin → plot3 also bolds that station', async ({ page }) => {
+    await clickLIByIdWithWait(page, 'rides', 'Newark')
+    await page.waitForTimeout(300)
+    // Plot1 shows Newark bold. In HourlyPlot, the trace name is identical.
+    expect(await legendFontWeightById(page, 'rides', 'Newark')).not.toBe('')
+    expect(await legendFontWeightById(page, 'hourly', 'Newark')).not.toBe('')
+  })
+
+  test('plot3 pin → plot1 also bolds that station', async ({ page }) => {
+    await clickLIByIdWithWait(page, 'hourly', 'Hoboken')
+    await page.waitForTimeout(300)
+    expect(await legendFontWeightById(page, 'hourly', 'Hoboken')).not.toBe('')
+    expect(await legendFontWeightById(page, 'rides', 'Hoboken')).not.toBe('')
+  })
+
+  test('plot3 pin → plot2 filters to that station', async ({ page }) => {
+    await clickLIByIdWithWait(page, 'hourly', 'WTC')
+    await page.waitForTimeout(300)
+    const sub = await plotById(page, 'monthly').locator('.plot-subtitle').textContent()
+    expect(sub).toContain('WTC')
+  })
+
+  test('plot1 pin → plot2 filters and plot3 keeps full legend', async ({ page }) => {
+    await clickLIByIdWithWait(page, 'rides', 'Journal Square')
+    await page.waitForTimeout(300)
+    expect(await legendFontWeightById(page, 'rides', 'Journal Square')).not.toBe('')
+    expect(await legendFontWeightById(page, 'hourly', 'Journal Square')).not.toBe('')
+    // Plot3 keeps all stations in its legend (data not narrowed by plot1 pin)
+    const hourlyNames = await plotById(page, 'hourly').locator('.legend .traces .legendtext').allTextContents()
+    expect(hourlyNames.length).toBeGreaterThan(5)
+    // Plot2 filters to the pinned station
+    const sub = await plotById(page, 'monthly').locator('.plot-subtitle').textContent()
+    expect(sub).toContain('Journal Square')
+  })
+})
+
 // ─── No render loops ───
 
 test.describe('No render loops', () => {
