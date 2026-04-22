@@ -4,11 +4,11 @@ import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Data, Layout, Legend } from "plotly.js"
-import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
+import { Plot as PltlyPlot } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam, codesParam } from "use-prms"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
-import { Plot, H2, Loading, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg } from "./plot-utils"
+import { Plot, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 import type { StationGroup } from "./RidesPlot"
@@ -707,8 +707,6 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
   })
 }
 
-const monthlyHeight = 450
-
 function BTMonthlyPlot({
   allRows,
   crossings,
@@ -761,65 +759,32 @@ function BTMonthlyPlot({
     return data
   }, [allRows, crossings, types])
 
-  const traceNames = useMemo(
-    () => plotData?.map(d => d.name).filter((n): n is string => !!n) ?? [],
-    [plotData],
-  )
-  const containerRef = useRef<HTMLDivElement>(null)
-  const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, traceNames)
-  const { soloTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
-  const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
-
-  const highlightTarget = soloTrace ?? hoverTrace
+  const [activeYear, setActiveYear] = useState<string | null>(null)
 
   useEffect(() => {
-    onActiveYearChange?.(highlightTarget)
-  }, [highlightTarget, onActiveYearChange])
+    onActiveYearChange?.(activeYear)
+  }, [activeYear, onActiveYearChange])
 
   const styledData = useMemo(
-    () => plotData ? highlightTraces(plotData, highlightTarget) : null,
-    [plotData, highlightTarget],
+    () => plotData ? highlightTraces(plotData, activeYear) : null,
+    [plotData, activeYear],
   )
-
-  const narrow = typeof window !== 'undefined' && window.innerWidth < 600
-  const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
-  const legendBase: Partial<Legend> = narrow
-    ? { orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
-    : {}
-
-  if (!styledData) {
-    return <div className="plot-container">
-      <H2 id="bt-monthly">{typeSuffix ? `Monthly traffic, by month — ${typeSuffix}` : "Monthly traffic, by month"}</H2>
-      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
-      <Loading />
-    </div>
-  }
 
   return (
     <div className="plot-container">
-      <H2 id="bt-monthly">{typeSuffix ? `Monthly traffic, by month — ${typeSuffix}` : "Monthly traffic, by month"}</H2>
-      {subtitle && <div className="plot-subtitle">{subtitle}</div>}
-      <div ref={containerRef}>
-        <PltlyPlot
-          
-          data={styledData}
-          disableLegendHover
-          onLegendClick={onLegendClick as () => boolean}
-          onLegendDoubleClick={onLegendDoubleClick as () => boolean}
-          onAfterPlot={attachLegend}
-          style={{ width: '100%', height: `${monthlyHeight}px` }}
-          layout={{
-            autosize: true,
-            margin,
-            hovermode: "x unified",
-            hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
-            barmode: "group",
-            xaxis: { fixedrange: true },
-            yaxis: { fixedrange: true },
-            legend: { ...legendBase, title: undefined, entrywidth: 60 } as Partial<Legend>,
-          }}
-        />
-      </div>
+      <Plot
+        id="bt-monthly"
+        title={typeSuffix ? `Monthly traffic, by month — ${typeSuffix}` : "Monthly traffic, by month"}
+        subtitle={subtitle}
+        data={styledData ?? undefined}
+        disableLegendHover
+        disableSoloTrace
+        onActiveTraceChange={setActiveYear}
+        layout={{
+          barmode: "group",
+          legend: { title: undefined, entrywidth: 60 } as Partial<Legend>,
+        }}
+      />
     </div>
   )
 }

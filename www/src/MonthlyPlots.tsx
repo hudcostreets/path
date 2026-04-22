@@ -1,12 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Data, Legend } from "plotly.js"
-import { Plot as PltlyPlot, useLegendHover, useSoloTrace } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
-import { H2, Loading, dark, hovertemplate, url } from "./plot-utils"
-
-const height = 450
+import { Plot, dark, hovertemplate, url } from "./plot-utils"
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -121,31 +118,16 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
     return data
   }, [allRows, stations, dayTypes, metric])
 
-  const traceNames = useMemo(
-    () => plotData?.map(d => d.name).filter((n): n is string => !!n) ?? [],
-    [plotData],
-  )
-  const containerRef = useRef<HTMLDivElement>(null)
-  const { hoverTrace, handlers: legendHandlers } = useLegendHover(containerRef, traceNames)
-  const { soloTrace, onLegendClick, onLegendDoubleClick } = useSoloTrace(traceNames, hoverTrace)
-  const attachLegend = useCallback(() => legendHandlers.onUpdate(), [legendHandlers])
-
-  const highlightTarget = soloTrace ?? hoverTrace
+  const [activeYear, setActiveYear] = useState<string | null>(null)
 
   useEffect(() => {
-    onActiveYearChange?.(highlightTarget)
-  }, [highlightTarget, onActiveYearChange])
+    onActiveYearChange?.(activeYear)
+  }, [activeYear, onActiveYearChange])
 
   const styledData = useMemo(
-    () => plotData ? highlightTraces(plotData, highlightTarget) : null,
-    [plotData, highlightTarget],
+    () => plotData ? highlightTraces(plotData, activeYear) : null,
+    [plotData, activeYear],
   )
-
-  const narrow = typeof window !== 'undefined' && window.innerWidth < 600
-  const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
-  const legendBase: Partial<Legend> = narrow
-    ? { orientation: "h", x: 0.5, xanchor: "center", y: -0.08, yanchor: "top" }
-    : {}
 
   const DAY_TYPE_NAMES: Record<string, string> = { weekday: "Weekday", weekend: "Weekend", holiday: "Holiday" }
   const allDayTypes = dayTypes.length >= 3
@@ -160,44 +142,26 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
 
   const fullSubtitle = [subtitle, dayTypeSubtitle].filter(Boolean).join(" · ")
 
-  if (!styledData) {
-    return <div className="plot-container">
-      <H2 id="monthly">{titleText}</H2>
-      {fullSubtitle && <div className="plot-subtitle">{fullSubtitle}</div>}
-      <Loading />
-    </div>
-  }
-
   return (
     <div className="plot-container">
-      <H2 id="monthly">{titleText}</H2>
-      {fullSubtitle && <div className="plot-subtitle">{fullSubtitle}</div>}
-      <div ref={containerRef}>
-      <PltlyPlot
-        
-        data={styledData}
+      <Plot
+        id="monthly"
+        title={titleText}
+        subtitle={fullSubtitle}
+        data={styledData ?? undefined}
         disableLegendHover
-        onLegendClick={onLegendClick as () => boolean}
-        onLegendDoubleClick={onLegendDoubleClick as () => boolean}
-        onAfterPlot={attachLegend}
-        style={{ width: '100%', height: `${height}px` }}
+        disableSoloTrace
+        onActiveTraceChange={setActiveYear}
         layout={{
-          autosize: true,
-          margin,
-          hovermode: "x unified",
-          hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
           barmode: "group",
           xaxis: {
-            fixedrange: true,
             tickmode: "array" as const,
             tickvals: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             ticktext: MONTH_LABELS,
           },
-          yaxis: { fixedrange: true },
-          legend: { ...legendBase, entrywidth: 60 } as Partial<Legend>,
+          legend: { entrywidth: 60 } as Partial<Legend>,
         }}
       />
-      </div>
     </div>
   )
 }
