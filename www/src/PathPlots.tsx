@@ -5,7 +5,8 @@ import MonthlyPlots from "./MonthlyPlots"
 import HourlyPlot from "./HourlyPlot"
 
 export default function PathPlots() {
-  const [effectiveStations, setEffectiveStations] = useState<string[]>([])
+  const [plot1Stations, setPlot1Stations] = useState<string[]>([])
+  const [plot3ActiveStation, setPlot3ActiveStation] = useState<string | null>(null)
   const [effectiveDayTypes, setEffectiveDayTypes] = useState<string[]>(["weekday", "weekend"])
   const [activeYear, setActiveYear] = useState<string | null>(null)
   // Plot2 metric: follows plot1 for avg/total, stays put when plot1 switches to pct2019
@@ -17,20 +18,28 @@ export default function PathPlots() {
       setPlot2Metric(metric)
     }
   }, [])
+  // Plot3 can also brush plot2: when it has an active station, prefer that
+  // over plot1's brush. Plot3 itself gets plot1's brush (not its own, to avoid
+  // narrowing its data to a single station that pltly's soloMode already
+  // visually isolates).
+  const plot2Stations = plot3ActiveStation ? [plot3ActiveStation] : plot1Stations
   return <>
     <RidesPlot
-      onEffectiveStationsChange={setEffectiveStations}
+      onEffectiveStationsChange={setPlot1Stations}
       onEffectiveDayTypesChange={setEffectiveDayTypes}
       onMetricChange={onMetricChange}
       activeYear={activeYear}
     />
     <MonthlyPlots
-      stations={effectiveStations}
+      stations={plot2Stations}
       dayTypes={effectiveDayTypes}
       metric={plot2Metric}
-      subtitle={stationSubtitle(effectiveStations)}
+      subtitle={stationSubtitle(plot2Stations)}
       onActiveYearChange={setActiveYear}
     />
-    <HourlyPlot stations={effectiveStations} />
+    <HourlyPlot
+      stations={plot1Stations}
+      onActiveStationChange={setPlot3ActiveStation}
+    />
   </>
 }

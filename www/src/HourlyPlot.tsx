@@ -109,8 +109,9 @@ function colKey(dayType: DayType, direction: Direction): keyof HourlyRow {
   return `avg_${dayType}_${direction}` as keyof HourlyRow
 }
 
-export default function HourlyPlot({ stations: externalStations }: {
+export default function HourlyPlot({ stations: externalStations, onActiveStationChange }: {
   stations?: string[]
+  onActiveStationChange?: (station: string | null) => void
 }) {
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("hg", groupByParam)
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
@@ -257,6 +258,16 @@ export default function HourlyPlot({ stations: externalStations }: {
   const dtSubtitle = dtSubtitleParts.join(", ")
   const subtitle = [dtSubtitle, "all months averaged (2017–present)"].filter(Boolean).join(" · ")
 
+  const handleActiveTrace = (name: string | null) => {
+    if (!onActiveStationChange) return
+    if (!name || groupBy !== "station") {
+      onActiveStationChange(null)
+      return
+    }
+    // Map legend name ("Christopher St." abbreviation) back to canonical station.
+    onActiveStationChange(name === "Christopher St." ? "Christopher Street" : name)
+  }
+
   return (
     <div className="plot-container">
       <H2 id="hourly">{titleText}</H2>
@@ -266,6 +277,7 @@ export default function HourlyPlot({ stations: externalStations }: {
           data={plotData}
           soloMode={legendMode === "solo" ? "hide" : "fade"}
           fadeOpacity={0.15}
+          onActiveTraceChange={handleActiveTrace}
           style={{ width: '100%', height: `${height}px` }}
           layout={{
             autosize: true,
