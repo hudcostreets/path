@@ -108,13 +108,16 @@ function colKey(dayType: DayType, direction: Direction): keyof HourlyRow {
   return `avg_${dayType}_${direction}` as keyof HourlyRow
 }
 
-export default function HourlyPlot({ stations: externalStations, onActiveStationChange, soloStation, onSoloStationChange }: {
+export default function HourlyPlot({ stations: externalStations, onActiveStationChange, soloStation, onSoloStationChange, externalActiveStation }: {
   stations?: string[]
   onActiveStationChange?: (station: string | null) => void
   /** Controlled solo/pin (full station name). Pair with `onSoloStationChange`
    *  to share pin state across plots. */
   soloStation?: string | null
   onSoloStationChange?: (station: string | null) => void
+  /** Cross-plot active signal (from another plot's local hover/pin). Fills in
+   *  the visual brush when there's no local hover/pin. */
+  externalActiveStation?: string | null
 }) {
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("hg", groupByParam)
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
@@ -258,10 +261,16 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   // Build subtitle with filter badges (station active, day types) + static text.
   const subtitle: React.ReactNode = useMemo(() => {
     const badges: React.ReactNode[] = []
-    if (activeTraceName && groupBy === "station") {
+    // Active station: local legend hover/pin OR cross-plot external signal.
+    const activeStation = (activeTraceName && groupBy === "station") ? activeTraceName : null
+    const crossPlotStation = (!activeStation && externalActiveStation && groupBy === "station")
+      ? (externalActiveStation === "Christopher Street" ? "Christopher St." : externalActiveStation)
+      : null
+    const displayStation = activeStation ?? crossPlotStation
+    if (displayStation) {
       badges.push(
         <span key="station" className="filter-badge">
-          {activeTraceName}
+          {displayStation}
           <span className="clear-filter" onClick={() => onSoloStationChange?.(null)}>&times;</span>
         </span>
       )
@@ -287,7 +296,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     const staticText = "all months averaged (2017–present)"
     if (badges.length === 0) return staticText
     return <>{badges} · {staticText}</>
-  }, [activeTraceName, groupBy, selectedDayTypes, onSoloStationChange])
+  }, [activeTraceName, externalActiveStation, groupBy, selectedDayTypes, onSoloStationChange])
 
   // Controlled solo: map full station name <-> trace name (with period abbreviation).
   const soloTraceName = useMemo(() => {
@@ -303,6 +312,14 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     if (groupBy !== "station") return
     onSoloStationChange(name === "Christopher St." ? "Christopher Street" : name)
   }, [onSoloStationChange, groupBy])
+
+  // External active-trace: map full station name → trace name (with abbrev).
+  const externalActiveTrace = useMemo(() => {
+    if (externalActiveStation === undefined || externalActiveStation === null) return undefined
+    if (groupBy !== "station") return undefined
+    const mapped = externalActiveStation === "Christopher Street" ? "Christopher St." : externalActiveStation
+    return (STATIONS as readonly string[]).includes(mapped) ? mapped : undefined
+  }, [externalActiveStation, groupBy])
 
   const layout = useMemo(() => ({
     barmode: "stack" as const,
@@ -326,6 +343,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         onActiveTraceChange={handleActiveTrace}
         soloTrace={soloTraceName}
         onSoloTraceChange={handleSoloTraceChange}
+        externalActiveTrace={externalActiveTrace}
         layout={layout}
       />
       <div className="plot-toggles">

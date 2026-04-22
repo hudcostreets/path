@@ -220,6 +220,52 @@ async function clickLIByIdWithWait(page: Page, id: string, name: string) {
   await clickLIById(page, id, name)
 }
 
+test.describe('Hover brushing on /', () => {
+  test.beforeEach(async ({ page }) => { await page.goto('/') })
+
+  test('plot1 hover station → plot2 subtitle shows that station', async ({ page }) => {
+    await expect.poll(async () => (await getLegendNamesById(page, 'rides')).includes('Newark'),
+      { timeout: 20_000 }).toBe(true)
+    await hoverLIById(page, 'rides', 'Newark')
+    await page.waitForTimeout(400)
+    const sub = await plotById(page, 'monthly').locator('.plot-subtitle').textContent()
+    expect(sub).toContain('Newark')
+  })
+
+  test('plot3 hover station → plot2 subtitle shows that station', async ({ page }) => {
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Newark'),
+      { timeout: 20_000 }).toBe(true)
+    await hoverLIById(page, 'hourly', 'Newark')
+    await page.waitForTimeout(400)
+    const sub = await plotById(page, 'monthly').locator('.plot-subtitle').textContent()
+    expect(sub).toContain('Newark')
+  })
+})
+
+test.describe('Bidirectional hover brushing on /', () => {
+  test.beforeEach(async ({ page }) => { await page.goto('/') })
+
+  test('plot1 hover → plot3 subtitle also shows that station', async ({ page }) => {
+    await expect.poll(async () => (await getLegendNamesById(page, 'rides')).includes('Newark'),
+      { timeout: 20_000 }).toBe(true)
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Newark'),
+      { timeout: 20_000 }).toBe(true)
+    await hoverLIById(page, 'rides', 'Newark')
+    await page.waitForTimeout(400)
+    const hourlySub = await plotById(page, 'hourly').locator('.plot-subtitle').textContent()
+    expect(hourlySub).toContain('Newark')
+  })
+
+  test('plot3 hover → plot1 subtitle also shows that station', async ({ page }) => {
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Hoboken'),
+      { timeout: 20_000 }).toBe(true)
+    await hoverLIById(page, 'hourly', 'Hoboken')
+    await page.waitForTimeout(400)
+    const ridesSub = await plotById(page, 'rides').locator('.plot-subtitle').textContent()
+    expect(ridesSub).toContain('Hoboken')
+  })
+})
+
 test.describe('Bidirectional pin brushing on /', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')

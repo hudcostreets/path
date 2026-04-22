@@ -6,6 +6,7 @@ import HourlyPlot from "./HourlyPlot"
 
 export default function PathPlots() {
   const [plot1Stations, setPlot1Stations] = useState<string[]>([])
+  const [plot1ActiveStation, setPlot1ActiveStation] = useState<string | null>(null)
   const [plot3ActiveStation, setPlot3ActiveStation] = useState<string | null>(null)
   const [effectiveDayTypes, setEffectiveDayTypes] = useState<string[]>(["weekday", "weekend"])
   const [activeYear, setActiveYear] = useState<string | null>(null)
@@ -34,6 +35,8 @@ export default function PathPlots() {
       activeYear={activeYear}
       soloStation={soloStation}
       onSoloStationChange={setSoloStation}
+      onActiveStationChange={setPlot1ActiveStation}
+      externalActiveStation={plot3ActiveStation}
     />
     <MonthlyPlots
       stations={plot2Stations}
@@ -46,6 +49,7 @@ export default function PathPlots() {
       onActiveStationChange={setPlot3ActiveStation}
       soloStation={soloStation}
       onSoloStationChange={setSoloStation}
+      externalActiveStation={plot1ActiveStation}
     />
   </>
 }

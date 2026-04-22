@@ -887,7 +887,7 @@ function buildByDayType(
   }
 }
 
-export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTypesChange, onMetricChange, activeYear, soloStation, onSoloStationChange }: {
+export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTypesChange, onMetricChange, activeYear, soloStation, onSoloStationChange, onActiveStationChange, externalActiveStation }: {
   onEffectiveStationsChange?: (stations: string[]) => void
   onEffectiveDayTypesChange?: (dayTypes: string[]) => void
   onMetricChange?: (metric: Metric) => void
@@ -896,6 +896,11 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
    *  `onSoloStationChange` to share pin state across plots. */
   soloStation?: string | null
   onSoloStationChange?: (station: string | null) => void
+  /** Fires when local hover/pin active trace changes (full station name). */
+  onActiveStationChange?: (station: string | null) => void
+  /** Cross-plot active signal: fills in the visual brush when there's no
+   *  local hover/pin (for bidirectional hover brushing). */
+  externalActiveStation?: string | null
 } = {}) {
   const [metric, setMetric] = useUrlState<Metric>("m", metricParam)
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("g", groupByParam)
@@ -1062,8 +1067,11 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
       const full = STATION_FROM_DISPLAY[activeTraceName]
       if (full) return [full]
     }
+    // Cross-plot active brush: if another plot is hovering a station, show it
+    // in our subtitle too (matches pltly's visual fade via externalActiveTrace).
+    if (externalActiveStation && groupBy === "station") return [externalActiveStation]
     return selectedStations
-  }, [activeTraceName, groupBy, selectedStations])
+  }, [activeTraceName, externalActiveStation, groupBy, selectedStations])
 
   const brushedDayTypes = useMemo(() => {
     if (activeTraceName && groupBy === "daytype") {
@@ -1152,6 +1160,21 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     onSoloStationChange(STATION_FROM_DISPLAY[name] ?? null)
   }, [onSoloStationChange, groupBy])
 
+  // External active-trace (from another plot's local hover/pin). Map full
+  // station name → pltly display name.
+  const externalActiveTrace = useMemo(() => {
+    if (externalActiveStation === undefined || externalActiveStation === null) return undefined
+    if (groupBy !== "station") return undefined
+    return displayName(externalActiveStation)
+  }, [externalActiveStation, groupBy])
+
+  // Emit local active station (hover+pin) for cross-plot propagation.
+  useEffect(() => {
+    if (!onActiveStationChange) return
+    if (!activeTraceName || groupBy !== "station") { onActiveStationChange(null); return }
+    onActiveStationChange(STATION_FROM_DISPLAY[activeTraceName] ?? null)
+  }, [activeTraceName, groupBy, onActiveStationChange])
+
   return (
     <div className="plot-container">
       {isError ? <div className="error">Error: {error?.toString()}</div> : null}
@@ -1164,6 +1187,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         onActiveTraceChange={setActiveTraceName}
         soloTrace={soloTraceName}
         onSoloTraceChange={handleSoloTraceChange}
+        externalActiveTrace={externalActiveTrace}
         {...plotProps}
       />
       {!clean && <>
