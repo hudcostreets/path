@@ -110,6 +110,92 @@ test.describe('BT legend interaction', () => {
   })
 })
 
+// ─── Plot stability ───
+//
+// Hovering or pinning a legend item must NOT shift the plot vertically. A
+// ~1px shift historically crept in from the filter-badge having a larger
+// box-height than the plain-text placeholder in `.plot-subtitle`.
+
+/** Locate a plot by its H2 id (set via `@rdub/base/heading` renders `id` on an
+ *  inner `<span>`, not on the `<h2>` itself). */
+function plotById(page: Page, id: string): Locator {
+  return page.locator(`xpath=(//span[@id='${id}']/ancestor::div[contains(@class, 'plot-container')])[1]`)
+}
+
+async function getLegendNamesById(page: Page, id: string): Promise<string[]> {
+  return plotById(page, id).locator('.legend .traces .legendtext').allTextContents()
+    .then(names => names.map(n => n.trim()))
+}
+
+async function hoverLIById(page: Page, id: string, name: string) {
+  const traces = plotById(page, id).locator('.legend .traces')
+  const count = await traces.count()
+  for (let i = 0; i < count; i++) {
+    const text = await traces.nth(i).locator('.legendtext').textContent()
+    if (text?.trim() === name) return traces.nth(i).hover()
+  }
+  throw new Error(`Legend item "${name}" not found in #${id}`)
+}
+
+async function clickLIById(page: Page, id: string, name: string) {
+  const traces = plotById(page, id).locator('.legend .traces')
+  const count = await traces.count()
+  for (let i = 0; i < count; i++) {
+    const text = await traces.nth(i).locator('.legendtext').textContent()
+    if (text?.trim() === name) return traces.nth(i).click()
+  }
+  throw new Error(`Legend item "${name}" not found in #${id}`)
+}
+
+async function plotTopById(page: Page, id: string): Promise<number> {
+  return plotById(page, id).evaluate(el => {
+    const plot = el.querySelector('.js-plotly-plot')
+    if (!plot) return 0
+    return plot.getBoundingClientRect().top + window.scrollY
+  })
+}
+
+test.describe('Plot position stable on hover/pin', () => {
+  const cases = [
+    { name: '/ plot1 (RidesPlot) hover station', url: '/', origin: 'rides', hover: 'Journal Square', check: ['rides', 'monthly', 'hourly'] },
+    { name: '/ plot3 (HourlyPlot) hover station', url: '/', origin: 'hourly', hover: 'Newark', check: ['rides', 'monthly', 'hourly'] },
+    { name: '/bt plot1 (TrafficPlot) hover crossing', url: '/bt', origin: 'bt-traffic', hover: 'GWB', check: ['bt-traffic', 'bt-monthly'] },
+    { name: '/bt plot2 (BTMonthlyPlot) hover year', url: '/bt', origin: 'bt-monthly', hover: '2020', check: ['bt-traffic', 'bt-monthly'] },
+  ] as const
+
+  for (const c of cases) {
+    test(c.name, async ({ page }) => {
+      await page.goto(c.url)
+      // Wait for the specific LI to render (async data loads can lag a tick)
+      await expect.poll(async () => {
+        const names = await getLegendNamesById(page, c.origin)
+        return names.includes(c.hover)
+      }, { timeout: 20_000 }).toBe(true)
+      // Let all plots render + any pending relayouts settle
+      await page.waitForTimeout(500)
+
+      const before: Record<string, number> = {}
+      for (const id of c.check) before[id] = await plotTopById(page, id)
+
+      await hoverLIById(page, c.origin, c.hover)
+      await page.waitForTimeout(400)
+      for (const id of c.check) {
+        const after = await plotTopById(page, id)
+        expect(after, `#${id} top shifted on hover (before=${before[id]} after=${after})`).toBe(before[id])
+      }
+
+      await clickLIById(page, c.origin, c.hover)
+      await page.waitForTimeout(200)
+      await page.mouse.move(10, 10)
+      await page.waitForTimeout(400)
+      for (const id of c.check) {
+        const after = await plotTopById(page, id)
+        expect(after, `#${id} top shifted on pin (before=${before[id]} after=${after})`).toBe(before[id])
+      }
+    })
+  }
+})
+
 // ─── No render loops ───
 
 test.describe('No render loops', () => {

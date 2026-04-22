@@ -10,7 +10,11 @@
   color: #999;
   margin-top: -0.5em;
   margin-bottom: 0.3em;
-  min-height: 1.8em;
+  // Reserve space for a `.filter-badge` (padding + 1px border top/bottom)
+  // so swapping from empty placeholder to badge doesn't shift the plot.
+  min-height: calc(1.5em + 0.2em + 2px);
+  display: flex;
+  align-items: center;
 }
 .plot {
   width: 100%;
