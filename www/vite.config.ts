@@ -40,10 +40,7 @@ export default defineConfig({
       external: ['plotly.js-dist-min'],
     },
   },
-  optimizeDeps: {
-    include: ['plotly.js/basic'],
-  },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' }
-  },
+  }
 })
