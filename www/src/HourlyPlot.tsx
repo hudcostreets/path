@@ -362,6 +362,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
       tickmode: "array" as const,
       tickvals: hours24,
       ticktext: HOUR_LABELS,
+      tickangle: -45,
     },
     legend: { traceorder: "reversed" } as Partial<Legend>,
   }), [])
