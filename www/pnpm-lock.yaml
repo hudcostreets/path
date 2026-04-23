@@ -39,14 +39,14 @@ importers:
         specifier: ^1.25.1
         version: 1.25.1
       plotly.js:
-        specifier: https://github.com/runsascoded/plotly.js#01a5afb9e0a40c9977695f657e3ad0387fb3424d
-        version: https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3)
+        specifier: https://github.com/runsascoded/plotly.js#4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709
+        version: https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3)
       plotly.js-dist-min:
         specifier: ^3.4.0
         version: 3.4.0
       pltly:
-        specifier: https://gitlab.com/runsascoded/js/pltly/-/archive/0ab01c4932166b5ee8606a22a2ff819a9381950d/pltly-0ab01c4932166b5ee8606a22a2ff819a9381950d.tar.gz
-        version: https://gitlab.com/runsascoded/js/pltly/-/archive/0ab01c4932166b5ee8606a22a2ff819a9381950d/pltly-0ab01c4932166b5ee8606a22a2ff819a9381950d.tar.gz(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3))(react-plotly.js@2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3))(react@18.3.1))(react@18.3.1)
+        specifier: https://gitlab.com/runsascoded/js/pltly/-/archive/923844276b7b569bbe6279dccef54f3bbd0592f2/pltly-923844276b7b569bbe6279dccef54f3bbd0592f2.tar.gz
+        version: https://gitlab.com/runsascoded/js/pltly/-/archive/923844276b7b569bbe6279dccef54f3bbd0592f2/pltly-923844276b7b569bbe6279dccef54f3bbd0592f2.tar.gz(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3))(react-plotly.js@2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3))(react@18.3.1))(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -3008,8 +3008,8 @@ packages:
     resolution: {integrity: sha512-Dgn0bUqdGbE3oZJ+WCKf8Dmu7VWLcmRJGc6RCzBgG31DLIyai9WAoEhYRgIHpt/BCRMrnXLbGWGPQuBUrnF0TA==}
     engines: {node: '>=18'}
 
-  detective-typescript@14.1.1:
-    resolution: {integrity: sha512-P0V72pffNrtjHm7kZPiwXeM47l3jF/M3nZ543ZNVWG6sWvYwq95ERoL1+6Txm5Mam8EPVu1gqpHECvoAZsznog==}
+  detective-typescript@14.1.2:
+    resolution: {integrity: sha512-bIeEn0eVi/JRsE1YizBR2ilnMlWRAIBJJ6kXCKNFxEEWhUcEY3R6I3KYIAy48ieURbD1hcb3Ebvl8AqeoPMSzg==}
     engines: {node: '>=18'}
     peerDependencies:
       typescript: ^5.4.4 || ^6.0.2
@@ -4978,14 +4978,14 @@ packages:
   plotly.js-dist-min@3.4.0:
     resolution: {integrity: sha512-eo7xh7oyE9fFoE/wintgmvfOjvTKwCb3wRf9ShQv90du4n+EVkOY7w5qEkmUS9SSkHRnAw8sk/0QI7wEc5U+8Q==}
 
-  plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d:
-    resolution: {tarball: https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d}
-    version: 3.3.1-dist.6f938b9
+  plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709:
+    resolution: {tarball: https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709}
+    version: 3.3.1-dist.f302eb6
     engines: {node: '>=18.0.0'}
 
-  pltly@https://gitlab.com/runsascoded/js/pltly/-/archive/0ab01c4932166b5ee8606a22a2ff819a9381950d/pltly-0ab01c4932166b5ee8606a22a2ff819a9381950d.tar.gz:
-    resolution: {tarball: https://gitlab.com/runsascoded/js/pltly/-/archive/0ab01c4932166b5ee8606a22a2ff819a9381950d/pltly-0ab01c4932166b5ee8606a22a2ff819a9381950d.tar.gz}
-    version: 0.1.0-dist.2ded2a8
+  pltly@https://gitlab.com/runsascoded/js/pltly/-/archive/923844276b7b569bbe6279dccef54f3bbd0592f2/pltly-923844276b7b569bbe6279dccef54f3bbd0592f2.tar.gz:
+    resolution: {tarball: https://gitlab.com/runsascoded/js/pltly/-/archive/923844276b7b569bbe6279dccef54f3bbd0592f2/pltly-923844276b7b569bbe6279dccef54f3bbd0592f2.tar.gz}
+    version: 0.1.0-dist.281a722
     peerDependencies:
       plotly.js: '>=2'
       react: '>=17'
@@ -5065,10 +5065,6 @@ packages:
 
   postcss@8.5.10:
     resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
-    engines: {node: ^10 || ^12 || >=14}
-
-  postcss@8.5.8:
-    resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
 
   potpack@1.0.2:
@@ -5379,11 +5375,6 @@ packages:
 
   resolve@0.6.3:
     resolution: {integrity: sha512-UHBY3viPlJKf85YijDUcikKX6tmF4SokIDp518ZDVT92JNDcG5uKIthaT/owt3Sar0lwtOafsQuwrg22/v2Dwg==}
-
-  resolve@1.22.11:
-    resolution: {integrity: sha512-RfqAvLnMl313r7c9oclB1HhUEAezcpLjz95wFH4LVuhk9JF/r22qmVP9AMmOU4vMX7Q8pN8jwNg/CSpdFnMjTQ==}
-    engines: {node: '>= 0.4'}
-    hasBin: true
 
   resolve@1.22.12:
     resolution: {integrity: sha512-TyeJ1zif53BPfHootBGwPRYT1RUt6oGWsaQr8UyZW/eAm9bKoijtvruSDEmZHm92CwS9nj7/fWttqPCgzep8CA==}
@@ -8874,12 +8865,12 @@ snapshots:
 
   css-loader@7.1.4(webpack@5.105.4(esbuild@0.25.12)):
     dependencies:
-      icss-utils: 5.1.0(postcss@8.5.8)
-      postcss: 8.5.8
-      postcss-modules-extract-imports: 3.1.0(postcss@8.5.8)
-      postcss-modules-local-by-default: 4.2.0(postcss@8.5.8)
-      postcss-modules-scope: 3.2.1(postcss@8.5.8)
-      postcss-modules-values: 4.0.0(postcss@8.5.8)
+      icss-utils: 5.1.0(postcss@8.5.10)
+      postcss: 8.5.10
+      postcss-modules-extract-imports: 3.1.0(postcss@8.5.10)
+      postcss-modules-local-by-default: 4.2.0(postcss@8.5.10)
+      postcss-modules-scope: 3.2.1(postcss@8.5.10)
+      postcss-modules-values: 4.0.0(postcss@8.5.10)
       postcss-value-parser: 4.2.0
       semver: 7.7.4
     optionalDependencies:
@@ -9160,7 +9151,7 @@ snapshots:
 
   detective-stylus@5.0.1: {}
 
-  detective-typescript@14.1.1(typescript@5.9.3):
+  detective-typescript@14.1.2(typescript@5.9.3):
     dependencies:
       '@typescript-eslint/typescript-estree': 8.59.0(typescript@5.9.3)
       ast-module-types: 6.0.1
@@ -9177,7 +9168,7 @@ snapshots:
       detective-sass: 6.0.1
       detective-scss: 5.0.1
       detective-stylus: 5.0.1
-      detective-typescript: 14.1.1(typescript@5.9.3)
+      detective-typescript: 14.1.2(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -10354,9 +10345,9 @@ snapshots:
     dependencies:
       safer-buffer: 2.1.2
 
-  icss-utils@5.1.0(postcss@8.5.8):
+  icss-utils@5.1.0(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
 
   ieee754@1.2.1: {}
 
@@ -10368,7 +10359,7 @@ snapshots:
       map-limit: 0.0.1
       multipipe: 0.3.1
       read-package-json: 2.1.2
-      resolve: 1.22.11
+      resolve: 1.22.12
 
   ignore@5.3.2: {}
 
@@ -11449,7 +11440,7 @@ snapshots:
   normalize-package-data@2.5.0:
     dependencies:
       hosted-git-info: 2.8.9
-      resolve: 1.22.11
+      resolve: 1.22.12
       semver: 5.7.2
       validate-npm-package-license: 3.0.4
 
@@ -11690,7 +11681,7 @@ snapshots:
 
   plotly.js-dist-min@3.4.0: {}
 
-  plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3):
+  plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3):
     dependencies:
       '@plotly/d3': 3.8.2
       '@plotly/d3-sankey': 0.7.2
@@ -11757,11 +11748,11 @@ snapshots:
       - mapbox-gl
       - supports-color
 
-  pltly@https://gitlab.com/runsascoded/js/pltly/-/archive/0ab01c4932166b5ee8606a22a2ff819a9381950d/pltly-0ab01c4932166b5ee8606a22a2ff819a9381950d.tar.gz(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3))(react-plotly.js@2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3))(react@18.3.1))(react@18.3.1):
+  pltly@https://gitlab.com/runsascoded/js/pltly/-/archive/923844276b7b569bbe6279dccef54f3bbd0592f2/pltly-923844276b7b569bbe6279dccef54f3bbd0592f2.tar.gz(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3))(react-plotly.js@2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3))(react@18.3.1))(react@18.3.1):
     dependencies:
-      plotly.js: https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3)
+      plotly.js: https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3)
       react: 18.3.1
-      react-plotly.js: 2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3))(react@18.3.1)
+      react-plotly.js: 2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3))(react@18.3.1)
 
   pluralize@8.0.0: {}
 
@@ -11780,26 +11771,26 @@ snapshots:
 
   possible-typed-array-names@1.0.0: {}
 
-  postcss-modules-extract-imports@3.1.0(postcss@8.5.8):
+  postcss-modules-extract-imports@3.1.0(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
 
-  postcss-modules-local-by-default@4.2.0(postcss@8.5.8):
+  postcss-modules-local-by-default@4.2.0(postcss@8.5.10):
     dependencies:
-      icss-utils: 5.1.0(postcss@8.5.8)
-      postcss: 8.5.8
+      icss-utils: 5.1.0(postcss@8.5.10)
+      postcss: 8.5.10
       postcss-selector-parser: 7.1.1
       postcss-value-parser: 4.2.0
 
-  postcss-modules-scope@3.2.1(postcss@8.5.8):
+  postcss-modules-scope@3.2.1(postcss@8.5.10):
     dependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
       postcss-selector-parser: 7.1.1
 
-  postcss-modules-values@4.0.0(postcss@8.5.8):
+  postcss-modules-values@4.0.0(postcss@8.5.10):
     dependencies:
-      icss-utils: 5.1.0(postcss@8.5.8)
-      postcss: 8.5.8
+      icss-utils: 5.1.0(postcss@8.5.10)
+      postcss: 8.5.10
 
   postcss-selector-parser@7.1.1:
     dependencies:
@@ -11828,12 +11819,6 @@ snapshots:
       source-map-js: 1.2.1
 
   postcss@8.5.10:
-    dependencies:
-      nanoid: 3.3.11
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
-  postcss@8.5.8:
     dependencies:
       nanoid: 3.3.11
       picocolors: 1.1.1
@@ -11869,7 +11854,7 @@ snapshots:
       detective-sass: 6.0.1
       detective-scss: 5.0.1
       detective-stylus: 5.0.1
-      detective-typescript: 14.1.1(typescript@5.9.3)
+      detective-typescript: 14.1.2(typescript@5.9.3)
       detective-vue2: 2.3.0(typescript@5.9.3)
       module-definition: 6.0.2
       node-source-walk: 7.0.1
@@ -12038,9 +12023,9 @@ snapshots:
 
   react-lifecycles-compat@3.0.4: {}
 
-  react-plotly.js@2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3))(react@18.3.1):
+  react-plotly.js@2.6.0(plotly.js@https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3))(react@18.3.1):
     dependencies:
-      plotly.js: https://codeload.github.com/runsascoded/plotly.js/tar.gz/01a5afb9e0a40c9977695f657e3ad0387fb3424d(mapbox-gl@1.13.3)
+      plotly.js: https://codeload.github.com/runsascoded/plotly.js/tar.gz/4b74cad1dc53d5c14b46a7ce3fbe4a85be8ed709(mapbox-gl@1.13.3)
       prop-types: 15.8.1
       react: 18.3.1
 
@@ -12291,12 +12276,6 @@ snapshots:
       protocol-buffers-schema: 3.6.0
 
   resolve@0.6.3: {}
-
-  resolve@1.22.11:
-    dependencies:
-      is-core-module: 2.16.1
-      path-parse: 1.0.7
-      supports-preserve-symlinks-flag: 1.0.0
 
   resolve@1.22.12:
     dependencies:
