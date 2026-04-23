@@ -11,6 +11,7 @@ from textwrap import dedent
 from traceback import format_exc
 
 import yaml
+from click import option
 from utz import err, lines, run
 
 from path_data.cli.base import path_data
@@ -322,9 +323,12 @@ def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> 
 
 
 NO_DATA_EMOJI = ':hourglass_flowing_sand:'
-# Matches OP format: "Latest: PATH Mar '26, B&T Dec '25. Polled Nx 🧵"
+# Matches OP format: "Latest: PATH Mar '26, B&T Dec '25. Polled Nx 🧵".
+# `conversations.history` returns emojis as `:shortcode:` (e.g. `:thread:`),
+# so accept either form — otherwise the thread-continuity check silently
+# falls through to "start a new thread" on every call.
 _NO_DATA_OP_RE = re.compile(
-    r"Latest: .+\. Polled (\d+)x \U0001f9f5"
+    r"Latest: .+\. Polled (\d+)x (?:\U0001f9f5|:thread:)"
 )
 
 
@@ -363,12 +367,21 @@ def _latest_summary() -> str:
     return ', '.join(parts) if parts else '—'
 
 
-def _post_no_new_data(slack_link: str) -> None:
+def _post_no_new_data(
+    slack_link: str,
+    *,
+    run_url: str | None = None,
+    now: datetime | None = None,
+) -> None:
     """Post or update a "no new data" thread in Slack using thrds.
 
     Builds the desired thread state (OP + all replies) and calls ``sync()``
     which diffs against existing messages — editing the OP and appending
     the new reply with minimal API calls.
+
+    ``run_url`` + ``now`` default to the current env's GHA run + wall-clock;
+    override them to backfill a "no new data" reply for a past run whose
+    Slack step failed (see the ``backfill-slack`` command).
     """
     token = environ.get('SLACK_BOT_TOKEN')
     channel = environ.get('SLACK_CHANNEL_ID')
@@ -382,14 +395,14 @@ def _post_no_new_data(slack_link: str) -> None:
     from thrds import Thread
     from zoneinfo import ZoneInfo
 
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
     now_et = now.astimezone(ZoneInfo('America/New_York'))
     timestamp_et = now_et.strftime('%b %-d, %-I:%M %p')
 
     summary = _latest_summary()
 
     # Build new reply text
-    run_url = _run_url()
+    run_url = run_url if run_url is not None else _run_url()
     if run_url:
         new_reply = f"<{run_url}|{timestamp_et}> \u00b7 No new data ({summary})"
     else:
@@ -600,3 +613,47 @@ def gha_update():
         if ts:
             _slack(f"```\n{tb[-2800:]}\n```", emoji=':rotating_light:', thread_ts=ts)
         exit(1)
+
+
+@path_data.command('backfill-slack')
+@option('-r', '--run-id', required=True, help='GHA run ID whose Slack post never landed')
+def backfill_slack(run_id: str):
+    """Post a "no new data" Slack reply for a past CI run whose Slack step failed.
+
+    Fetches the run's `updatedAt` (completion time) for the reply timestamp
+    and the run's URL for the link. Appends the reply directly to the
+    latest "no new data" thread via `SlackClient.post(thread_id=...)` —
+    skipping the full thrds `sync()` path because Slack rejects
+    `chat.update` on OPs more than a few days old, which kicks thrds into
+    a delete+repost fallback that re-posts the OP inside the thread.
+    Summary ("PATH Mar '26, B&T Dec '25") comes from the current
+    working-tree data — fine for no-data backfills since latest-month
+    metadata hasn't changed.
+    """
+    from subprocess import check_output
+    from zoneinfo import ZoneInfo
+
+    token = environ.get('SLACK_BOT_TOKEN')
+    channel = environ.get('SLACK_CHANNEL_ID')
+    if not (token and channel):
+        err("Slack skipped (no token/channel)")
+        return
+
+    data = json.loads(check_output(
+        ['gh', 'run', 'view', run_id, '--json', 'updatedAt,url']
+    ))
+    run_url = data['url']
+    now = datetime.fromisoformat(data['updatedAt'].replace('Z', '+00:00'))
+    now_et = now.astimezone(ZoneInfo('America/New_York'))
+    timestamp_et = now_et.strftime('%b %-d, %-I:%M %p')
+    summary = _latest_summary()
+    reply_text = f"<{run_url}|{timestamp_et}> · No new data ({summary})"
+
+    client = get_client(token=token, channel=channel)
+    latest = latest_bot_message(client)
+    if not latest or not _NO_DATA_OP_RE.match(latest.get('text', '')):
+        err(f"No matching 'Latest: ...' OP found in recent history — aborting")
+        exit(1)
+    op_ts = latest['ts']
+    err(f"Backfilling NND reply for run {run_id} ({data['updatedAt']}) → thread {op_ts}")
+    client.post(reply_text, thread_id=op_ts)
