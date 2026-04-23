@@ -2641,7 +2641,7 @@ requires-dist = [
     { name = "plotly" },
     { name = "pypdf2" },
     { name = "tabula-py" },
-    { name = "thrds", git = "https://github.com/runsascoded/thrds?rev=b07db0e" },
+    { name = "thrds", git = "https://github.com/runsascoded/thrds?rev=3cb9a0f" },
     { name = "tornado", marker = "extra == 'eda'", specifier = "<=6.1" },
     { name = "utz" },
     { name = "xlsxwriter" },
@@ -3768,7 +3768,7 @@ wheels = [
 [[package]]
 name = "thrds"
 version = "0.3.0"
-source = { git = "https://github.com/runsascoded/thrds?rev=b07db0e#b07db0e3373f96f07114ba2a6d6f9c276f4672b8" }
+source = { git = "https://github.com/runsascoded/thrds?rev=3cb9a0f#3cb9a0f90eab32b80770d9c91ee09ef1a4fcc8a7" }
 
 [[package]]
 name = "tinycss2"
