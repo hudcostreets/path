@@ -362,18 +362,33 @@ test.describe('Filter badges on /', () => {
 // don't dismiss the pin.
 
 test.describe('Pin survives consumer control toggles on /', () => {
-  test('plot3 pin → Exit toggle → pin persists on both plots', async ({ page }) => {
+  test('plot3 pin → Exit toggle → pin persists on both plots (bold + solo-hide)', async ({ page }) => {
     await page.goto('/')
     await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Journal Square'), { timeout: 20_000 }).toBe(true)
     await expect.poll(async () => (await getLegendNamesById(page, 'rides')).includes('Journal Square'), { timeout: 20_000 }).toBe(true)
     await clickLIById(page, 'hourly', 'Journal Square')
     await expect.poll(() => legendFontWeightById(page, 'hourly', 'Journal Square'), { timeout: 5000 }).not.toBe('')
     await expect.poll(() => legendFontWeightById(page, 'rides', 'Journal Square'), { timeout: 5000 }).not.toBe('')
-    // Click the Exit button — outside .js-plotly-plot, sibling of plot3's container
+    // Snapshot: with soloMode='hide' the other stations must be 'legendonly'
+    const hiddenBefore = await plotById(page, 'hourly').evaluate(el => {
+      const p = el.querySelector('.js-plotly-plot') as any
+      return p._fullData.filter((d: any) => d.name !== 'Journal Square').every((d: any) => d.visible === 'legendonly')
+    })
+    expect(hiddenBefore).toBe(true)
+
+    // Click Exit — outside .js-plotly-plot, triggers Plotly.react with new data.
+    // This used to silently reset `visible` flags while bold stayed, so bold-only
+    // assertions passed but the solo visual was wrong.
     await page.getByRole('button', { name: 'Exit', exact: true }).click()
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(600)
+
     expect(await legendFontWeightById(page, 'hourly', 'Journal Square')).not.toBe('')
     expect(await legendFontWeightById(page, 'rides', 'Journal Square')).not.toBe('')
+    const hiddenAfter = await plotById(page, 'hourly').evaluate(el => {
+      const p = el.querySelector('.js-plotly-plot') as any
+      return p._fullData.filter((d: any) => d.name !== 'Journal Square').every((d: any) => d.visible === 'legendonly')
+    })
+    expect(hiddenAfter, 'solo-hide `visible: legendonly` must persist across Plotly.react from the Exit toggle').toBe(true)
   })
 })
 
