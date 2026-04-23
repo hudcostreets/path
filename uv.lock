@@ -2641,7 +2641,7 @@ requires-dist = [
     { name = "plotly" },
     { name = "pypdf2" },
     { name = "tabula-py" },
-    { name = "thrds", git = "https://github.com/runsascoded/thrds?rev=41ca769" },
+    { name = "thrds", git = "https://github.com/runsascoded/thrds?rev=b07db0e" },
     { name = "tornado", marker = "extra == 'eda'", specifier = "<=6.1" },
     { name = "utz" },
     { name = "xlsxwriter" },
@@ -2662,7 +2662,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -3767,8 +3767,8 @@ wheels = [
 
 [[package]]
 name = "thrds"
-version = "0.2.0"
-source = { git = "https://github.com/runsascoded/thrds?rev=41ca769#41ca76942b71f941ff240e52627505783ba107f8" }
+version = "0.3.0"
+source = { git = "https://github.com/runsascoded/thrds?rev=b07db0e#b07db0e3373f96f07114ba2a6d6f9c276f4672b8" }
 
 [[package]]
 name = "tinycss2"

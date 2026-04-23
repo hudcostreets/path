@@ -15,7 +15,7 @@ dependencies = [
     "plotly",
     "PyPDF2",
     "tabula-py",
-    "thrds @ git+https://github.com/runsascoded/thrds@41ca769",
+    "thrds @ git+https://github.com/runsascoded/thrds@b07db0e",
     "utz",
     "xlsxwriter",
 ]
