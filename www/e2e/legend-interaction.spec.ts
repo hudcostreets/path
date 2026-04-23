@@ -354,6 +354,83 @@ test.describe('Filter badges on /', () => {
   })
 })
 
+// ─── Pin survives control toggle ───
+//
+// Clicking a plot's own ToggleButton (outside `.js-plotly-plot`, in a sibling
+// container) used to unpin via pltly's document-scoped outside-click dismiss.
+// pltly now scopes that listener to the plot container, so consumer controls
+// don't dismiss the pin.
+
+test.describe('Pin survives consumer control toggles on /', () => {
+  test('plot3 pin → Exit toggle → pin persists on both plots', async ({ page }) => {
+    await page.goto('/')
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Journal Square'), { timeout: 20_000 }).toBe(true)
+    await expect.poll(async () => (await getLegendNamesById(page, 'rides')).includes('Journal Square'), { timeout: 20_000 }).toBe(true)
+    await clickLIById(page, 'hourly', 'Journal Square')
+    await expect.poll(() => legendFontWeightById(page, 'hourly', 'Journal Square'), { timeout: 5000 }).not.toBe('')
+    await expect.poll(() => legendFontWeightById(page, 'rides', 'Journal Square'), { timeout: 5000 }).not.toBe('')
+    // Click the Exit button — outside .js-plotly-plot, sibling of plot3's container
+    await page.getByRole('button', { name: 'Exit', exact: true }).click()
+    await page.waitForTimeout(400)
+    expect(await legendFontWeightById(page, 'hourly', 'Journal Square')).not.toBe('')
+    expect(await legendFontWeightById(page, 'rides', 'Journal Square')).not.toBe('')
+  })
+})
+
+// ─── HourlyPlot modes ───
+
+test.describe('HourlyPlot groupBy=direction on /', () => {
+  test('?hg=r renders stacked Entries + Exits traces', async ({ page }) => {
+    await page.goto('/?hg=r')
+    await expect.poll(async () => (await getLegendNamesById(page, 'hourly')).includes('Entries'), { timeout: 20_000 }).toBe(true)
+    const names = await getLegendNamesById(page, 'hourly')
+    expect(names.sort()).toEqual(['Entries', 'Exits'])
+    const title = await plotById(page, 'hourly').locator('h2').textContent()
+    expect(title).toContain('entries vs. exits')
+  })
+})
+
+// ─── Axis tozero ───
+
+test.describe('RidesPlot yaxis tozero', () => {
+  for (const [name, url] of [
+    ['metric=avg (default)', '/'],
+    ['metric=avg groupBy=daytype', '/?g=d'],
+    ['metric=total groupBy=station', '/?m=t'],
+  ] as const) {
+    test(`${name}`, async ({ page }) => {
+      await page.goto(url)
+      await expect.poll(async () => (await getLegendNamesById(page, 'rides')).length > 0, { timeout: 20_000 }).toBe(true)
+      await page.waitForTimeout(500)
+      const { rangemode, rangeLo } = await plotById(page, 'rides').evaluate(el => {
+        const p = el.querySelector('.js-plotly-plot') as any
+        return { rangemode: p._fullLayout.yaxis.rangemode, rangeLo: p._fullLayout.yaxis.range[0] }
+      })
+      expect(rangemode).toBe('tozero')
+      expect(rangeLo).toBe(0)
+    })
+  }
+})
+
+// ─── Narrow viewport legend ───
+
+test.describe('Mobile viewport legend below', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  for (const [name, url, plotId] of [
+    ['/ rides', '/', 'rides'],
+    ['/bt traffic', '/bt', 'bt-traffic'],
+  ] as const) {
+    test(`${name} has horizontal legend`, async ({ page }) => {
+      await page.goto(url)
+      await expect.poll(async () => (await getLegendNamesById(page, plotId)).length > 0, { timeout: 20_000 }).toBe(true)
+      await page.waitForTimeout(500)
+      const orient = await plotById(page, plotId).evaluate(el => (el.querySelector('.js-plotly-plot') as any)._fullLayout.legend?.orientation)
+      expect(orient).toBe('h')
+    })
+  }
+})
+
 // ─── No render loops ───
 
 test.describe('No render loops', () => {

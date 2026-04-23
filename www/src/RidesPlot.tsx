@@ -1316,6 +1316,19 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
               </span>
             )
           })}
+          {" · "}
+          <a
+            href="?hg=r#hourly"
+            onClick={e => {
+              e.preventDefault()
+              const url = new URL(window.location.href)
+              url.searchParams.set('hg', 'r')
+              window.history.pushState({}, '', url.toString())
+              document.getElementById('hourly')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+          >
+            hourly: entries vs. exits
+          </a>
         </div>
         <hr/>
         <div>
