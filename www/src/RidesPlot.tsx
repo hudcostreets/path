@@ -650,6 +650,7 @@ function buildByStation(
         },
         yaxis: {
           hoverformat: ",.0f",
+          rangemode: 'tozero' as const,
         },
         legend: { entrywidth: 100, traceorder: "reversed" } as Partial<Legend>,
       },
@@ -834,6 +835,7 @@ function buildByDayType(
         },
         yaxis: {
           hoverformat: ",.0f",
+          rangemode: 'tozero' as const,
         },
         legend: { traceorder: "reversed" } as Partial<Legend>,
       },

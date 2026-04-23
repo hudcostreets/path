@@ -1,5 +1,5 @@
 import { Headings } from "@rdub/base/heading"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Annotations, Data, Layout } from "plotly.js"
 
 import { Plot as PltlyPlot, type PlotProps as PltlyPlotProps } from 'pltly/react'
@@ -66,25 +66,26 @@ type PlotOwnProps = {
   subtitle?: React.ReactNode
 }
 
+/** Track `window.innerWidth < threshold` as reactive React state. Subscribes
+ *  to `resize` so toggling mobile↔desktop in DevTools repaints without refresh. */
+function useNarrow(threshold = 600): boolean {
+  const [narrow, setNarrow] = useState(() => window.innerWidth < threshold)
+  useEffect(() => {
+    const on = () => setNarrow(window.innerWidth < threshold)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [threshold])
+  return narrow
+}
+
 export function Plot(
   { id, title, subtitle, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
 ) {
   const h2 = <H2 id={id}>{title}</H2>
   const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
-  const narrow = window.innerWidth < 600
-  const margin = { l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }
-  if (!props.data) {
-    return <>
-      {h2}
-      {sub}
-      <Loading/>
-    </>
-  }
-  const {
-    data,
-    layout: userLayout,
-    ...plotProps
-  } = props as { data: Data[], layout?: Partial<Layout> } & Omit<PltlyPlotProps, 'style' | 'data' | 'layout'>
+  const narrow = useNarrow()
+  const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }), [narrow])
+  const userLayout = (props as { layout?: Partial<Layout> }).layout
   // Memoize the computed layout so its identity depends only on `userLayout`.
   // Otherwise every re-render of this wrapper would create a new layout object,
   // causing pltly's Plot to fire a redundant Plotly.react on every hover.
@@ -102,7 +103,15 @@ export function Plot(
         : { ...legendIn },
       ...rest,
     }
-  }, [narrow, userLayout])
+  }, [narrow, userLayout, margin])
+  if (!props.data) {
+    return <>
+      {h2}
+      {sub}
+      <Loading/>
+    </>
+  }
+  const { data, layout: _layout, ...plotProps } = props as { data: Data[], layout?: Partial<Layout> } & Omit<PltlyPlotProps, 'style' | 'data' | 'layout'>
   return <>
     {h2}
     {sub}
