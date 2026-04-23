@@ -684,6 +684,10 @@ function buildByStation(
         hoverformat: "%b '%y",
         tickangle: -45,
       },
+      yaxis: {
+        hoverformat: ",.0f",
+        rangemode: 'tozero' as const,
+      },
       legend: { entrywidth: 100 } as Partial<Legend>,
     },
   }
@@ -879,6 +883,10 @@ function buildByDayType(
         hoverformat: "%b '%y",
         tickangle: -45,
         ...(isRecent ? { range: recentRange } : {}),
+      },
+      yaxis: {
+        hoverformat: ",.0f",
+        rangemode: 'tozero' as const,
       },
       legend: {
         yanchor: "top" as const, y: 0.99,

@@ -67,14 +67,18 @@ type PlotOwnProps = {
 }
 
 /** Track `window.innerWidth < threshold` as reactive React state. Subscribes
- *  to `resize` so toggling mobile↔desktop in DevTools repaints without refresh. */
+ *  via `matchMedia` — which DevTools responsive-mode toggles fire reliably,
+ *  unlike `window.resize` which it skips. */
 function useNarrow(threshold = 600): boolean {
-  const [narrow, setNarrow] = useState(() => window.innerWidth < threshold)
+  const query = `(max-width: ${threshold - 1}px)`
+  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches)
   useEffect(() => {
-    const on = () => setNarrow(window.innerWidth < threshold)
-    window.addEventListener('resize', on)
-    return () => window.removeEventListener('resize', on)
-  }, [threshold])
+    const mql = window.matchMedia(query)
+    const on = () => setNarrow(mql.matches)
+    setNarrow(mql.matches)
+    mql.addEventListener('change', on)
+    return () => mql.removeEventListener('change', on)
+  }, [query])
   return narrow
 }
 
