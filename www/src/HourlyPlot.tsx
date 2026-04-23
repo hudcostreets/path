@@ -57,14 +57,23 @@ const REGION_GROUPS: StationGroup[] = [
 ]
 
 type DayType = "weekday" | "saturday" | "sunday" | "holiday"
-type GroupBy = "station" | "daytype"
+type GroupBy = "station" | "daytype" | "direction"
 type Direction = "entry" | "exit"
 type LegendMode = "solo" | "highlight"
 
 const DAY_TYPES: DayType[] = ["weekday", "saturday", "sunday", "holiday"]
 
-const groupByParam = codeParam<GroupBy>("station", { station: "s", daytype: "d" })
+const groupByParam = codeParam<GroupBy>("station", { station: "s", daytype: "d", direction: "r" })
 const directionParam = codeParam<Direction>("entry", { entry: "n", exit: "x" })
+
+const DIRECTION_COLORS: Record<Direction, string> = {
+  entry: "#22c55e",
+  exit: "#f97316",
+}
+const DIRECTION_LABELS: Record<Direction, string> = {
+  entry: "Entries",
+  exit: "Exits",
+}
 const legendModeParam = codeParam<LegendMode>("solo", { solo: "s", highlight: "h" })
 
 const DAY_TYPE_LABELS: Record<string, string> = {
@@ -169,6 +178,30 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     const filtered = allRows.filter(r => activeStations.includes(r.station))
     const hours = Array.from({ length: 24 }, (_, i) => i)
 
+    if (groupBy === "direction") {
+      // One trace per direction (entries/exits), summed across stations × day types.
+      const specs: { dir: Direction, label: string, color: string }[] = [
+        { dir: "entry", label: DIRECTION_LABELS.entry, color: DIRECTION_COLORS.entry },
+        { dir: "exit", label: DIRECTION_LABELS.exit, color: DIRECTION_COLORS.exit },
+      ]
+      return specs.map(({ dir, label, color }) => {
+        const hourSums = new Map<number, { sum: number, count: number }>()
+        for (const r of filtered) {
+          for (const dt of selectedDayTypes) {
+            const prev = hourSums.get(r.hour) ?? { sum: 0, count: 0 }
+            prev.sum += r[colKey(dt, dir)] as number
+            prev.count += 1
+            hourSums.set(r.hour, prev)
+          }
+        }
+        const y = hours.map(h => {
+          const entry = hourSums.get(h)
+          return entry ? Math.round(entry.sum / entry.count) : 0
+        })
+        return { name: label, type: "bar", x: hours, y, marker: { color }, hovertemplate } as Data
+      })
+    }
+
     if (groupBy === "station") {
       // One trace per station, sum across selected day types
       const stationHourSums = new Map<string, { sum: number, count: number }>()
@@ -241,8 +274,10 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   }, [allRows, activeStations, selectedDayTypes, groupBy, direction])
 
   const dirLabel = direction === "entry" ? "entries" : "exits"
-  const groupLabel = groupBy === "station" ? "by station" : "by day type"
-  const titleText = `Avg hourly ${dirLabel} ${groupLabel}`
+  const groupLabel = groupBy === "station" ? "by station" : groupBy === "daytype" ? "by day type" : "by direction"
+  const titleText = groupBy === "direction"
+    ? "Avg hourly entries vs. exits"
+    : `Avg hourly ${dirLabel} ${groupLabel}`
 
   // Track active (hover OR pin) trace for the subtitle badge.
   const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
@@ -347,13 +382,16 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         layout={layout}
       />
       <div className="plot-toggles">
-        <ToggleButtonGroup size="small" exclusive value={direction} onChange={(_, v) => v && setDirection(v)}>
-          <ToggleButton value="entry">Entry</ToggleButton>
-          <ToggleButton value="exit">Exit</ToggleButton>
-        </ToggleButtonGroup>
+        {groupBy !== "direction" && (
+          <ToggleButtonGroup size="small" exclusive value={direction} onChange={(_, v) => v && setDirection(v)}>
+            <ToggleButton value="entry">Entry</ToggleButton>
+            <ToggleButton value="exit">Exit</ToggleButton>
+          </ToggleButtonGroup>
+        )}
         <ToggleButtonGroup size="small" exclusive value={groupBy} onChange={(_, v) => v && setGroupBy(v)}>
           <ToggleButton value="station">By Station</ToggleButton>
           <ToggleButton value="daytype">By Day Type</ToggleButton>
+          <ToggleButton value="direction">By Direction</ToggleButton>
         </ToggleButtonGroup>
         <ToggleButtonGroup size="small" exclusive value={legendMode} onChange={(_, v) => v && setLegendMode(v)}>
           <ToggleButton value="solo">Solo</ToggleButton>

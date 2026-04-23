@@ -88,7 +88,7 @@ export function Plot(
   const h2 = <H2 id={id}>{title}</H2>
   const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
   const narrow = useNarrow()
-  const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: 0, t: 0, b: narrow ? 50 : 40 }), [narrow])
+  const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: narrow ? 20 : 0, t: 0, b: narrow ? 50 : 40 }), [narrow])
   const userLayout = (props as { layout?: Partial<Layout> }).layout
   // Memoize the computed layout so its identity depends only on `userLayout`.
   // Otherwise every re-render of this wrapper would create a new layout object,
