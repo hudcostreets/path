@@ -19,26 +19,21 @@ type MonthlyRow = {
   total_holiday: number
 }
 
-function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
-  if (!activeTrace) return data
-  return data.map(trace => {
-    const isActive = trace.name === activeTrace
-    if (isActive) {
-      const y: number[] = Array.isArray((trace as any).y) ? (trace as any).y : []
-      return {
-        ...trace,
-        width: 0.25,
-        zorder: 100,
-        text: y.map(v => v > 0 ? `<b>${Math.round(v / 1000)}k</b>` : ''),
-        textposition: 'outside',
-        textfont: { color: dark ? '#e4e4e4' : '#333', size: 11 },
-        textangle: 0,
-        constraintext: 'none',
-        cliponaxis: false,
-      } as Data
-    }
-    return { ...trace, opacity: 0.3, zorder: 1 } as Data
-  })
+// Active-bar styling — applied by pltly via grouped `Plotly.restyle` (no
+// `Plotly.react` round-trip), so width/text/zorder change in the same frame
+// as pltly's fade rather than one render later. Kept minimal: `cliponaxis`,
+// `textangle`, `constraintext` were dropped because they trigger plot-wide
+// re-clip/relayout passes (visible hover lag on this plot, not on crashes'
+// FBM which uses the same 5-attr shape).
+const activeStyle = (trace: Data) => {
+  const y: number[] = Array.isArray((trace as any).y) ? (trace as any).y : []
+  return {
+    width: 0.25,
+    zorder: 100,
+    text: y.map(v => v > 0 ? `<b>${Math.round(v / 1000)}k</b>` : ''),
+    textposition: 'outside',
+    textfont: { color: dark ? '#e4e4e4' : '#333', size: 14 },
+  }
 }
 
 export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subtitle, onActiveYearChange }: {
@@ -124,11 +119,6 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
     onActiveYearChange?.(activeYear)
   }, [activeYear, onActiveYearChange])
 
-  const styledData = useMemo(
-    () => plotData ? highlightTraces(plotData, activeYear) : null,
-    [plotData, activeYear],
-  )
-
   const DAY_TYPE_NAMES: Record<string, string> = { weekday: "Weekday", weekend: "Weekend", holiday: "Holiday" }
   const allDayTypes = dayTypes.length >= 3
   const excluded = ["weekday", "weekend", "holiday"].filter(dt => !dayTypes.includes(dt))
@@ -148,10 +138,9 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
         id="monthly"
         title={titleText}
         subtitle={fullSubtitle}
-        data={styledData ?? undefined}
-        disableLegendHover
-        disableSoloTrace
+        data={plotData ?? undefined}
         onActiveTraceChange={setActiveYear}
+        activeStyle={activeStyle}
         layout={{
           barmode: "group",
           xaxis: {

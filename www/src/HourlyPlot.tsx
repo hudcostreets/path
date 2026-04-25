@@ -117,7 +117,7 @@ function colKey(dayType: DayType, direction: Direction): keyof HourlyRow {
   return `avg_${dayType}_${direction}` as keyof HourlyRow
 }
 
-export default function HourlyPlot({ stations: externalStations, onActiveStationChange, soloStation, onSoloStationChange, externalActiveStation }: {
+export default function HourlyPlot({ stations: externalStations, onActiveStationChange, soloStation, onSoloStationChange, externalActiveStation, dateRange }: {
   stations?: string[]
   onActiveStationChange?: (station: string | null) => void
   /** Controlled solo/pin (full station name). Pair with `onSoloStationChange`
@@ -127,6 +127,9 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   /** Cross-plot active signal (from another plot's local hover/pin). Fills in
    *  the visual brush when there's no local hover/pin. */
   externalActiveStation?: string | null
+  /** "YYYY-MM" range filter from sibling plot (e.g. plot4 / map). When set,
+   *  rows outside [from, to] are excluded before aggregation. */
+  dateRange?: { from: string, to: string }
 }) {
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("hg", groupByParam)
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
@@ -175,7 +178,13 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
 
   const plotData = useMemo(() => {
     if (!allRows) return null
-    const filtered = allRows.filter(r => activeStations.includes(r.station))
+    const inRange = dateRange
+      ? (r: typeof allRows[number]) => {
+          const ym = `${r.year}-${String(r.month).padStart(2, '0')}`
+          return ym >= dateRange.from && ym <= dateRange.to
+        }
+      : () => true
+    const filtered = allRows.filter(r => activeStations.includes(r.station) && inRange(r))
     const hours = Array.from({ length: 24 }, (_, i) => i)
 
     if (groupBy === "direction") {
@@ -271,7 +280,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         } as Data
       })
     }
-  }, [allRows, activeStations, selectedDayTypes, groupBy, direction])
+  }, [allRows, activeStations, selectedDayTypes, groupBy, direction, dateRange])
 
   const dirLabel = direction === "entry" ? "entries" : "exits"
   const groupLabel = groupBy === "station" ? "by station" : groupBy === "daytype" ? "by day type" : "by direction"

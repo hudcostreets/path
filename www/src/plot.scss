@@ -282,3 +282,153 @@ html.clean {
     opacity: 0.8;
   }
 }
+
+// Elide divider between the NJ-outer pane and the core/NYC pane. Renders
+// a pair of diagonal slashes ("//") in the gap, signaling that the ~10km
+// of empty geography between the clusters has been compressed.
+.map-elide-divider {
+  position: relative;
+  background: #1a1a2e; // matches page bg so it reads as a "cut"
+  // Pair of diagonal "//" slashes spanning the full pane height. Drawn with
+  // linear-gradient so they're crisp at any zoom. Each slash is ~3px thick.
+  background-image:
+    linear-gradient(
+      105deg,
+      transparent calc(50% - 6px),
+      #b8b8c8 calc(50% - 6px),
+      #b8b8c8 calc(50% - 3px),
+      transparent calc(50% - 3px),
+      transparent calc(50% + 3px),
+      #b8b8c8 calc(50% + 3px),
+      #b8b8c8 calc(50% + 6px),
+      transparent calc(50% + 6px)
+    );
+  background-size: 100% 22px;
+  background-repeat: repeat-y;
+  background-position: center;
+}
+
+// Hour clock embedded as a Leaflet topright control. Semi-transparent dark
+// panel with the hour label above the dial for compactness.
+.map-clock-control {
+  margin: 8px !important;
+  background: rgba(20, 20, 30, 0.78);
+  color: #ddd;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  backdrop-filter: blur(2px);
+}
+.map-clock-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin-bottom: 4px;
+  .map-clock-hint {
+    color: #888;
+    font-size: 0.85em;
+  }
+  strong {
+    font-size: 0.95em;
+  }
+}
+.map-clock-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+// Custom attribution: an info icon in the lower-left that reveals the full
+// © text on hover/focus. Replaces Leaflet's default bottom-right control.
+.map-attr-info {
+  background: rgba(0, 0, 0, 0.55);
+  color: #ccc;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  .info-icon {
+    cursor: help;
+    user-select: none;
+  }
+  .info-text {
+    display: none;
+    a { color: #aaa; text-decoration: underline; }
+  }
+  &:hover .info-text, &:focus-within .info-text {
+    display: inline;
+  }
+}
+
+// Station name label inside each marker — sibling of `.station-glyph`,
+// positioned just below the visible glyph extent via `--marker-extent`
+// (set per data update). Living inside the divIcon (rather than a Leaflet
+// permanent tooltip) lets us track the actual glyph height without
+// re-binding the tooltip on every change.
+.station-pie {
+  // Children need a positioning context.
+  position: relative;
+}
+.station-name {
+  position: absolute;
+  top: calc(50% + var(--marker-extent, 56px) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: #eee;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  border-radius: 2px;
+  // `top` is calc(... var(--marker-extent) ...), so when the variable
+  // changes (per data update) the resolved px value transitions smoothly.
+  transition: top var(--anim-ms, 400ms) var(--anim-easing, ease);
+  // Outer marker has overflow: visible by default; label can extend past it.
+}
+
+// Inner glyph element inside each marker — `transform: scale(...)` is set
+// inline per-marker on aggregate change. Origin is the center of the box so
+// the pie/bars grow/shrink in place over the station's coordinate. Pie wedge
+// angle is animated by JS (rAF + SVG path); transform/scale and bar heights
+// are CSS-transitioned, both honoring `--anim-ms` set inline per-element.
+.station-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform;
+  transition: transform var(--anim-ms, 400ms) var(--anim-easing, ease);
+
+  .bars-row {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    // Subtle horizontal line at the station coordinate; entries grow above,
+    // exits below.
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.25);
+    }
+  }
+  .bar {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 0;
+    transition: height var(--anim-ms, 400ms) var(--anim-easing, ease);
+    opacity: 0.9;
+  }
+  .bar-entry { bottom: 50%; background: #22c55e; }
+  .bar-exit { top: 50%; background: #f97316; }
+}

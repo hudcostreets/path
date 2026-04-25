@@ -16,6 +16,7 @@ import { HccsIcon, GhIcon } from './speed-dial-icons'
 
 const BridgeTunnel = lazy(() => import('./BridgeTunnel'))
 const BannerPage = lazy(() => import('./ABPBanner').then(m => ({ default: m.BannerPage })))
+const StationsMap = lazy(() => import('./StationsMap'))
 
 const components = {
   a: A,
@@ -60,6 +61,11 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/bt" element={
                 <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
                   <BridgeTunnel />
+                </Suspense>
+              } />
+              <Route path="/map" element={
+                <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
+                  <StationsMap />
                 </Suspense>
               } />
               <Route path="*" element={
