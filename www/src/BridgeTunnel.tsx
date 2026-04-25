@@ -8,7 +8,7 @@ import { Plot as PltlyPlot } from "pltly/react"
 import { INFERNO, getColorAt } from "pltly"
 import { useUrlState, codeParam, codesParam } from "use-prms"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
-import { Plot, blendAvgColor, dark, hovertemplate, hovertemplatePct, rollingAvg } from "./plot-utils"
+import { Plot, blendAvgColor, hovertemplate, hovertemplatePct, isDark, rollingAvg, useDark } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 import type { StationGroup } from "./RidesPlot"
@@ -574,7 +574,7 @@ function TrafficPlot({
     const avg12 = rollingAvg(avgSource, 12)
     const avgColor = active
       ? blendAvgColor((active as any).marker?.color ?? '#888', 0.5)
-      : (dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
+      : (isDark() ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)")
     return [{
       name: "12mo avg",
       x: allDates,
@@ -697,7 +697,7 @@ function highlightTraces(data: Data[], activeTrace: string | null): Data[] {
           return `<b>${Math.round(v / 1000)}k</b>`
         }),
         textposition: 'outside',
-        textfont: { color: dark ? '#e4e4e4' : '#333', size: 11 },
+        textfont: { color: isDark() ? '#e4e4e4' : '#333', size: 11 },
         textangle: 0,
         constraintext: 'none',
         cliponaxis: false,
@@ -792,6 +792,7 @@ function BTMonthlyPlot({
 // --- Page ---
 
 export default function BridgeTunnel() {
+  useDark()  // subscribe so the component re-renders when theme changes
   const [urlCrossings, setUrlCrossings] = useUrlState<string[]>("c", crossingsParam)
   const [urlTypes, setUrlTypes] = useUrlState<string[]>("v", vehicleTypesParam)
   // Immediate local state; URL syncs on debounce

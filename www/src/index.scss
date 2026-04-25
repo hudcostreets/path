@@ -171,7 +171,7 @@ hr {
   }
 }
 
-@media (prefers-color-scheme: light) {
+:root[data-theme="light"] {
   .more-plots {
     border-color: #ccc;
   }
@@ -195,11 +195,9 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
+:root[data-theme="light"] {
+  color: #213547;
+  background-color: #ffffff;
   a:hover {
     color: #747bff;
   }
@@ -243,11 +241,9 @@ button:focus-visible {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #e4e4e4;
-    background-color: #1a1a2e;
-  }
+:root[data-theme="dark"] {
+  color: #e4e4e4;
+  background-color: #1a1a2e;
   a {
     color: #818cf8;
   }

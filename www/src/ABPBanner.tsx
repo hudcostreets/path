@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { useActions } from "use-kbd"
-import { dark } from "./plot-utils"
+import { useDark } from "./plot-utils"
 
-const HEADING_FILL = dark ? "white" : "#100F0D"
 const SUBTITLE_FILL = "#22783A"
 
 export type BannerMode = "paths" | "text"
@@ -19,16 +18,18 @@ function InlineSVG({ src, className }: { src: string, className?: string }) {
 
 function BannerContent({ mode }: { mode: BannerMode }) {
   const textMode = mode === "text"
+  const dark = useDark()
   const svgSrc = dark
     ? (textMode ? "/abp-banner-dark-deco.svg" : "/abp-banner-dark.svg")
     : (textMode ? "/abp-banner-deco.svg" : "/abp-banner.svg")
+  const headingFill = dark ? "white" : "#100F0D"
 
   return (
     <div className="abp-banner-wrap">
       <InlineSVG src={svgSrc} className="abp-banner-inline" />
       {textMode && (
         <div className="abp-banner-text">
-          <span className="abp-banner-heading" style={{ color: HEADING_FILL }}>A Better PATH</span>
+          <span className="abp-banner-heading" style={{ color: headingFill }}>A Better PATH</span>
           <span className="abp-banner-subtitle" style={{ color: SUBTITLE_FILL }}>A <strong>Hudson County Complete Streets</strong> Campaign</span>
         </div>
       )}
@@ -59,6 +60,7 @@ export default function ABPBanner() {
 
 /** Standalone banner comparison page with side-by-side and toggle */
 export function BannerPage() {
+  const dark = useDark()
   const bg = dark ? '#1a1a2e' : '#fff'
   const [mode, setMode] = useState<BannerMode>("paths")
 

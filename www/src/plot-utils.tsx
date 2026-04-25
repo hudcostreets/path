@@ -4,10 +4,12 @@ import { Annotations, Data, Layout } from "plotly.js"
 
 import { Plot as PltlyPlot, type PlotProps as PltlyPlotProps } from 'pltly/react'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
+import { isDark, useDark } from './ThemeContext'
+
+export { isDark, useDark }
 
 const height = 450
 const DefaultHeight = height
-export const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
 export const clean = new URLSearchParams(window.location.search).has('clean')
 
 export const hovertemplate = "%{y:,.0f}"
@@ -34,9 +36,11 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
 
 export const { H2 } = Headings({ className: "heading" })
 
-/** Blend a hex color toward white (dark mode) or black (light mode) by `t` (0–1). */
+/** Blend a hex color toward white (dark mode) or black (light mode) by `t` (0–1).
+ *  Reads the live theme from the document; callers re-rendering on theme
+ *  change should also be theme-reactive (e.g. via `useDark()`). */
 export function blendAvgColor(hexColor: string, t = 0.5): string {
-  const base = dark ? [255, 255, 255] : [0, 0, 0]
+  const base = isDark() ? [255, 255, 255] : [0, 0, 0]
   const hex = hexColor.replace('#', '')
   const r = parseInt(hex.substring(0, 2), 16)
   const g = parseInt(hex.substring(2, 4), 16)
@@ -90,6 +94,7 @@ export function Plot(
   const narrow = useNarrow()
   const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: narrow ? 20 : 0, t: 0, b: narrow ? 50 : 40 }), [narrow])
   const userLayout = (props as { layout?: Partial<Layout> }).layout
+  const dark = useDark()
   // Memoize the computed layout so its identity depends only on `userLayout`.
   // Otherwise every re-render of this wrapper would create a new layout object,
   // causing pltly's Plot to fire a redundant Plotly.react on every hover.
@@ -107,7 +112,7 @@ export function Plot(
         : { ...legendIn },
       ...rest,
     }
-  }, [narrow, userLayout, margin])
+  }, [narrow, userLayout, margin, dark])
   if (!props.data) {
     return <>
       {h2}

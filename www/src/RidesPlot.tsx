@@ -9,7 +9,7 @@ import { useActions } from "use-kbd"
 import { Param, useUrlState, codeParam } from "use-prms"
 import { repelLabels } from "pltly/plotly"
 import type { RepelLineObstacle, RepelPoint, RepelRectObstacle } from "pltly/plotly"
-import { Plot, blendAvgColor, clean, dark, hovertemplate, hovertemplatePct, rollingAvg, url } from "./plot-utils"
+import { Plot, blendAvgColor, clean, hovertemplate, hovertemplatePct, isDark, rollingAvg, url, useDark } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 
@@ -520,7 +520,7 @@ function endpointAnnotations(
     margin,
     fontSize: 12,
     standoff: 6,
-    textColor: dark ? '#e4e4e4' : '#333',
+    textColor: isDark() ? '#e4e4e4' : '#333',
     connectors: { color: '#888', width: 1 },
     lineObstacles,
     rectObstacles,
@@ -623,7 +623,7 @@ function buildByStation(
           return sum
         })
     const avg12 = rollingAvg(avgSource, 12)
-    const avgColor = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
+    const avgColor = isDark() ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
     const avgTrace: Data = {
       name: "12mo avg",
       x: months,
@@ -812,7 +812,7 @@ function buildByDayType(
           return sum
         })
     const avg12 = rollingAvg(avgSource, 12)
-    const avgColor = dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
+    const avgColor = isDark() ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)"
     const avgTrace: Data = {
       name: "12mo avg",
       x: months,
@@ -912,6 +912,9 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
    *  local hover/pin (for bidirectional hover brushing). */
   externalActiveStation?: string | null
 } = {}) {
+  // Subscribe to theme so the component re-renders on changes; helpers below
+  // call `isDark()` to read the current value.
+  useDark()
   const [metric, setMetric] = useUrlState<Metric>("m", metricParam)
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("g", groupByParam)
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
@@ -1337,7 +1340,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
               <summary>Plot data</summary>
               <ReactJsonView
                 src={processed}
-                theme={dark ? "monokai" : "rjv-default"}
+                theme={isDark() ? "monokai" : "rjv-default"}
                 displayDataTypes={false}
                 displayArrayKey={true}
                 name={false}

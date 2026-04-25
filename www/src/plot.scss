@@ -47,7 +47,7 @@
   }
 }
 
-@media (prefers-color-scheme: light) {
+:root[data-theme="light"] {
   .plot-presets {
     color: #777;
     a {

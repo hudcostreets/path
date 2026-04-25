@@ -3,7 +3,7 @@ import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useEffect, useMemo, useState } from "react"
 import { Data, Legend } from "plotly.js"
 import { INFERNO, getColorAt } from "pltly"
-import { Plot, dark, hovertemplate, url } from "./plot-utils"
+import { Plot, hovertemplate, isDark, url } from "./plot-utils"
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -32,7 +32,7 @@ const activeStyle = (trace: Data) => {
     zorder: 100,
     text: y.map(v => v > 0 ? `<b>${Math.round(v / 1000)}k</b>` : ''),
     textposition: 'outside',
-    textfont: { color: dark ? '#e4e4e4' : '#333', size: 14 },
+    textfont: { color: isDark() ? '#e4e4e4' : '#333', size: 14 },
   }
 }
 
