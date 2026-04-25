@@ -357,9 +357,9 @@ test.describe('Filter badges on /', () => {
 // ─── Pin survives control toggle ───
 //
 // Clicking a plot's own ToggleButton (outside `.js-plotly-plot`, in a sibling
-// container) used to unpin via pltly's document-scoped outside-click dismiss.
-// pltly now scopes that listener to the plot container, so consumer controls
-// don't dismiss the pin.
+// container) would unpin via pltly's document-scoped outside-click dismiss.
+// We mark `.plot-toggles` rows with `[data-pltly-keep-pin]` so pltly's
+// listener treats them as sticky — consumer controls don't dismiss pins.
 
 test.describe('Pin survives consumer control toggles on /', () => {
   test('plot3 pin → Exit toggle → pin persists on both plots (bold + solo-hide)', async ({ page }) => {

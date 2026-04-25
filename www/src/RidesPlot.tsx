@@ -1201,7 +1201,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
         {...plotProps}
       />
       {!clean && <>
-        <div className="plot-toggles">
+        <div className="plot-toggles" data-pltly-keep-pin>
           <ToggleButtonGroup
             value={metric}
             exclusive
@@ -1251,7 +1251,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
           />
         </div>
         {metric === "pct2019" && (
-          <div className="plot-toggles baseline-controls" style={{ flexWrap: 'wrap', gap: '0.5em', alignItems: 'center' }}>
+          <div className="plot-toggles baseline-controls" data-pltly-keep-pin style={{ flexWrap: 'wrap', gap: '0.5em', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85em' }}>Baseline:</span>
             <input
               type="number"

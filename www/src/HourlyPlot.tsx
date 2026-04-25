@@ -391,7 +391,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         externalActiveTrace={externalActiveTrace}
         layout={layout}
       />
-      <div className="plot-toggles">
+      <div className="plot-toggles" data-pltly-keep-pin>
         {groupBy !== "direction" && (
           <ToggleButtonGroup size="small" exclusive value={direction} onChange={(_, v) => v && setDirection(v)}>
             <ToggleButton value="entry">Entry</ToggleButton>
