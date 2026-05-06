@@ -203,7 +203,9 @@ def _stations_stack(m: pd.DataFrame, *, y: str, title: str, name: str | None = N
             title=title,
             labels={'station': 'Station', y: title, 'month': ''},
         )
-    ).update_xaxes(range=[start, end], dtick=dtick).update_layout(width=PLOT_W, height=PLOT_H)
+        # ISO strings (not Timestamps) — kaleido in CI errors with
+        # "Type is not JSON serializable: Timestamp" otherwise.
+    ).update_xaxes(range=[start.isoformat(), end.isoformat()], dtick=dtick).update_layout(width=PLOT_W, height=PLOT_H)
     if name:
         _save_json(fig, name)
         _save_png(fig, name)
@@ -303,7 +305,7 @@ def _generate_og_image(m: pd.DataFrame, end_month: str, last_ym_label: str | Non
             title=title,
             labels={'station': 'Station', 'avg weekday': 'Avg weekday ridership', 'month': ''},
         )
-    ).update_xaxes(range=[start, end], dtick='M12').update_layout(width=1200, height=630)
+    ).update_xaxes(range=[start.isoformat(), end.isoformat()], dtick='M12').update_layout(width=1200, height=630)
     og_path = join(WWW_PUBLIC, 'og.png')
     try:
         fig.write_image(og_path, width=1200, height=630)
