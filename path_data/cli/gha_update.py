@@ -1,6 +1,7 @@
 import json
 import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from glob import glob
 from os import environ, listdir
@@ -460,20 +461,38 @@ def gha_update():
         pdf_paths = _staged_paths(path_filter='data/')
         updated_pdfs = [p for p in pdf_paths if p.endswith('.pdf')]
 
+        # Pre-fetch S3-cached outputs so `dvx run` can hash-verify against
+        # `.dvc` outs and skip stages whose deps haven't changed. Without
+        # this, fresh CI runners (empty `.dvc/cache`) recompute every stage
+        # from upstream PDFs (~25min). `check=False` so a partial cache
+        # miss (e.g. brand-new `.dvc` not yet pushed) doesn't fail the run
+        # — `dvx run` will recompute whatever pull missed.
+        err('=== dvx pull ===')
+        run('dvx', 'pull', check=False)
+
         err('=== dvx run ===')
         dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('data/bt/*.dvc')) + sorted(glob('www/public/*.dvc'))
-        # Capture output so the failure handler can parse `✗ <path>: failed`
-        # lines. Echo it live so the step log still reflects progress.
-        dvx_res = subprocess.run(
+        # Stream output live (so step log shows progress per-stage) while
+        # also accumulating it for the failure parser (`✗ <path>: failed`).
+        # `subprocess.run(capture_output=True)` would buffer everything
+        # until exit — silent for ~25min, then a wall of text.
+        proc = subprocess.Popen(
             ['dvx', 'run', '-v', *dvc_targets],
-            capture_output=True, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
         )
-        err(dvx_res.stdout)
-        err(dvx_res.stderr)
-        if dvx_res.returncode != 0:
-            e = CalledProcessError(dvx_res.returncode, ['dvx', 'run', '-v', '…'])
-            e.stdout = dvx_res.stdout
-            e.stderr = dvx_res.stderr
+        captured_lines: list[str] = []
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            sys.stderr.write(line)
+            sys.stderr.flush()
+            captured_lines.append(line)
+        proc.wait()
+        captured = ''.join(captured_lines)
+        if proc.returncode != 0:
+            e = CalledProcessError(proc.returncode, ['dvx', 'run', '-v', '…'])
+            e.stdout = captured
+            e.stderr = ''
             raise e
 
         run('git', 'add', 'data/', 'www/public/', 'img/')
