@@ -203,21 +203,26 @@ def _rerun_failing_dvc(captured_output: str = '') -> str | None:
             return s
         return s[:head_n] + f'\n\n…[{len(s) - head_n - tail_n} chars omitted]…\n\n' + s[-tail_n:]
 
-    return dedent(f"""\
-        Re-ran `{cmd}` directly (exit {result.returncode}); no cell-error in `out/*.ipynb`.
+    return dedent("""\
+        Re-ran `{cmd}` directly (exit {rc}); no cell-error in `out/*.ipynb`.
 
         ### stderr
 
         ```
-        {_head_tail(result.stderr)}
+        {stderr}
         ```
 
         ### stdout
 
         ```
-        {_head_tail(result.stdout, head_n=1500, tail_n=500)}
+        {stdout}
         ```
-        """)
+        """).format(
+        cmd=cmd,
+        rc=result.returncode,
+        stderr=_head_tail(result.stderr),
+        stdout=_head_tail(result.stdout, head_n=1500, tail_n=500),
+    )
 
 
 def _pdf_last_modified(dvc_path: str) -> str | None:
@@ -567,18 +572,24 @@ def gha_update():
             diag_section = f"\n\n### Notebook cell error\n\n{nb_err}"
         elif rerun_err:
             diag_section = f"\n\n### Direct command re-run\n\n{rerun_err}"
-        _append_summary(dedent(f"""\
+        _append_summary(dedent("""\
             ## :rotating_light: Pipeline error
 
-            `{prog}` exited with status {e.returncode}. See the GHA run log
+            `{prog}` exited with status {rc}. See the GHA run log
             for the underlying command's output.
 
             ```
-            {tb[-1500:]}
-            ```{diag_section}
+            {tb}
+            ```{diag}
 
-            {md_link}
-            """))
+            {link}
+            """).format(
+            prog=prog,
+            rc=e.returncode,
+            tb=tb[-1500:],
+            diag=diag_section,
+            link=md_link,
+        ))
         # Main message stays short; the full diagnostic (cell error or
         # re-run output) lands as a thread reply so the channel isn't
         # spammed with stack traces.
@@ -597,15 +608,18 @@ def gha_update():
     except Exception:
         tb = format_exc()
         err(tb)
-        _append_summary(dedent(f"""\
+        _append_summary(dedent("""\
             ## :rotating_light: Unexpected error
 
             ```
-            {tb[-2000:]}
+            {tb}
             ```
 
-            {md_link}
-            """))
+            {link}
+            """).format(
+            tb=tb[-2000:],
+            link=md_link,
+        ))
         ts = _slack(
             f":rotating_light: *PATH pipeline crashed* (see run log)\n{slack_link}",
             emoji=':rotating_light:',
