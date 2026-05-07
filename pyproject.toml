@@ -12,10 +12,9 @@ dependencies = [
     "numpy>=2",
     "openpyxl==3.1.5",
     "pandas>=3",
-    "pdfplumber",  # parse_bt.py
     "plotly",
-    "pyarrow",  # parse_bt.py
     "PyPDF2",
+    "uv",  # for `uv run parse_bt.py` (inline-metadata isolation: avoids pyarrow polluting the main venv, which triggers pandas's pyarrow-string default and breaks fastparquet's writer)
     "tabula-py",
     "thrds @ git+https://github.com/runsascoded/thrds@3cb9a0f",
     "utz",
