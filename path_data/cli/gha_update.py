@@ -181,10 +181,14 @@ def _rerun_failing_dvc(captured_output: str = '') -> str | None:
     # internally, so if it fails, the `-o` path is never written — we have to
     # rely on captured stderr.
     from os import makedirs
+    from os.path import dirname
     makedirs('out', exist_ok=True)
     run_env = {**environ, 'PYTHONUNBUFFERED': '1'}
-    err(f"_rerun_failing_dvc: re-running `{cmd}`")
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600, env=run_env)
+    # Match DVX's cwd-from-.dvc-dir behavior so cmds with relative `cd`s
+    # (e.g. `cd ../.. && python ...` for B&T) don't double up on `_rerun`.
+    cmd_cwd = dirname(dvc_path) or None
+    err(f"_rerun_failing_dvc: re-running `{cmd}` (cwd={cmd_cwd or '.'})")
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=600, env=run_env, cwd=cmd_cwd)
     err(f"_rerun_failing_dvc: exit={result.returncode} stdout_len={len(result.stdout or '')} stderr_len={len(result.stderr or '')}")
     # Papermill writes cell errors to the output notebook even on failure;
     # parse that first.

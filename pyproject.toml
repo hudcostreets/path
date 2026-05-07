@@ -14,6 +14,7 @@ dependencies = [
     "pandas>=3",
     "pdfplumber",  # parse_bt.py
     "plotly",
+    "pyarrow",  # parse_bt.py
     "PyPDF2",
     "tabula-py",
     "thrds @ git+https://github.com/runsascoded/thrds@3cb9a0f",
