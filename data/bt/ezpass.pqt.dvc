@@ -5,7 +5,7 @@ outs:
   path: ezpass.pqt
 meta:
   computation:
-    cmd: python parse_bt.py && cp data/bt/ezpass.pqt www/public/bt-ezpass.pqt
+    cmd: cd ../.. && python parse_bt.py && cp data/bt/ezpass.pqt www/public/bt-ezpass.pqt
     git_deps:
       parse_bt.py: 8fa434e7faa1eb6ab55faad5cf17221dee04508d
       data/traffic-e-zpass-usage-2011.pdf: 071decc418b570c6ed1bdadb74def95b82ac80b1
