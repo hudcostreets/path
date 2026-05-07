@@ -1114,8 +1114,8 @@ wheels = [
 
 [[package]]
 name = "dvx"
-version = "0.4.1.dev3+g0d5bab93f"
-source = { git = "https://github.com/runsascoded/dvx?rev=0d5bab93f#0d5bab93fc5730691334c2ff053bdf0bed92fa35" }
+version = "0.4.1.dev4+g6156acc0b"
+source = { git = "https://github.com/runsascoded/dvx?rev=6156acc0b#6156acc0b8c4370b0b96f6e9359a3c543f02216c" }
 dependencies = [
     { name = "click" },
     { name = "dffs" },
@@ -2632,7 +2632,7 @@ eda = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dvx", extras = ["s3"], git = "https://github.com/runsascoded/dvx?rev=0d5bab93f" },
+    { name = "dvx", extras = ["s3"], git = "https://github.com/runsascoded/dvx?rev=6156acc0b" },
     { name = "fastparquet", specifier = "==2024.11.0" },
     { name = "ipython" },
     { name = "joblib" },
