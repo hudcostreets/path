@@ -7,5 +7,5 @@ meta:
   computation:
     cmd: path-data monthly -y 2021
     git_deps:
-      data/2021-PATH-Monthly-Ridership-Report.pdf: 7dbcefa18398000ae1421a56e9c3cbdbcd9e662a
+      2021-PATH-Monthly-Ridership-Report.pdf: 7dbcefa18398000ae1421a56e9c3cbdbcd9e662a
       monthly.ipynb: 9762d56544fd608da8a7ca271f80463f4582a2f3

@@ -7,20 +7,20 @@ meta:
   computation:
     cmd: path-data months
     deps:
-      data/2012.pqt: ee659c5767e40adcf02d2ee18914fd10
-      data/2013.pqt: 722a5ed4c1f1abe79a73dc1a46e546c7
-      data/2014.pqt: d42b26707c07c2310479390322f60cdc
-      data/2015.pqt: 95e01640c4903430e58e0034017540fa
-      data/2016.pqt: 549cb919b23b5ce7f6501379236c9c09
-      data/2017.pqt: ad8e022e91c7213ad66cdc2ee7657b06
-      data/2018.pqt: 9f91a506ac6aad562c116273bcb519b8
-      data/2019.pqt: 77c14431260253a67302953d07be4458
-      data/2020.pqt: 90f5888f6a5638f577e4aff44243f68f
-      data/2021.pqt: 6e756c9108ac56eec4920f356053b2b6
-      data/2022.pqt: 7aa6a8a04ed812eb5b2ee2aa495b1f9f
-      data/2023.pqt: f5f03974c6ebdfb8394649e510568cd0
-      data/2024.pqt: 5cf774d5cb9c7bd4bd24435cd7b5376a
-      data/2025.pqt: 7f134c2dfdb069b80dff5036cc4ac7f8
-      data/2026.pqt: c76b584a35a9b4265dc472965715bcbd
+      2012.pqt: 455452a99c2833640d36d5a76ff62535
+      2013.pqt: 8e85912f40ab8e248e9c58900396a2f0
+      2014.pqt: 9f335f12feb0e806e41220c9f50ecbea
+      2015.pqt: e260446f539f670f7f5cacd638689c57
+      2016.pqt: 6f25e85def5769df59a5e43e7faec052
+      2017.pqt: 78d681b8cb7c4a76f34c5ad749423614
+      2018.pqt: 3351dfdbeb683568076416ceb902c174
+      2019.pqt: f46cbe08ed30d165ebec63719603067d
+      2020.pqt: 854d83f8a63bf37f08dde8e31d56088e
+      2021.pqt: 087d28115504e6f28ca5ed3466677552
+      2022.pqt: 365a36adf84b7c62e686a050fdeaddba
+      2023.pqt: 24242c6a1fa4c873ce2897e19682a06a
+      2024.pqt: 12eab0f9b288e73486d4380a992e3f21
+      2025.pqt: 0cc76c453c6bd5dc92ac8f12f9245699
+      2026.pqt: 279312ee33a0ae88c32d7f9e1be2db4b
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089

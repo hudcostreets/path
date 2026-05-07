@@ -7,5 +7,5 @@ meta:
   computation:
     cmd: path-data parse-hourly -y 2018
     deps:
-      data/2018-PATH-Hourly-Ridership-Report.pdf: 6859a4478ec72d4acfc7d00c8b595b7b
+      2018-PATH-Hourly-Ridership-Report.pdf: 6859a4478ec72d4acfc7d00c8b595b7b
       path_data/parse_hourly.py: 9fc08256c3149e06396e7f34f4c21361
