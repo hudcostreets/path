@@ -618,8 +618,13 @@ def gha_update():
         )
         details = nb_err or rerun_err
         if ts and details:
+            # Don't outer-wrap in `\`\`\``: `details` already contains its own
+            # `\`\`\`` blocks (stderr/stdout sections of `rerun_err`, source/
+            # traceback of `nb_err`), and Slack doesn't support nested fences
+            # — the inner `\`\`\`` would close the outer, leaving content
+            # flapping in/out of code mode.
             _slack(
-                f"```\n{details[:2800]}\n```",
+                details[:2800],
                 emoji=':rotating_light:',
                 thread_ts=ts,
             )
