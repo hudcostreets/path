@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "PATH ridership data analysis and visualization"
 requires-python = ">=3.11"
 dependencies = [
-    "dvx[s3] @ git+https://github.com/runsascoded/dvx@28c6b9aad",
+    "dvx[s3] @ git+https://github.com/runsascoded/dvx@0d5bab93f",
     "fastparquet==2024.11.0",
     "ipython",  # required by `utz.plots` (imports `IPython.display.Image`)
     "joblib",

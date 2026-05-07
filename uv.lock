@@ -1010,8 +1010,8 @@ wheels = [
 
 [[package]]
 name = "dvc-data"
-version = "3.18.3.dev5+g9d3ef02c2"
-source = { git = "https://github.com/runsascoded/dvc-data.git?rev=9d3ef02c2c1e6752f897d2885f467d12fe934646#9d3ef02c2c1e6752f897d2885f467d12fe934646" }
+version = "3.18.3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "dictdiffer" },
@@ -1023,6 +1023,10 @@ dependencies = [
     { name = "pygtrie" },
     { name = "sqltrie" },
     { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c3/2f/e00e933d10512ca7ec4f3f2f450d915e6bed4c01cf666d50a1a8f9b033ff/dvc_data-3.18.3.tar.gz", hash = "sha256:61c8085a7c5b5e3ecaa86d63c3f22dc7c951a5dc55bd0a1bb5afa15377a25b1a", size = 84527, upload-time = "2026-02-27T05:12:44.58Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/65/e0/695d043a0a2a4e830456e841c4a14be99d31305198fc4feccaeaace0b979/dvc_data-3.18.3-py3-none-any.whl", hash = "sha256:ab459a033c07ad94ec23ad4e83c14c68b73e7291367629813e751f882b10b4f3", size = 79324, upload-time = "2026-02-27T05:12:43.27Z" },
 ]
 
 [[package]]
@@ -1110,8 +1114,8 @@ wheels = [
 
 [[package]]
 name = "dvx"
-version = "0.3.1.dev7+g28c6b9aad"
-source = { git = "https://github.com/runsascoded/dvx?rev=28c6b9aad#28c6b9aad888fad3c1ca3f55b160ef81dd92bb6c" }
+version = "0.4.1.dev3+g0d5bab93f"
+source = { git = "https://github.com/runsascoded/dvx?rev=0d5bab93f#0d5bab93fc5730691334c2ff053bdf0bed92fa35" }
 dependencies = [
     { name = "click" },
     { name = "dffs" },
@@ -2627,13 +2631,13 @@ eda = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dvx", extras = ["s3"], git = "https://github.com/runsascoded/dvx?rev=28c6b9aad" },
+    { name = "dvx", extras = ["s3"], git = "https://github.com/runsascoded/dvx?rev=0d5bab93f" },
     { name = "fastparquet", specifier = "==2024.11.0" },
     { name = "ipython" },
     { name = "joblib" },
     { name = "jupyter", marker = "extra == 'eda'" },
     { name = "juq-py", marker = "extra == 'eda'", specifier = ">=0.5.1" },
-    { name = "kaleido" },
+    { name = "kaleido", specifier = "<1.3" },
     { name = "numpy", specifier = ">=2" },
     { name = "openpyxl", specifier = "==3.1.5" },
     { name = "pandas", specifier = ">=3" },
