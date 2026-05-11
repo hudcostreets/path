@@ -493,7 +493,7 @@ function TrafficPlot({
     const recentRange = ['2019-12-01', '2026-01-01']
 
     if (isVs2019) {
-      const rawTraces = buildVs2019Traces(allRows, [...CROSSINGS], [...VEHICLE_TYPES], stackBy)
+      const rawTraces = buildVs2019Traces(allRows, activeCrossings, activeTypes, stackBy)
       // Opacity/fading is handled by usePinnedLegend's restyleFade (Plotly.restyle)
       const traces = rawTraces
       return {
@@ -510,10 +510,12 @@ function TrafficPlot({
       }
     }
 
-    // Traffic mode — build ALL traces for stacked dimension, solo or fade non-selected
+    // Traffic mode — dropdown filters apply to both dimensions; legend
+    // solo/fade (via activeTraceName) is a separate transient highlight that
+    // works on whatever stacked-dim traces remain after filtering.
     const rawTraces = stackBy === "vehicle"
-      ? buildStackedByVehicle(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
-      : buildStackedByCrossing(allRows, [...CROSSINGS], [...VEHICLE_TYPES])
+      ? buildStackedByVehicle(allRows, activeCrossings, activeTypes)
+      : buildStackedByCrossing(allRows, activeCrossings, activeTypes)
 
     // Compute stack max so we can pin y-axis range (prevents autorange shifts
     // when the linked avg line changes to a per-trace value).
