@@ -53,6 +53,22 @@ const HOUR_LABELS = [
   '12p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '10p', '11p',
 ]
 
+/** "9-10am", "11am-12pm", "12-1pm", "11pm-12am". */
+function formatHourRange(h: number): string {
+  const n = (h + 1) % 24
+  const fmt = (x: number) => x === 0 || x === 12 ? '12' : String(x % 12)
+  const ap = (x: number) => x < 12 ? 'am' : 'pm'
+  return ap(h) === ap(n) ? `${fmt(h)}-${fmt(n)}${ap(h)}` : `${fmt(h)}${ap(h)}-${fmt(n)}${ap(n)}`
+}
+
+/** Compact integer formatter for in-marker labels: 0-999 raw, 1k-9.9k one
+ *  decimal, 10k+ rounded. */
+function formatCompactNum(n: number): string {
+  if (n < 1000) return String(Math.round(n))
+  if (n < 10000) return (n / 1000).toFixed(1) + 'k'
+  return Math.round(n / 1000) + 'k'
+}
+
 export default function StationsMap({ embedded = false, onDateRangeChange }: {
   embedded?: boolean
   /** Fires whenever the date range changes (after auto-init or user edit).
@@ -118,7 +134,7 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
   const [hoveredHour, setHoveredHour] = useState<number | null>(null)
   const effectiveHour = hoveredHour ?? hour
   const [shape, setShape] = useUrlState<Shape>('ms', shapeParam)
-  const [animMs, setAnimMs] = useState<number>(400)
+  const [animMs, setAnimMs] = useState<number>(800)
   const [playing, setPlaying] = useState<boolean>(urlHour === ALL_HOURS)
   // Mirror external URL edits → liveHour while paused. (Ignored during play
   // so animation isn't disrupted by our own `setUrlHour(ALL_HOURS)` clear.)
@@ -159,15 +175,35 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
   // While playing, advance the hour every animMs (clamped) so the wedges/bars
   // tween straight into the next state. Wraps 11p → 12a; entering play from
   // "All hours" jumps to 12a so the first frame has a real hour.
+  //
+  // Background-tab handling: browsers throttle setInterval to ~1Hz on hidden
+  // tabs, and may fire several deferred callbacks in rapid succession when
+  // the tab regains focus (visible "catch-up spin"). Skip the tick when
+  // `document.hidden` and resume cleanly via the `visibilitychange` event,
+  // so there's no replay of background time.
   useEffect(() => {
     if (!playing) return
     if (hourRef.current === ALL_HOURS) setHour(0)
     const period = Math.max(animMs, 120)
-    const id = setInterval(() => {
-      const cur = hourRef.current
-      setHour(cur === ALL_HOURS ? 0 : (cur + 1) % 24)
-    }, period)
-    return () => clearInterval(id)
+    let id: number | undefined
+    const start = () => {
+      if (id !== undefined) return
+      id = window.setInterval(() => {
+        if (document.hidden) return
+        const cur = hourRef.current
+        setHour(cur === ALL_HOURS ? 0 : (cur + 1) % 24)
+      }, period)
+    }
+    const stop = () => {
+      if (id !== undefined) { clearInterval(id); id = undefined }
+    }
+    const onVis = () => { if (document.hidden) stop(); else start() }
+    if (!document.hidden) start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [playing, animMs, setHour])
 
   useEffect(() => {
@@ -345,9 +381,15 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
     ro.observe(coreContainerRef.current!)
 
     // Add markers to the appropriate pane based on station partitioning.
+    // Per-slice/bar value labels live OUTSIDE `.station-glyph` so they don't
+    // scale with the glyph; the data-update effect positions them via
+    // `--lx`/`--ly` CSS variables based on the current scaled wedge/bar
+    // geometry.
     for (const [station, [lng, lat]] of Object.entries(STATION_COORDS)) {
       const icon = L.divIcon({
         html: `<div class="station-glyph" style="width:${ICON_BOX}px;height:${ICON_BOX}px"></div>`
+          + `<span class="value-label value-label-entry"></span>`
+          + `<span class="value-label value-label-exit"></span>`
           + `<span class="station-name">${station}</span>`,
         className: 'station-pie',
         iconSize: [ICON_BOX, ICON_BOX],
@@ -400,6 +442,32 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
       const exitFrac = total > 0 ? t.exits / total : 0
       const bottomExtent = (shape === 'pie' ? MAX_RADIUS : exitFrac * MAX_RADIUS) * scale
       markerEl.style.setProperty('--marker-extent', `${bottomExtent}px`)
+      // Per-slice/bar value labels: snap to the new hour's geometry (no
+      // transition) while the wedge angles / bar heights still tween.
+      const labelE = markerEl.querySelector<HTMLElement>('.value-label-entry')
+      const labelX = markerEl.querySelector<HTMLElement>('.value-label-exit')
+      if (labelE && labelX) {
+        labelE.textContent = formatCompactNum(t.entries)
+        labelX.textContent = formatCompactNum(t.exits)
+        if (shape === 'pie') {
+          const entryFrac = total > 0 ? t.entries / total : 0.5
+          const angE = -Math.PI / 2 + entryFrac * Math.PI
+          const angX = Math.PI / 2 + entryFrac * Math.PI
+          const r = MAX_RADIUS * 0.62 * scale
+          labelE.style.setProperty('--lx', `${r * Math.cos(angE)}px`)
+          labelE.style.setProperty('--ly', `${r * Math.sin(angE)}px`)
+          labelX.style.setProperty('--lx', `${r * Math.cos(angX)}px`)
+          labelX.style.setProperty('--ly', `${r * Math.sin(angX)}px`)
+        } else {
+          // Bars: entry above center, exit below center; labels just past each
+          // bar's outer edge so they don't overlap the bar fill.
+          const entryFrac = total > 0 ? t.entries / total : 0
+          labelE.style.setProperty('--lx', '0px')
+          labelE.style.setProperty('--ly', `${-(entryFrac * MAX_RADIUS * scale + 9)}px`)
+          labelX.style.setProperty('--lx', '0px')
+          labelX.style.setProperty('--ly', `${exitFrac * MAX_RADIUS * scale + 9}px`)
+        }
+      }
       marker.bindPopup(
         `<strong>${station}</strong><br/>Avg entries: ${Math.round(t.entries).toLocaleString()}<br/>Avg exits: ${Math.round(t.exits).toLocaleString()}`
       )
@@ -407,7 +475,7 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
   }, [rangeAvg, maxTotal, shape, animMs, playing])
 
 
-  const hourLabel = effectiveHour === ALL_HOURS ? 'All hours' : HOUR_LABELS[effectiveHour]
+  const hourLabel = effectiveHour === ALL_HOURS ? 'All hours' : formatHourRange(effectiveHour)
 
   const outerStyle: React.CSSProperties = embedded
     ? { width: '100%', display: 'flex', flexDirection: 'column', margin: '1em 0' }

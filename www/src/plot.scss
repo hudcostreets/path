@@ -392,6 +392,23 @@ html.clean {
   // Outer marker has overflow: visible by default; label can extend past it.
 }
 
+// Per-slice (pie) / per-bar value labels. Position is set per-data-update via
+// `--lx` / `--ly` CSS variables (relative to the marker center), so labels
+// snap to the new hour's geometry instead of tweening with the shape.
+.value-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(calc(-50% + var(--lx, 0px)), calc(-50% + var(--ly, 0px)));
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.9);
+  line-height: 1;
+}
+
 // Inner glyph element inside each marker — `transform: scale(...)` is set
 // inline per-marker on aggregate change. Origin is the center of the box so
 // the pie/bars grow/shrink in place over the station's coordinate. Pie wedge
