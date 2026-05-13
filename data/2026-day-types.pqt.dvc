@@ -1,8 +1,11 @@
 outs:
-- md5: 6bb388b16c1d1d974826c3973e680f58
-  size: 1586
+- md5: 8ecd9c4166dc43c1c3b006c927bbb098
+  size: 1589
   hash: md5
   path: 2026-day-types.pqt
 meta:
   computation:
     cmd: path-data monthly -y 2026
+    git_deps:
+      2026-PATH-Monthly-Ridership-Report.pdf: c64a08d1297fca7ee7da60d16ac5e439397fb995
+      /path_data/monthly.py: 3ef26b7d2c1920c514a87b46c5be3ca4cf497168
