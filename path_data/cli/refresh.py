@@ -39,19 +39,30 @@ def ensure_year_pipeline(year: int):
     """Create computation .dvc stubs for a new year, and add the year to all.pqt deps."""
     files_created = []
 
+    # `git_deps` values left as null; dvx populates real blob SHAs on first
+    # run. Without these, dvx can't see the upstream PDF/script changing and
+    # the stage is treated as eternally up-to-date (the 2026 bug).
+    monthly_git_deps = {
+        f'{year}-PATH-Monthly-Ridership-Report.pdf': None,
+        '/path_data/monthly.py': None,
+    }
+    hourly_git_deps = {
+        f'{year}-PATH-Hourly-Ridership-Report.pdf': None,
+        '/path_data/parse_hourly.py': None,
+    }
     monthly_stubs = [
-        (f'data/{year}.pqt.dvc',           f'{year}.pqt',            f'path-data monthly -y {year}'),
-        (f'data/{year}-day-types.pqt.dvc', f'{year}-day-types.pqt',  f'path-data monthly -y {year}'),
+        (f'data/{year}.pqt.dvc',           f'{year}.pqt',            f'path-data monthly -y {year}', monthly_git_deps),
+        (f'data/{year}-day-types.pqt.dvc', f'{year}-day-types.pqt',  f'path-data monthly -y {year}', monthly_git_deps),
     ]
     hourly_stubs = [
-        (f'data/{year}-hourly.pqt.dvc',        f'{year}-hourly.pqt',        f'path-data parse-hourly -y {year}'),
-        (f'data/{year}-hourly-total.pqt.dvc',  f'{year}-hourly-total.pqt',  f'path-data parse-hourly -y {year}'),
-        (f'data/{year}-hourly-system.pqt.dvc', f'{year}-hourly-system.pqt', f'path-data parse-hourly -y {year}'),
+        (f'data/{year}-hourly.pqt.dvc',        f'{year}-hourly.pqt',        f'path-data parse-hourly -y {year}', hourly_git_deps),
+        (f'data/{year}-hourly-total.pqt.dvc',  f'{year}-hourly-total.pqt',  f'path-data parse-hourly -y {year}', hourly_git_deps),
+        (f'data/{year}-hourly-system.pqt.dvc', f'{year}-hourly-system.pqt', f'path-data parse-hourly -y {year}', hourly_git_deps),
     ]
     # Hourly PDFs are only published from 2017 onward.
     stubs = monthly_stubs + (hourly_stubs if year >= 2017 else [])
 
-    for dvc_path, out_path, cmd in stubs:
+    for dvc_path, out_path, cmd, git_deps in stubs:
         if not exists(dvc_path):
             err(f'\tcreating computation stub: {dvc_path}')
             stub = {
@@ -59,6 +70,7 @@ def ensure_year_pipeline(year: int):
                 'meta': {
                     'computation': {
                         'cmd': cmd,
+                        'git_deps': dict(git_deps),
                     }
                 },
             }
