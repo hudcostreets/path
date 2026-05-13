@@ -106,12 +106,31 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
 
   const [fromYm, setFromYm] = useState<string>('')
   const [toYm, setToYm] = useState<string>('')
-  const [hour, setHour] = useUrlState<number>('mh', hourParam)
+  // `mh` URL param holds the paused hour for shareable URLs. While the clock
+  // is animating we drive `liveHour` internally (no URL writes) so the param
+  // doesn't churn on every tick; pausing commits `liveHour` to the URL, and
+  // resuming play clears it. If a fresh load has `?mh=`, we start paused on
+  // that hour.
+  const [urlHour, setUrlHour] = useUrlState<number>('mh', hourParam)
+  const [liveHour, setLiveHour] = useState<number>(urlHour)
+  const hour = liveHour
+  const setHour = setLiveHour
   const [hoveredHour, setHoveredHour] = useState<number | null>(null)
   const effectiveHour = hoveredHour ?? hour
   const [shape, setShape] = useUrlState<Shape>('ms', shapeParam)
   const [animMs, setAnimMs] = useState<number>(400)
-  const [playing, setPlaying] = useState(true)
+  const [playing, setPlaying] = useState<boolean>(urlHour === ALL_HOURS)
+  // Mirror external URL edits → liveHour while paused. (Ignored during play
+  // so animation isn't disrupted by our own `setUrlHour(ALL_HOURS)` clear.)
+  useEffect(() => {
+    if (!playing) setLiveHour(urlHour)
+  }, [urlHour, playing])
+  // Play/pause transitions: clear `mh` on play, commit `liveHour` on pause.
+  useEffect(() => {
+    if (playing) setUrlHour(ALL_HOURS)
+    else setUrlHour(liveHour)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing])
   // Spacebar toggles play/pause when the map is on screen. Gated on
   // viewport visibility so it doesn't break page-scroll on the rest of
   // the page (the homepage has multiple plots above this one).
@@ -142,10 +161,7 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
   // "All hours" jumps to 12a so the first frame has a real hour.
   useEffect(() => {
     if (!playing) return
-    if (hourRef.current === ALL_HOURS) {
-      setHour(0)
-      return
-    }
+    if (hourRef.current === ALL_HOURS) setHour(0)
     const period = Math.max(animMs, 120)
     const id = setInterval(() => {
       const cur = hourRef.current
