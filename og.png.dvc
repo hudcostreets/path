@@ -1,6 +1,6 @@
 outs:
-- md5: 10ccd3d7be81c2bf00144c5b2ca79f95
-  size: 181035
+- md5: a14372c4e145abeeb0a3c9d5f97d78be
+  size: 179238
   hash: md5
   path: og.png
 meta:
