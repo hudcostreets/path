@@ -293,22 +293,6 @@ def _bt_latest_month() -> str | None:
         return None
 
 
-def _classify_updated_pdfs(staged: list[str]) -> dict[str, list[str]]:
-    """Classify staged PDF paths by source type."""
-    result: dict[str, list[str]] = {'path_monthly': [], 'path_hourly': [], 'bt': []}
-    for p in staged:
-        if not p.endswith('.pdf'):
-            continue
-        name = basename(p)
-        if 'traffic-e-zpass' in name:
-            result['bt'].append(p)
-        elif 'Hourly' in name or 'hourly' in name:
-            result['path_hourly'].append(p)
-        elif 'Monthly' in name:
-            result['path_monthly'].append(p)
-    return result
-
-
 def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> str:
     curr_label = _ym_label(curr_ym)
     prev_label = _ym_label(prev_ym)
@@ -453,8 +437,9 @@ def gha_update():
     md_link = _run_link_md(url)
 
     try:
-        # Snapshot `last_month()` BEFORE refresh so we can report
-        # "through YYYY-MM (was YYYY-MM)" in Slack + summary.
+        # Snapshot `last_month()` BEFORE refresh — PATH Monthly PDFs are
+        # git-tracked, so reading them now (pre-refresh) gives the previous
+        # month; `path-data refresh` then overwrites with the new content.
         prev_ym = _safe_last_month()
 
         err('=== path-data refresh ===')
@@ -473,6 +458,12 @@ def gha_update():
         # — `dvx run` will recompute whatever pull missed.
         err('=== dvx pull ===')
         run('dvx', 'pull', check=False)
+
+        # `_bt_latest_month()` reads `data/bt/traffic.pqt` which isn't git-tracked,
+        # so snapshot the "previous" BT month AFTER the pull (which hydrates the
+        # last-committed parquet) but BEFORE `dvx run` (which may re-parse from
+        # any new PDF).
+        prev_bt = _bt_latest_month()
 
         err('=== dvx run ===')
         dvc_targets = sorted(glob('data/*.dvc')) + sorted(glob('data/bt/*.dvc')) + sorted(glob('www/public/*.dvc'))
@@ -556,23 +547,30 @@ def gha_update():
         _append_summary(_summarize_new_data(updated_pdfs, prev_ym, curr_ym) + f'\n\n{md_link}\n')
         curr_label = _ym_label(curr_ym)
         prev_label = _ym_label(prev_ym)
+        curr_bt = _bt_latest_month()
 
-        # Classify what actually changed upstream
-        by_source = _classify_updated_pdfs(updated_pdfs)
+        # Compare parsed-data snapshots, not staged PDFs: a re-uploaded PDF
+        # with the same content can stage a new `.pdf.dvc` (new etag/mtime)
+        # without producing any new parsed rows.
         new_path = bool(curr_label and prev_label and prev_label != curr_label)
-        new_bt = bool(by_source['bt'])
-        prev_bt = _bt_latest_month()  # already reflects new data if parsed
+        new_bt = bool(curr_bt and curr_bt != prev_bt)
 
         if new_path or new_bt:
             # At least one source has genuinely new upstream data
             parts = []
             if new_path:
                 parts.append(f"PATH through {curr_label} (was {prev_label})")
-            if new_bt and prev_bt:
-                parts.append(f"B&T through {prev_bt}")
+            if new_bt:
+                if prev_bt:
+                    parts.append(f"B&T through {curr_bt} (was {prev_bt})")
+                else:
+                    parts.append(f"B&T through {curr_bt}")
             headline = ":white_check_mark: *New data:* " + ", ".join(parts) + " — published and deployed"
+            # Link to /bt when only BT changed; otherwise the headline page.
+            site_path = '/bt' if new_bt and not new_path else '/'
+            site_url = 'https://path.hudcostreets.org' + site_path
             _slack(
-                f"{headline}\n{slack_link} · <https://path.hudcostreets.org|View site>",
+                f"{headline}\n{slack_link} · <{site_url}|View site>",
                 emoji=':white_check_mark:',
             )
         else:
