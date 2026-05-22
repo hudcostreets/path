@@ -112,6 +112,33 @@ def ensure_year_pipeline(year: int):
         run('git', 'add', *files_created)
 
 
+def ensure_bt_year(year: int):
+    """Declare a newly-imported B&T PDF as a `git_dep` of the parse-BT stages.
+
+    `parse_bt.py` auto-discovers every `traffic-e-zpass-usage-*.pdf`, but
+    `dvx run` only re-runs the stage when a *declared* dep changes. Without
+    this, a new year's PDF is invisible to dvx and `data/bt/{traffic,ezpass}.pqt`
+    are treated as eternally up-to-date (the 2026 B&T bug). Value left null;
+    dvx populates the real blob SHA on first run."""
+    pdf_dep = f'data/traffic-e-zpass-usage-{year}.pdf'
+    files_changed = []
+    for dvc_path in ('data/bt/traffic.pqt.dvc', 'data/bt/ezpass.pqt.dvc'):
+        if not exists(dvc_path):
+            continue
+        with open(dvc_path) as f:
+            dvc_data = yaml.safe_load(f)
+        git_deps = dvc_data.get('meta', {}).get('computation', {}).get('git_deps')
+        if git_deps is None or pdf_dep in git_deps:
+            continue
+        err(f'\tadding {pdf_dep} to {dvc_path} git_deps')
+        git_deps[pdf_dep] = None
+        with open(dvc_path, 'w') as f:
+            yaml.dump(dvc_data, f, default_flow_style=False, sort_keys=False)
+        files_changed.append(dvc_path)
+    if files_changed:
+        run('git', 'add', *files_changed)
+
+
 @path_data.command
 @commit_opt
 @option('-y', '--year', type=int, help='Year to update PATH data PDFs for')
@@ -143,7 +170,10 @@ def refresh(commit: int, year: int | None):
     err('=== Bridge & Tunnel PDFs ===')
     for bt_year in years:
         bt_name = f'traffic-e-zpass-usage-{bt_year}.pdf'
+        bt_is_new = not exists(f'data/{bt_name}.dvc')
         update_pdf(bt_name, base_url=BT_BASE_URL)
+        if bt_is_new and exists(f'data/{bt_name}'):
+            ensure_bt_year(bt_year)
 
     # Create pipeline stages for any newly imported years
     for y in new_years:

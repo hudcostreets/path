@@ -92,11 +92,27 @@ def parse_pdf(path: Path) -> tuple[list[dict], list[dict]]:
         raise ValueError(f"Could not parse year from title: {lines[0]!r}")
     year = int(year_match.group(1))
 
-    # Determine how many months are present from header
+    # The header lists all 12 months + "Year-to-Date" regardless of how
+    # many months actually have data, so it can't tell us the real column
+    # count. Each data row holds `<months-present>` monthly values followed
+    # by a Year-to-Date total; derive the month count from the canonical
+    # "All Crossings / Total Vehicles" row (always present, fully populated).
     header_line = next(l for l in lines if l.startswith("(Eastbound Traffic)"))
-    header_parts = header_line.split()
-    month_cols = [part for part in header_parts if part in MONTHS]
-    n_months = len(month_cols)
+    all_months = [p for p in header_line.split() if p in MONTHS]
+
+    n_months: int | None = None
+    probe_crossing: str | None = None
+    for line in lines:
+        line = line.strip()
+        if line in CROSSINGS:
+            probe_crossing = line
+        elif probe_crossing == "All Crossings" and line.startswith("Total Vehicles"):
+            vals = rejoin_split_numbers(line[len("Total Vehicles"):].split())
+            n_months = len(vals) - 1  # trailing value is the Year-to-Date total
+            break
+    if not n_months or not 1 <= n_months <= 12:
+        raise ValueError(f"{path}: could not determine month count (got {n_months})")
+    month_cols = all_months[:n_months]
 
     traffic_rows: list[dict] = []
     ezpass_rows: list[dict] = []
@@ -212,14 +228,25 @@ def validate(
 @click.command()
 @click.option('-d', '--data-dir', default='data', help='Directory containing PDF files')
 @click.option('-o', '--output-dir', default='data/bt', help='Output directory for parquet files')
-@click.option('-y', '--years', default='2011-2025', help='Year range (e.g. 2011-2025)')
-def main(data_dir: str, output_dir: str, years: str):
+@click.option('-y', '--years', default=None, help='Year range (e.g. "2011-2025"); default: every `traffic-e-zpass-usage-*.pdf` found in `--data-dir`')
+def main(data_dir: str, output_dir: str, years: str | None):
     data_path = Path(data_dir)
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    start, end = years.split("-")
-    year_range = range(int(start), int(end) + 1)
+    if years:
+        start, end = years.split("-")
+        year_range = list(range(int(start), int(end) + 1))
+    else:
+        # Discover every `traffic-e-zpass-usage-YYYY.pdf` present, so a new
+        # year's PDF is parsed automatically (no annual `--years` bump).
+        year_range = sorted(
+            int(m.group(1))
+            for p in data_path.glob("traffic-e-zpass-usage-*.pdf")
+            if (m := match(r"traffic-e-zpass-usage-(\d{4})\.pdf$", p.name))
+        )
+        if not year_range:
+            raise click.ClickException(f"No traffic-e-zpass-usage-*.pdf in {data_dir}")
 
     all_traffic: list[dict] = []
     all_ezpass: list[dict] = []
