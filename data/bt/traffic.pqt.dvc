@@ -1,6 +1,6 @@
 outs:
-- md5: 991b9f1a8714a9b3a639bb26c9e6a3c2
-  size: 35283
+- md5: 00463af132e4320cf51ab50a1f4d273b
+  size: 35705
   hash: md5
   path: traffic.pqt
 meta:
@@ -23,4 +23,3 @@ meta:
       data/traffic-e-zpass-usage-2023.pdf: ba0af336366aa75d20d4a870f7a7f18858352384
       data/traffic-e-zpass-usage-2024.pdf: b0b498a1d96d887d57dde52d5038948fda3a7287
       data/traffic-e-zpass-usage-2025.pdf: 2fc9715a304b1921f99257f0465af70315c567d1
-      data/traffic-e-zpass-usage-2026.pdf: null
