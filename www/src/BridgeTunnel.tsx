@@ -263,7 +263,7 @@ function buildStackedByVehicle(rows: TrafficRow[], crossings: string[], types: s
     }).filter((d): d is Data => d !== null)
 }
 
-function buildVs2019Traces(rows: TrafficRow[], crossings: string[], types: string[], stackBy: StackBy): Data[] {
+function buildVs2019Traces(rows: TrafficRow[], crossings: string[], types: string[], stackBy: StackBy, baselineEnd: Date): Data[] {
   const filtered = filterRows(rows, crossings, types)
 
   if (stackBy === "vehicle") {
@@ -273,6 +273,7 @@ function buildVs2019Traces(rows: TrafficRow[], crossings: string[], types: strin
       r => r.type,
       VEHICLE_TYPE_ABBREV,
       VEHICLE_TYPE_COLORS,
+      baselineEnd,
     )
   }
   return buildVs2019ByDimension(
@@ -281,6 +282,7 @@ function buildVs2019Traces(rows: TrafficRow[], crossings: string[], types: strin
     r => r.crossing,
     CROSSING_ABBREV,
     CROSSING_COLORS,
+    baselineEnd,
   )
 }
 
@@ -290,6 +292,7 @@ function buildVs2019ByDimension(
   getDim: (r: TrafficRow) => string,
   abbrev: Record<string, string>,
   colors: Record<string, string>,
+  baselineEnd: Date,
 ): Data[] {
   const baseline = new Map<string, Map<string, number>>()
   for (const row of rows) {
@@ -344,7 +347,7 @@ function buildVs2019ByDimension(
 
   traces.push({
     name: "2019 baseline",
-    x: [new Date(2020, 0, 1), new Date(2025, 11, 1)],
+    x: [new Date(2020, 0, 1), baselineEnd],
     y: [1, 1],
     type: "scatter",
     mode: "lines",
@@ -489,11 +492,24 @@ function TrafficPlot({
 
     if (!allRows) return {}
     const isRecent = timeRange === "recent"
-    const allTimeRange = ['2011-01-01', '2026-01-01']
-    const recentRange = ['2019-12-01', '2026-01-01']
+    // Right edge = first of the month AFTER the latest data month, so the
+    // newest bar has visual room (was hardcoded `2026-01-01`, which cropped
+    // Jan/Feb '26 to a sliver/off-screen on initial render).
+    let maxY = 0, maxMi = -1
+    for (const r of allRows) {
+      if (r.count <= 0) continue
+      const mi = MONTH_ORDER[r.month] - 1
+      if (r.year > maxY || (r.year === maxY && mi > maxMi)) { maxY = r.year; maxMi = mi }
+    }
+    const rightEdge = maxMi >= 0
+      ? new Date(maxMi === 11 ? maxY + 1 : maxY, (maxMi + 1) % 12, 1)
+      : new Date(2026, 0, 1)
+    const allTimeRange: [Date, Date] = [new Date(2011, 0, 1), rightEdge]
+    const recentRange: [Date, Date] = [new Date(2019, 11, 1), rightEdge]
 
     if (isVs2019) {
-      const rawTraces = buildVs2019Traces(allRows, activeCrossings, activeTypes, stackBy)
+      // Baseline runs from 2020 to the latest data month (was clipped at Dec '25).
+      const rawTraces = buildVs2019Traces(allRows, activeCrossings, activeTypes, stackBy, rightEdge)
       // Opacity/fading is handled by usePinnedLegend's restyleFade (Plotly.restyle)
       const traces = rawTraces
       return {
@@ -819,11 +835,25 @@ export default function BridgeTunnel() {
   })
   const subtitle = btCrossingSubtitle(effective.crossings)
   const typeSuffix = btTypeSuffix(effective.types)
+  // Derive the data range from the parquet so the subtitle advances when
+  // a new month lands (was hardcoded "2011–2025" → stale 5 months after
+  // the Feb '26 data shipped).
+  const dataRange = useMemo(() => {
+    if (!allRows?.length) return null
+    const positive = allRows.filter(r => r.count > 0)
+    if (!positive.length) return null
+    const minYear = Math.min(...positive.map(r => r.year))
+    const maxYear = Math.max(...positive.map(r => r.year))
+    const lastMonthIdx = Math.max(
+      ...positive.filter(r => r.year === maxYear).map(r => MONTH_ORDER[r.month] - 1)
+    )
+    return `${minYear}–${MONTHS[lastMonthIdx]} ${maxYear}`
+  }, [allRows])
 
   return <>
     <h1>PANYNJ Bridge &amp; Tunnel Traffic</h1>
     <p style={{ color: "#888", marginTop: "-0.5em" }}>
-      Eastbound (tolled direction) vehicle counts, 2011–2025.{" "}
+      Eastbound (tolled direction) vehicle counts, {dataRange ?? "2011–present"}.{" "}
       <a href="/">← PATH ridership</a>
     </p>
     <TrafficPlot

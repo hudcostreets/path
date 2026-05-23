@@ -530,6 +530,13 @@ def gha_update():
         existing = [p for p in to_cache if exists(p)]
         if existing:
             run('dvx', 'add', '-f', *existing)
+            # `dvx add -f` rewrites each input's .dvc with the fresh md5/size.
+            # Re-stage so the commit captures those rewrites — otherwise
+            # `www/public/bt-{traffic,ezpass}.pqt.dvc` (which have no `cmd`,
+            # so `dvx run` doesn't touch them) stay at the pre-update md5
+            # and the FE's `dvcResolve('bt-traffic.pqt')` URL keeps pointing
+            # at the old parquet on S3.
+            run('git', 'add', 'data/', 'www/public/', 'img/')
         run('dvx', 'push')
 
         run('git', 'commit', '-m', 'Update PATH ridership data')
