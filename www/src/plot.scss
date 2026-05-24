@@ -449,3 +449,141 @@ html.clean {
   .bar-entry { bottom: 50%; background: #22c55e; }
   .bar-exit { top: 50%; background: #f97316; }
 }
+
+// `/bt` flow map — auto-fit grid of per-cluster Leaflet panes. Each pane
+// fits its own viewport so empty water between e.g. GWB and Outerbridge
+// doesn't dominate the layout. All panes share a single Leaflet zoom so
+// ribbon widths are directly comparable (see `BTFlowMap.tsx`).
+.bt-flow-map {
+  margin: 1.5em 0;
+}
+.bt-flow-map-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5em;
+  color: #818cf8;
+}
+:root[data-theme="light"] .bt-flow-map-title { color: #4f46e5; }
+.bt-flow-map-row {
+  // `auto-fit` collapses empty tracks so panes always fill the row, while
+  // `minmax(260px, 1fr)` makes them wrap to multiple rows on narrow screens.
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 6px;
+}
+.bt-flow-pane {
+  height: 240px;
+  // Leaflet wants explicit dimensions; the inner `.leaflet-container` fills.
+}
+.bt-flow-single {
+  width: 100%;
+  // Vertically drag-resizable; user height persists in sessionStorage. Cap
+  // matches the `MAX_HEIGHT` constant in `BTFlowMap.tsx`.
+  resize: vertical;
+  overflow: hidden;
+  min-height: 320px;
+  max-height: 1400px;
+  border-radius: 4px;
+}
+.bt-flow-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 0 0.5em;
+  font-size: 0.85rem;
+  color: #aaa;
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  input[type='range'] {
+    width: 110px;
+    accent-color: #818cf8;
+  }
+}
+.bt-flow-controls-value {
+  min-width: 2.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #ccc;
+}
+.bt-flow-controls-btn {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2a2a3e;
+  color: inherit;
+  cursor: pointer;
+  &:hover { border-color: #818cf8; }
+}
+// Edit-mode drag handles. The inner `<div>` wears the per-crossing color
+// (set via `--c` inline style) so the 6 path-groups read at a glance.
+.bt-edit-handle {
+  background: none;
+  border: none;
+  > div {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--c, #ffeb3b);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
+    cursor: grab;
+  }
+  > div:active { cursor: grabbing; }
+}
+:root[data-theme="light"] .bt-flow-controls {
+  color: #555;
+  .bt-flow-controls-value { color: #222; }
+  input[type='range'] { accent-color: #4f46e5; }
+}
+// Crossing-name labels rendered via Leaflet `L.divIcon`. `iconAnchor=[0,0]`
+// puts the marker's top-left at the lat/lng, so we translate the inner span
+// left/up to anchor the text's right-middle on the NJ-side path endpoint —
+// keeps the label clear of every ribbon (paths all run NJ→east/southeast).
+.bt-crossing-label {
+  background: none;
+  border: none;
+  pointer-events: none;
+  span {
+    display: inline-block;
+    position: relative;
+    transform: translate(calc(-100% - 6px), -50%);
+    font-size: 11px;
+    font-weight: 600;
+    color: #f0f0f0;
+    text-shadow:
+      0 0 2px rgba(0, 0, 0, 0.95),
+      0 0 4px rgba(0, 0, 0, 0.8),
+      1px 1px 2px rgba(0, 0, 0, 0.9);
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+}
+:root[data-theme="light"] .bt-crossing-label span {
+  color: #1a1a2e;
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 4px rgba(255, 255, 255, 0.8),
+    1px 1px 2px rgba(255, 255, 255, 0.9);
+}
+.bt-flow-map-attr {
+  margin: 0.5em 0 0;
+  font-size: 0.78em;
+  color: #6f6f88;
+  text-align: right;
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.18);
+    &:hover { text-decoration-color: currentColor; }
+  }
+}
+:root[data-theme="light"] .bt-flow-map-attr {
+  color: #888;
+  a { text-decoration-color: rgba(0, 0, 0, 0.2); }
+}
+

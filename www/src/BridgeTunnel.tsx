@@ -12,6 +12,7 @@ import { Plot, blendAvgColor, hovertemplate, hovertemplatePct, isDark, rollingAv
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 import type { StationGroup } from "./RidesPlot"
+import BTFlowMap from "./BTFlowMap"
 
 // --- Constants ---
 
@@ -922,6 +923,7 @@ export default function BridgeTunnel() {
       typeSuffix={typeSuffix}
       onActiveYearChange={setActiveYear}
     />
+    {allRows && <BTFlowMap rows={allRows} />}
     <div className="abp-footer">
       <p>
         Data from <a href="https://www.panynj.gov/bridges-tunnels/en/traffic---volume-information---b-t.html">PANYNJ</a> ·
