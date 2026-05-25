@@ -123,37 +123,6 @@ const vehicleTypesParam = codesParam<string>(
   },
 )
 
-// Per-dim legend-pin URL state, distinct from the dropdown filter (`c=`/`v=`):
-//   - Dropdown "Only X"      → `c=l`  (sticky filter; only chip `×` clears it)
-//   - Legend-click pin X     → `pc=l` (ephemeral; outside-click clears it)
-// Per-dim keys because crossing/vehicle abbrevs collide (`b` = Bayonne AND
-// Buses). When a pin is set it also narrows data in the cross-dim view (so
-// pinning Lincoln in BY CROSSING and switching to BY VEHICLE still shows
-// Lincoln's vehicle breakdown — the original [Image #93] behavior).
-const CROSSING_ABBREV_PAIRS: [string, string][] = [
-  ["George Washington Bridge", "g"],
-  ["Lincoln Tunnel", "l"],
-  ["Holland Tunnel", "h"],
-  ["Goethals Bridge", "o"],
-  ["Outerbridge Crossing", "u"],
-  ["Bayonne Bridge", "b"],
-]
-const VEHICLE_ABBREV_PAIRS: [string, string][] = [
-  ["Automobiles", "a"],
-  ["Buses", "b"],
-  ["Trucks", "t"],
-]
-const crossingPinParam = {
-  encode: (v: string | null) => v ? CROSSING_ABBREV_PAIRS.find(([k]) => k === v)?.[1] : undefined,
-  decode: (s: string | undefined): string | null =>
-    s ? CROSSING_ABBREV_PAIRS.find(([, c]) => c === s)?.[0] ?? null : null,
-}
-const vehiclePinParam = {
-  encode: (v: string | null) => v ? VEHICLE_ABBREV_PAIRS.find(([k]) => k === v)?.[1] : undefined,
-  decode: (s: string | undefined): string | null =>
-    s ? VEHICLE_ABBREV_PAIRS.find(([, c]) => c === s)?.[0] ?? null : null,
-}
-
 // --- Data hooks ---
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -220,6 +189,26 @@ function useEZPassData() {
 
 function filterRows(rows: TrafficRow[], crossings: string[], types: string[]): TrafficRow[] {
   return rows.filter(r => crossings.includes(r.crossing) && types.includes(r.type))
+}
+
+// Hide non-selected same-dim traces via `visible: 'legendonly'` — bars
+// disappear from the chart but LIs stay in the legend (so the legend doesn't
+// reflow on every selection change). `showlegend: false` traces (like the
+// vs2019 baseline) are passed through unchanged.
+function bakeSameDimVisibility<T extends Data>(
+  traces: T[],
+  selected: string[],
+  all: readonly string[],
+  abbrev: Record<string, string>,
+): T[] {
+  if (selected.length === 0 || selected.length === all.length) return traces
+  const selectedAbbrevs = new Set(selected.map(s => abbrev[s]))
+  return traces.map(t => {
+    if ((t as any).showlegend === false) return t
+    const tname = (t as any).name as string
+    if (selectedAbbrevs.has(tname)) return t
+    return { ...t, visible: 'legendonly' as const }
+  })
 }
 
 
@@ -429,8 +418,6 @@ function TrafficPlot({
   allRows,
   selectedCrossings, setSelectedCrossings,
   selectedTypes, setSelectedTypes,
-  crossingPin, setCrossingPin,
-  vehiclePin, setVehiclePin,
   activeYear,
   subtitleNode,
   onEffectiveChange,
@@ -438,8 +425,6 @@ function TrafficPlot({
   allRows: TrafficRow[] | null | undefined
   selectedCrossings: string[], setSelectedCrossings: (v: string[]) => void
   selectedTypes: string[], setSelectedTypes: (v: string[]) => void
-  crossingPin: string | null, setCrossingPin: (v: string | null) => void
-  vehiclePin: string | null, setVehiclePin: (v: string | null) => void
   activeYear: string | null
   subtitleNode: React.ReactNode
   onEffectiveChange?: (eff: { crossings: string[], types: string[] }) => void
@@ -461,7 +446,8 @@ function TrafficPlot({
     [stackBy],
   )
 
-  // Dropdown-only "selected or all" — for the dropdown's `selected` display.
+  // `selected` is the URL-bound canonical state for each dim; `active` is
+  // "what to actually use" (falls back to all when nothing is selected).
   const activeCrossings = useMemo(() =>
     selectedCrossings.length > 0 ? selectedCrossings : [...CROSSINGS],
     [selectedCrossings])
@@ -469,46 +455,41 @@ function TrafficPlot({
     selectedTypes.length > 0 ? selectedTypes : [...VEHICLE_TYPES],
     [selectedTypes])
 
-  // Narrowing = pin (ephemeral, takes precedence) || dropdown filter (sticky).
-  // Used for (a) cross-dim data filter, (b) secondary plot brushing, (c) the
-  // chip's display string. Same-dim data filter is the dropdown only — the
-  // pin shows as a soft-solo via pltly's `soloTrace` instead.
-  const narrowedCrossings = useMemo(() =>
-    crossingPin ? [crossingPin] : activeCrossings,
-    [crossingPin, activeCrossings])
-  const narrowedTypes = useMemo(() =>
-    vehiclePin ? [vehiclePin] : activeTypes,
-    [vehiclePin, activeTypes])
-
-  // Stack-by-aware data filter.
-  // - Same-dim: only the dropdown filter applies at the data layer
-  //   (pin is visual via `soloTrace` — data still has all dropdown-selected
-  //   traces so non-pinned ones can be shown as `visible: 'legendonly'`).
-  // - Cross-dim: pin OR dropdown filter narrows the data — pinning Lincoln
-  //   and switching to BY VEHICLE shows Lincoln's vehicle breakdown.
+  // Stack-by-aware trace builder inputs:
+  // - Same-dim: build traces for ALL items (visibility narrowing is then
+  //   applied per-trace via `visible: 'legendonly'` below — so non-selected
+  //   stay in the legend, just no bars).
+  // - Cross-dim: filter data to selected items — pinning Lincoln and
+  //   switching to BY VEHICLE shows Lincoln's vehicle breakdown.
   const dataCrossings = useMemo(() =>
-    stackBy === "vehicle" ? narrowedCrossings : activeCrossings,
-    [stackBy, narrowedCrossings, activeCrossings])
+    stackBy === "vehicle" ? activeCrossings : [...CROSSINGS],
+    [stackBy, activeCrossings])
   const dataTypes = useMemo(() =>
-    stackBy === "crossing" ? narrowedTypes : activeTypes,
-    [stackBy, narrowedTypes, activeTypes])
+    stackBy === "crossing" ? activeTypes : [...VEHICLE_TYPES],
+    [stackBy, activeTypes])
 
   const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
 
   useEffect(() => {
-    onEffectiveChange?.({ crossings: narrowedCrossings, types: narrowedTypes })
-  }, [narrowedCrossings, narrowedTypes, onEffectiveChange])
+    onEffectiveChange?.({ crossings: activeCrossings, types: activeTypes })
+  }, [activeCrossings, activeTypes, onEffectiveChange])
 
-  // Controlled `soloTrace` for pltly. In SOLO mode this is the per-dim PIN
-  // (`crossingPin` / `vehiclePin`) — pltly soft-solos the pinned trace via
-  // `visible: 'legendonly'` on the others. Dropdown "Only X" is a real data
-  // filter (handled in `dataCrossings`/`dataTypes`); it doesn't drive
-  // `soloTrace` because dropdown-narrowed data has no other traces to solo.
+  // SOLO mode: drive pltly's solo from selectedCrossings when narrowed to
+  //   one item (legend-click and dropdown "Only" produce the same state).
+  //   For 2+ selected, we don't use pltly's solo — visibility is baked at
+  //   the data layer below.
+  // HIGHLIGHT mode: pltly's solo follows transient activeTraceName.
   const soloTrace = useMemo<string | null>(() => {
     if (legendMode === "highlight") return activeTraceName
-    if (stackBy === "crossing") return crossingPin ? CROSSING_ABBREV[crossingPin] ?? null : null
-    return vehiclePin ? VEHICLE_TYPE_ABBREV[vehiclePin] ?? null : null
-  }, [legendMode, stackBy, crossingPin, vehiclePin, activeTraceName])
+    if (stackBy === "crossing") {
+      return selectedCrossings.length === 1
+        ? CROSSING_ABBREV[selectedCrossings[0]] ?? null
+        : null
+    }
+    return selectedTypes.length === 1
+      ? VEHICLE_TYPE_ABBREV[selectedTypes[0]] ?? null
+      : null
+  }, [legendMode, stackBy, selectedCrossings, selectedTypes, activeTraceName])
 
   const handleSoloTraceChange = useCallback((name: string | null) => {
     if (legendMode === "highlight") {
@@ -516,32 +497,31 @@ function TrafficPlot({
       return
     }
     setActiveTraceName(null)
+    // SOLO mode: legend-click writes to selectedCrossings/Types — same URL
+    // state as dropdown "Only X" / dropdown checkbox. Re-clicking the
+    // currently-solo'd LI clears the narrowing (pltly emits `null`).
     if (name === null) {
-      // Background unpin: clear PINS only (ephemeral). Dropdown filter
-      // (`selectedCrossings` / `selectedTypes`) is sticky — chip `×` or the
-      // dropdown UI is needed to clear that.
-      setCrossingPin(null)
-      setVehiclePin(null)
+      if (stackBy === "crossing") setSelectedCrossings([...CROSSINGS])
+      else setSelectedTypes([...VEHICLE_TYPES])
       return
     }
-    // Pin gesture: write to the current-stacked dim's pin (NOT the dropdown
-    // filter). Don't touch the other-dim's pin — it's already acting as a
-    // cross-dim data filter (e.g. user pinned Lincoln in BY CROSSING, then
-    // switched to BY VEHICLE and pinned Autos; both pins should live so the
-    // view is Lincoln's vehicle breakdown with Autos soft-solo'd).
     if (stackBy === "crossing") {
       const full = ABBREV_TO_CROSSING[name]
-      if (full) setCrossingPin(full)
+      if (full) setSelectedCrossings([full])
     } else {
       const full = ABBREV_TO_TYPE[name]
-      if (full) setVehiclePin(full)
+      if (full) setSelectedTypes([full])
     }
-  }, [legendMode, stackBy, setCrossingPin, setVehiclePin])
+  }, [legendMode, stackBy, setSelectedCrossings, setSelectedTypes])
 
   const plotProps = useMemo(() => {
     if (isEZPass) {
       if (!ezpassRows) return {}
-      const traces = buildEZPassTraces(ezpassRows, activeCrossings)
+      // Build traces for ALL crossings; narrowing applied via `legendonly`
+      // so non-selected crossings stay in the legend (consistent with bar
+      // modes; LIs don't reflow on selection change).
+      const rawTraces = buildEZPassTraces(ezpassRows, [...CROSSINGS])
+      const traces = bakeSameDimVisibility(rawTraces, activeCrossings, CROSSINGS, CROSSING_ABBREV)
       return {
         data: traces,
         layout: {
@@ -571,8 +551,9 @@ function TrafficPlot({
     if (isVs2019) {
       // Baseline runs from 2020 to the latest data month (was clipped at Dec '25).
       const rawTraces = buildVs2019Traces(allRows, dataCrossings, dataTypes, stackBy, rightEdge)
-      // Opacity/fading is handled by usePinnedLegend's restyleFade (Plotly.restyle)
-      const traces = rawTraces
+      const traces = stackBy === "crossing"
+        ? bakeSameDimVisibility(rawTraces, activeCrossings, CROSSINGS, CROSSING_ABBREV)
+        : bakeSameDimVisibility(rawTraces, activeTypes, VEHICLE_TYPES, VEHICLE_TYPE_ABBREV)
       return {
         data: traces,
         layout: {
@@ -587,27 +568,32 @@ function TrafficPlot({
       }
     }
 
-    // Traffic mode — `dataCrossings`/`dataTypes` apply the dropdown filter
-    // ONLY for the cross-dim (so e.g. pinning Lincoln + switching to BY
-    // VEHICLE shows Lincoln's vehicle breakdown). In same-dim, all items
-    // are passed so pltly's `soloMode: 'hide'` can mark non-selected as
-    // `visible: 'legendonly'` (others stay clickable in the legend).
+    // Traffic mode — `dataCrossings`/`dataTypes` filter only the cross-dim
+    // (same-dim gets all items so non-selected stay in the legend as
+    // `visible: 'legendonly'` from `bakeSameDimVisibility`). Pinning Lincoln
+    // in BY CROSSING + switching to BY VEHICLE still shows Lincoln's vehicle
+    // breakdown via the cross-dim filter.
     const rawTraces = stackBy === "vehicle"
       ? buildStackedByVehicle(allRows, dataCrossings, dataTypes)
       : buildStackedByCrossing(allRows, dataCrossings, dataTypes)
+    const bakedTraces = stackBy === "crossing"
+      ? bakeSameDimVisibility(rawTraces, activeCrossings, CROSSINGS, CROSSING_ABBREV)
+      : bakeSameDimVisibility(rawTraces, activeTypes, VEHICLE_TYPES, VEHICLE_TYPE_ABBREV)
 
-    // Compute stack max so we can pin y-axis range (prevents autorange shifts
-    // when the linked avg line changes to a per-trace value).
-    const nPoints = rawTraces.length > 0 ? ((rawTraces[0] as any).y as number[]).length : 0
+    // Compute stack max from VISIBLE traces only — narrowing should refit
+    // the y-axis to the displayed data (otherwise a sole Lincoln bar in BY
+    // CROSSING looks tiny against the all-crossings stack max).
+    const visibleTraces = bakedTraces.filter(t => (t as any).visible !== 'legendonly')
+    const nPoints = visibleTraces.length > 0 ? ((visibleTraces[0] as any).y as number[]).length : 0
     let stackMax = 0
     for (let i = 0; i < nPoints; i++) {
       let sum = 0
-      for (const t of rawTraces) sum += ((t as any).y as number[])[i] ?? 0
+      for (const t of visibleTraces) sum += ((t as any).y as number[])[i] ?? 0
       if (sum > stackMax) stackMax = sum
     }
 
     const yearNum = activeYear ? parseInt(activeYear) : null
-    const traces = rawTraces.map(trace => {
+    const traces = bakedTraces.map(trace => {
       const dates = (trace as any).x as Date[]
       const yearOpacity = yearNum
         ? dates.map(d => d.getFullYear() === yearNum ? 1 : 0.15)
@@ -638,7 +624,7 @@ function TrafficPlot({
         legend: { entrywidth: 80, traceorder: "reversed" } as Partial<Legend>,
       } as Partial<Layout>,
     }
-  }, [allRows, ezpassRows, mode, stackBy, timeRange, activeCrossings, dataCrossings, dataTypes, isEZPass, isVs2019, activeYear, stackedNameMap, legendMode])
+  }, [allRows, ezpassRows, mode, stackBy, timeRange, activeCrossings, activeTypes, dataCrossings, dataTypes, isEZPass, isVs2019, activeYear, stackedNameMap, legendMode])
 
   const colors = stackBy === "crossing" ? CROSSING_COLORS : VEHICLE_TYPE_COLORS
   const buildLinkedTraces = useCallback((active: Data | null, all: Data[]): Data[] => {
@@ -689,9 +675,10 @@ function TrafficPlot({
         linkedTraces={buildLinkedTraces}
         soloTrace={soloTrace}
         onSoloTraceChange={handleSoloTraceChange}
+        disableSoloDismiss
         {...plotProps as any}
       />
-      <div className="plot-toggles" data-pltly-keep-pin>
+      <div className="plot-toggles">
         <ToggleButtonGroup
           value={mode}
           exclusive
@@ -877,12 +864,6 @@ export default function BridgeTunnel() {
   const [urlCrossings, setUrlCrossings] = useUrlState<string[]>("c", crossingsParam)
   const [urlTypes, setUrlTypes] = useUrlState<string[]>("v", vehicleTypesParam)
   // Per-dim legend-pin URL state. Coexists with `c=`/`v=`: dropdown writes to
-  // filter (sticky), legend click writes to pin (ephemeral, outside-click
-  // clears). Pin also narrows data in the cross-dim view, so pinning Lincoln
-  // in BY CROSSING and switching to BY VEHICLE shows Lincoln's vehicle
-  // breakdown — original [Image #93] behavior, plus ephemeral clearing.
-  const [crossingPin, setCrossingPin] = useUrlState<string | null>("pc", crossingPinParam)
-  const [vehiclePin, setVehiclePin] = useUrlState<string | null>("pv", vehiclePinParam)
   // Immediate local state; URL syncs on debounce
   const [selectedCrossings, setSelectedCrossingsRaw] = useState<string[]>(urlCrossings)
   const [selectedTypes, setSelectedTypesRaw] = useState<string[]>(urlTypes)
@@ -906,18 +887,15 @@ export default function BridgeTunnel() {
   const subtitle = btCrossingSubtitle(effective.crossings)
   const typeSuffix = btTypeSuffix(effective.types)
 
-  // Chip-style subtitle node, shared between TrafficPlot and BTMonthlyPlot so
-  // both surfaces show the same narrowing UI (was: TrafficPlot had chips,
-  // BTMonthlyPlot had a plain-text subtitle + `— Autos` title suffix). The
-  // `×` button clears both the dropdown filter (sticky) and the pin
-  // (ephemeral) for that dim, returning to "all visible, no narrowing".
+  // Chip-style subtitle, shared between TrafficPlot and BTMonthlyPlot so both
+  // surfaces show the same narrowing UI. `×` clears that dim's selection.
   const subtitleNode: React.ReactNode = useMemo(() => {
     const badges: React.ReactNode[] = []
     if (subtitle) {
       badges.push(
         <span key="crossings" className="filter-badge">
           {subtitle}
-          <span className="clear-filter" onClick={() => { setCrossingPin(null); setSelectedCrossings([...CROSSINGS]) }}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedCrossings([...CROSSINGS])}>&times;</span>
         </span>
       )
     }
@@ -925,13 +903,13 @@ export default function BridgeTunnel() {
       badges.push(
         <span key="types" className="filter-badge">
           {typeSuffix}
-          <span className="clear-filter" onClick={() => { setVehiclePin(null); setSelectedTypes([...VEHICLE_TYPES]) }}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedTypes([...VEHICLE_TYPES])}>&times;</span>
         </span>
       )
     }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [subtitle, typeSuffix, setSelectedCrossings, setSelectedTypes, setCrossingPin, setVehiclePin])
+  }, [subtitle, typeSuffix, setSelectedCrossings, setSelectedTypes])
   // Derive the data range from the parquet so the subtitle advances when
   // a new month lands (was hardcoded "2011–2025" → stale 5 months after
   // the Feb '26 data shipped).
@@ -957,8 +935,6 @@ export default function BridgeTunnel() {
       allRows={allRows}
       selectedCrossings={selectedCrossings} setSelectedCrossings={setSelectedCrossings}
       selectedTypes={selectedTypes} setSelectedTypes={setSelectedTypes}
-      crossingPin={crossingPin} setCrossingPin={setCrossingPin}
-      vehiclePin={vehiclePin} setVehiclePin={setVehiclePin}
       activeYear={activeYear}
       subtitleNode={subtitleNode}
       onEffectiveChange={setEffective}

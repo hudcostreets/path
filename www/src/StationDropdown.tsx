@@ -147,19 +147,6 @@ export function StationDropdown({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [isOpen])
 
-  // While the dropdown is open, suppress pltly's outside-click reset of any
-  // soloed legend item — otherwise the click that closes the dropdown also
-  // unpins the chart. `data-pltly-keep-pin` on `<body>` is found via
-  // `closest()` from every click target, so pltly's reset bails for the
-  // duration. Cleared on close. (The dropdown's outside-click handler above
-  // does its own close logic; this is purely to prevent the bubble from
-  // reaching pltly's separate document-level listener.)
-  useEffect(() => {
-    if (!isOpen) return
-    document.body.setAttribute('data-pltly-keep-pin', '')
-    return () => { document.body.removeAttribute('data-pltly-keep-pin') }
-  }, [isOpen])
-
   return (
     <details
       ref={detailsRef}
