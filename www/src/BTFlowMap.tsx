@@ -3,7 +3,7 @@ import L from 'leaflet'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUrlState } from 'use-prms'
 import {
-  ribbonArrow, offsetPath, pxToHalfDeg, pxToDeg,
+  ribbonArrow, offsetPath, pxToHalfDeg, pxToDeg, smoothPath,
   type LatLon,
 } from 'geo-sankey'
 import { useDark } from './plot-utils'
@@ -121,7 +121,12 @@ function buildRibbonFeatures(
   for (const crossing of crossings) {
     const baseRaw = paths[crossing]
     if (!baseRaw) continue
-    const basePath = scalePath(baseRaw, bodyLen)
+    // Catmull-Rom spline through the 3 user-defined waypoints, then resample
+    // densely so `ribbonArrow` produces a smooth curve (instead of the harsh
+    // mid-path elbow of a 3-point polyline). Edit-mode handles remain at the
+    // original waypoints — they're the spline knots, so the curve passes
+    // through each handle exactly.
+    const basePath = smoothPath(scalePath(baseRaw, bodyLen), 12).path
     const widths = VEHICLE_TYPES.map(t => widthOf(volumes.get(`${crossing}|${t}`) ?? 0))
     // Stack offsets perpendicular to the flow.
     const totalW = widths.reduce((a, b) => a + b, 0)
@@ -221,10 +226,10 @@ interface ControlsProps {
 function MapControls(p: ControlsProps) {
   return (
     <div className="bt-flow-controls">
-      <label title="Multiplier on ribbon widths (1× = default).">
+      <label title="Multiplier on ribbon widths.">
         <span>Width</span>
         <input
-          type="range" min={0.2} max={3} step={0.1}
+          type="range" min={0.2} max={WIDTH_SCALE_MAX} step={0.1}
           value={p.widthScale}
           onChange={e => p.setWidthScale(parseFloat(e.target.value))}
         />
@@ -233,14 +238,14 @@ function MapControls(p: ControlsProps) {
       <label title="Stretches the ribbon body backwards from the NY-side destination; NY-end held fixed.">
         <span>Length</span>
         <input
-          type="range" min={0.5} max={4} step={0.1}
+          type="range" min={0.5} max={BODY_LEN_MAX} step={0.1}
           value={p.bodyLen}
           onChange={e => p.setBodyLen(parseFloat(e.target.value))}
           disabled={p.edit}
         />
         <span className="bt-flow-controls-value">{p.bodyLen.toFixed(1)}×</span>
       </label>
-      <label title="Edit mode: drag the per-waypoint handles to reposition each crossing's path. Body-length scaling is suspended so you're editing the actual coords.">
+      <label title="Edit mode: drag the per-waypoint handles to reposition each crossing's path. The Length slider is locked while editing — dragend inverse-scales drops back to 1× coords so the JSON export round-trips cleanly.">
         <input
           type="checkbox"
           checked={p.edit}
@@ -266,17 +271,48 @@ function MapControls(p: ControlsProps) {
 // Default export: single tall map covering the full BT bbox.
 // =============================================================================
 
+const DEFAULT_WIDTH_SCALE = 2
+const DEFAULT_BODY_LEN = 4
+const WIDTH_SCALE_MAX = 4
+const BODY_LEN_MAX = 10
 const widthScaleParam = {
-  encode: (v: number) => v === 1 ? undefined : v.toFixed(1),
-  decode: (s: string | undefined) => s !== undefined ? parseFloat(s) : 1,
+  encode: (v: number) => v === DEFAULT_WIDTH_SCALE ? undefined : v.toFixed(1),
+  decode: (s: string | undefined) => s !== undefined ? parseFloat(s) : DEFAULT_WIDTH_SCALE,
 }
 const bodyLenParam = {
-  encode: (v: number) => v === 1 ? undefined : v.toFixed(1),
-  decode: (s: string | undefined) => s !== undefined ? parseFloat(s) : 1,
+  encode: (v: number) => v === DEFAULT_BODY_LEN ? undefined : v.toFixed(1),
+  decode: (s: string | undefined) => s !== undefined ? parseFloat(s) : DEFAULT_BODY_LEN,
 }
 const editParam = {
   encode: (v: boolean) => v ? '1' : undefined,
   decode: (s: string | undefined) => s === '1',
+}
+
+// `llz=<lat><lon><zoom>` with sign-separator encoding (matches the
+// convention in sibling crash-map / household-vehicles apps). Lon's leading
+// `-` (or `+` if positive) and zoom's leading `+` are the delimiters, so
+// e.g. `40.7345-74.0843+10.50` parses cleanly with the regex below.
+type LLZ = { lat: number, lon: number, zoom: number }
+// Chosen at the typical desktop viewport so all 6 crossings fit comfortably
+// at an INTEGER zoom level (no fractional-zoom tile gridline artifacts on
+// CARTO dark tiles). Update if a better view-of-record gets chosen.
+const DEFAULT_LLZ: LLZ = { lat: 40.7171, lon: -74.1570, zoom: 11 }
+const llzParam = {
+  encode: (v: LLZ | null) => {
+    if (!v) return undefined
+    const lonSign = v.lon < 0 ? '' : '+'
+    return `${v.lat.toFixed(4)}${lonSign}${v.lon.toFixed(4)}+${v.zoom.toFixed(2)}`
+  },
+  decode: (s: string | undefined): LLZ | null => {
+    if (!s) return null
+    const parts = s.match(/[+-]?\d+(?:\.\d+)?/g)
+    if (!parts || parts.length < 3) return null
+    const lat = parseFloat(parts[0])
+    const lon = parseFloat(parts[1])
+    const zoom = parseFloat(parts[2])
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(zoom)) return null
+    return { lat, lon, zoom }
+  },
 }
 
 const PATHS_EDIT_KEY = 'bt-flow-paths-edit'
@@ -300,11 +336,17 @@ function formatPathsForExport(paths: Record<string, LatLon[]>): string {
  *  rendered ribbon; on drag we inverse-scale back to the underlying coord
  *  before updating state, so the JSON export round-trips cleanly regardless
  *  of the current `bodyLen`. The 3 sub-ribbons per crossing share one path,
- *  so dragging any waypoint rotates the whole group. */
+ *  so dragging any waypoint rotates the whole group.
+ *
+ *  Dragging the NY-end (last) handle preserves the other waypoints' VISIBLE
+ *  positions by compensating their stored coords for the moved end —
+ *  otherwise scalePath would re-stretch them from the new end at `bodyLen`
+ *  and they'd jump by (1 - bodyLen)× the end's delta (e.g. at bodyLen=4,
+ *  a 1° end drag would jump the other handles 3° the *opposite* way). */
 function buildEditHandles(
   paths: Record<string, LatLon[]>,
   bodyLen: number,
-  onMove: (crossing: string, idx: number, latlon: LatLon) => void,
+  onPathChange: (crossing: string, path: LatLon[]) => void,
 ): L.LayerGroup {
   const group = L.layerGroup()
   const palette: Record<string, string> = {
@@ -318,7 +360,7 @@ function buildEditHandles(
   for (const [crossing, path] of Object.entries(paths)) {
     const color = palette[crossing] ?? '#ffeb3b'
     const scaled = scalePath(path, bodyLen)
-    const [endLat, endLon] = path[path.length - 1]
+    const endIdx = path.length - 1
     path.forEach((_, idx) => {
       const [vlat, vlon] = scaled[idx]
       const icon = L.divIcon({
@@ -335,13 +377,30 @@ function buildEditHandles(
       // Leaflet updates the icon position directly; ribbons snap on release.
       m.on('dragend', () => {
         const ll = m.getLatLng()
-        // NY-end handle (last index) is the pivot — its scaled position equals
-        // its stored position. Other waypoints' stored coord is inverse-scaled.
-        const stored: LatLon =
-          idx === path.length - 1 || bodyLen === 0
+        const [endLat, endLon] = path[endIdx]
+        if (idx === endIdx) {
+          // END drag: move the end + translate other points' STORED coords
+          // so their visible positions stay put under scalePath. Derivation:
+          //   visible_i = endOld + (stored_i - endOld) * k         (current)
+          //   visible_i = endNew + (stored_i_new - endNew) * k     (want)
+          // → stored_i_new = stored_i + (endNew - endOld) * (1 - 1/k)
+          const dLat = ll.lat - endLat
+          const dLon = ll.lng - endLon
+          const factor = bodyLen === 0 ? 0 : 1 - 1 / bodyLen
+          const next: LatLon[] = path.map((p, i) =>
+            i === endIdx
+              ? [ll.lat, ll.lng]
+              : [p[0] + dLat * factor, p[1] + dLon * factor] as LatLon
+          )
+          onPathChange(crossing, next)
+        } else {
+          // Non-end drag: inverse-scale the single dragged point.
+          const stored: LatLon = bodyLen === 0
             ? [ll.lat, ll.lng]
             : [endLat + (ll.lat - endLat) / bodyLen, endLon + (ll.lng - endLon) / bodyLen]
-        onMove(crossing, idx, stored)
+          const next: LatLon[] = path.map((p, i) => (i === idx ? stored : p))
+          onPathChange(crossing, next)
+        }
       })
       group.addLayer(m)
     })
@@ -361,6 +420,14 @@ export default function BTFlowMap({ rows }: Props) {
   const [widthScale, setWidthScale] = useUrlState<number>('ws', widthScaleParam)
   const [bodyLen, setBodyLen] = useUrlState<number>('blen', bodyLenParam)
   const [edit, setEdit] = useUrlState<boolean>('edit', editParam)
+  const [llz, setLlz] = useUrlState<LLZ | null>('llz', llzParam)
+  // Keep the latest setter in a ref so the init-once map effect doesn't need
+  // to re-run when use-prms hands back a new setter identity.
+  const setLlzRef = useRef(setLlz)
+  setLlzRef.current = setLlz
+  // Snapshot the URL-loaded llz for the init effect (so it's not re-read on
+  // subsequent renders, which would fight user pan/zoom).
+  const initialLlzRef = useRef(llz)
   const [height, setHeight] = useState<number>(() => {
     if (typeof sessionStorage === 'undefined') return defaultMapHeight()
     const stored = sessionStorage.getItem(MAP_HEIGHT_KEY)
@@ -397,12 +464,8 @@ export default function BTFlowMap({ rows }: Props) {
     else sessionStorage.setItem(PATHS_EDIT_KEY, JSON.stringify(paths))
   }, [paths])
 
-  const updatePoint = (crossing: string, idx: number, latlon: LatLon) => {
-    setPaths(prev => {
-      const next = { ...prev }
-      next[crossing] = next[crossing].map((p, i) => i === idx ? latlon : p)
-      return next
-    })
+  const updatePath = (crossing: string, path: LatLon[]) => {
+    setPaths(prev => ({ ...prev, [crossing]: path }))
   }
   const resetPaths = () => setPaths(structuredClone(BT_CROSSING_PATHS))
   const exportPaths = async () => {
@@ -417,9 +480,12 @@ export default function BTFlowMap({ rows }: Props) {
     }
   }
 
-  // Init map once. Pan/zoom enabled (drag + wheel + zoom buttons). fitBounds
-  // runs ONLY on initial mount; subsequent container resizes call
-  // `invalidateSize` so user pan/zoom isn't clobbered.
+  // Init map once. Pan/zoom enabled (drag + wheel + zoom buttons). If the
+  // URL had an `llz=` value, restore that view; otherwise use `DEFAULT_LLZ`
+  // (an integer-zoom view chosen to fit all crossings without tile gridline
+  // artifacts). Subsequent container resizes call `invalidateSize` so user
+  // pan/zoom isn't clobbered. Every user pan/zoom syncs the new view back
+  // to `llz=` so the URL is shareable + can drive new defaults.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
@@ -428,15 +494,24 @@ export default function BTFlowMap({ rows }: Props) {
       attributionControl: false,
       scrollWheelZoom: true,
     })
-    map.fitBounds(
-      [[BT_BBOX.minLat, BT_BBOX.minLon], [BT_BBOX.maxLat, BT_BBOX.maxLon]],
-      { padding: [24, 24] },
-    )
+    const initial = initialLlzRef.current ?? DEFAULT_LLZ
+    map.setView([initial.lat, initial.lon], initial.zoom)
     mapRef.current = map
     const ro = new ResizeObserver(() => map.invalidateSize())
     ro.observe(containerRef.current)
+    // Sync every moveend back to the URL. Skip the very first moveend (from
+    // the init setView/fitBounds above) so an auto-fit on a clean URL
+    // doesn't immediately bake the auto-chosen zoom into the URL.
+    let skipFirst = true
+    const onMoveEnd = () => {
+      if (skipFirst) { skipFirst = false; return }
+      const c = map.getCenter()
+      setLlzRef.current({ lat: c.lat, lon: c.lng, zoom: map.getZoom() })
+    }
+    map.on('moveend', onMoveEnd)
     return () => {
       ro.disconnect()
+      map.off('moveend', onMoveEnd)
       if (labelsRef.current) { labelsRef.current.remove(); labelsRef.current = null }
       map.remove()
       mapRef.current = null
@@ -458,7 +533,7 @@ export default function BTFlowMap({ rows }: Props) {
     const map = mapRef.current
     if (!map) return
     if (handlesRef.current) { handlesRef.current.remove(); handlesRef.current = null }
-    if (edit) handlesRef.current = buildEditHandles(paths, bodyLen, updatePoint).addTo(map)
+    if (edit) handlesRef.current = buildEditHandles(paths, bodyLen, updatePath).addTo(map)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit, paths, bodyLen])
 
@@ -492,6 +567,7 @@ export default function BTFlowMap({ rows }: Props) {
     <div className="bt-flow-map">
       <h2 className="bt-flow-map-title">
         Monthly traffic by crossing — {monthLabel}
+        <span className="bt-flow-map-dir"> · eastbound (NY-bound) only</span>
       </h2>
       <MapControls
         widthScale={widthScale}

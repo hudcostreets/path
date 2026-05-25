@@ -464,6 +464,11 @@ html.clean {
   color: #818cf8;
 }
 :root[data-theme="light"] .bt-flow-map-title { color: #4f46e5; }
+.bt-flow-map-dir {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #888;
+}
 .bt-flow-map-row {
   // `auto-fit` collapses empty tracks so panes always fill the row, while
   // `minmax(260px, 1fr)` makes them wrap to multiple rows on narrow screens.

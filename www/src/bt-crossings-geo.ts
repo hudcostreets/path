@@ -8,46 +8,46 @@ import type { LatLon } from 'geo-sankey'
 export const BT_CROSSING_PATHS: Record<string, LatLon[]> = {
   // Hudson River (NJ → Manhattan)
   'George Washington Bridge': [
-    [40.851, -73.974],  // NJ approach (Fort Lee)
-    [40.852, -73.957],  // mid-Hudson
-    [40.852, -73.946],  // NY (Washington Heights, 178th)
+    [40.8663, -73.9746],
+    [40.8580, -73.9578],
+    [40.8520, -73.9460],
   ],
   'Lincoln Tunnel': [
-    [40.766, -74.023],  // NJ portal (Weehawken)
-    [40.762, -74.011],  // mid-Hudson
-    [40.759, -73.999],  // NY portal (39th St / 10th Ave)
+    [40.7678, -74.0316],
+    [40.7645, -74.0126],
+    [40.7590, -73.9990],
   ],
   'Holland Tunnel': [
-    [40.729, -74.037],  // NJ portal (Jersey City, 14th St)
-    [40.727, -74.020],  // mid-Hudson
-    [40.726, -74.007],  // NY portal (Broome St / Hudson Sq)
+    [40.7305, -74.0473],
+    [40.7275, -74.0287],
+    [40.7260, -74.0070],
   ],
 
   // NJ → Staten Island (Arthur Kill / Kill Van Kull)
   'Bayonne Bridge': [
-    [40.642, -74.131],  // NJ approach (Bayonne)
-    [40.640, -74.137],  // mid-channel (Kill Van Kull)
-    [40.638, -74.143],  // SI side (Port Richmond)
+    [40.6394, -74.1322],
+    [40.6339, -74.1357],
+    [40.6257, -74.1405],
   ],
   'Goethals Bridge': [
-    [40.640, -74.196],  // NJ approach (Elizabeth)
-    [40.638, -74.187],  // mid-channel (Arthur Kill)
-    [40.636, -74.176],  // SI side (Howland Hook)
+    [40.6429, -74.2041],
+    [40.6372, -74.1929],
+    [40.6300, -74.1815],
   ],
   'Outerbridge Crossing': [
-    [40.521, -74.250],  // NJ approach (Perth Amboy)
-    [40.523, -74.246],  // mid-channel (Arthur Kill)
-    [40.525, -74.243],  // SI side (Tottenville)
+    [40.5198, -74.2607],
+    [40.5188, -74.2471],
+    [40.5193, -74.2317],
   ],
 } as const
 
 /** Bounding box of all crossings (lat min/max, lon min/max). Used for the
  *  initial map fit. */
 export const BT_BBOX = {
-  minLat: 40.521,
-  maxLat: 40.852,
-  minLon: -74.250,
-  maxLon: -73.946,
+  minLat: 40.5188,
+  maxLat: 40.8663,
+  minLon: -74.2607,
+  maxLon: -73.9460,
 }
 
 /** Short labels for on-map placement (saves horizontal room vs the full
