@@ -525,13 +525,16 @@ function TrafficPlot({
       return
     }
     // Pin gesture: write to the current-stacked dim's pin (NOT the dropdown
-    // filter). Cross-dim pin clears so the new pin is unambiguous.
+    // filter). Don't touch the other-dim's pin — it's already acting as a
+    // cross-dim data filter (e.g. user pinned Lincoln in BY CROSSING, then
+    // switched to BY VEHICLE and pinned Autos; both pins should live so the
+    // view is Lincoln's vehicle breakdown with Autos soft-solo'd).
     if (stackBy === "crossing") {
       const full = ABBREV_TO_CROSSING[name]
-      if (full) { setCrossingPin(full); setVehiclePin(null) }
+      if (full) setCrossingPin(full)
     } else {
       const full = ABBREV_TO_TYPE[name]
-      if (full) { setVehiclePin(full); setCrossingPin(null) }
+      if (full) setVehiclePin(full)
     }
   }, [legendMode, stackBy, setCrossingPin, setVehiclePin])
 
