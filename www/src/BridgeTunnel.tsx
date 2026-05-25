@@ -468,11 +468,34 @@ function TrafficPlot({
     stackBy === "crossing" ? activeTypes : [...VEHICLE_TYPES],
     [stackBy, activeTypes])
 
+  // Hover (transient, both modes) + HIGHLIGHT-mode click (sticky in
+  // HIGHLIGHT only). In SOLO mode, click writes URL via setSelectedCrossings
+  // — activeTraceName stays for hover only.
+  const [hoverTraceName, setHoverTraceName] = useState<string | null>(null)
   const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
 
+  // "Effective" narrowing for plot2 brushing + the subtitle badges: includes
+  // transient hover (so hovering Holland LI brushes plot2 to Holland) on top
+  // of the URL-bound `selectedCrossings`/`selectedTypes` filter.
+  const transientTraceName = hoverTraceName ?? activeTraceName
+  const effectiveCrossings = useMemo(() => {
+    if (transientTraceName && stackBy === "crossing") {
+      const full = ABBREV_TO_CROSSING[transientTraceName]
+      if (full) return [full]
+    }
+    return activeCrossings
+  }, [transientTraceName, stackBy, activeCrossings])
+  const effectiveTypes = useMemo(() => {
+    if (transientTraceName && stackBy === "vehicle") {
+      const full = ABBREV_TO_TYPE[transientTraceName]
+      if (full) return [full]
+    }
+    return activeTypes
+  }, [transientTraceName, stackBy, activeTypes])
+
   useEffect(() => {
-    onEffectiveChange?.({ crossings: activeCrossings, types: activeTypes })
-  }, [activeCrossings, activeTypes, onEffectiveChange])
+    onEffectiveChange?.({ crossings: effectiveCrossings, types: effectiveTypes })
+  }, [effectiveCrossings, effectiveTypes, onEffectiveChange])
 
   // SOLO mode: drive pltly's solo from selectedCrossings when narrowed to
   //   one item (legend-click and dropdown "Only" produce the same state).
@@ -675,6 +698,7 @@ function TrafficPlot({
         linkedTraces={buildLinkedTraces}
         soloTrace={soloTrace}
         onSoloTraceChange={handleSoloTraceChange}
+        onHoverTraceChange={setHoverTraceName}
         disableSoloDismiss
         {...plotProps as any}
       />
