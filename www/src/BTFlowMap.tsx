@@ -20,6 +20,17 @@ const VEHICLE_TYPE_COLORS: Record<string, string> = {
   Trucks:      '#00cc96',
 }
 
+// Per-crossing palette. Used by edit-mode drag handles AND by labels' pinned
+// border (so the click-pinned crossing's chip wears its own brand color).
+const CROSSING_PALETTE: Record<string, string> = {
+  'George Washington Bridge': '#636efa',
+  'Lincoln Tunnel': '#EF553B',
+  'Holland Tunnel': '#00cc96',
+  'Bayonne Bridge': '#19d3f3',
+  'Goethals Bridge': '#ab63fa',
+  'Outerbridge Crossing': '#FFA15A',
+}
+
 // Max ribbon width (Autos at the busiest crossing) in pixels at the rendered
 // zoom — before the user's `ws` multiplier. Sqrt scale keeps the smallest
 // flows ≥1px even after scaling.
@@ -56,6 +67,12 @@ interface Props {
   /** Chip-style narrowing badges, lifted from `BridgeTunnel` so the map
    *  shows the same `Lincoln × Autos ×` indicator as the plots above. */
   subtitleNode?: React.ReactNode
+  /** Hovered crossing (full name). Shared with `TrafficPlot` via the
+   *  `BridgeTunnel` parent — hovering a map ribbon brushes the bar chart
+   *  + by-month plot + chip; hovering a legend item highlights the map
+   *  ribbon. Bidirectional brushing. */
+  hoverCrossing?: string | null
+  setHoverCrossing?: (crossing: string | null) => void
 }
 
 interface FlowProps {
@@ -174,6 +191,7 @@ function buildRibbonFeatures(
 function ribbonGeoJSONLayer(
   features: GeoJSON.Feature<GeoJSON.Polygon, FlowProps>[],
   onCrossingClick?: (crossing: string) => void,
+  onCrossingHover?: (crossing: string | null) => void,
 ): L.GeoJSON {
   const fc: GeoJSON.FeatureCollection<GeoJSON.Polygon, FlowProps> = {
     type: 'FeatureCollection',
@@ -195,9 +213,49 @@ function ribbonGeoJSONLayer(
       if (onCrossingClick) {
         layer.on('click', () => onCrossingClick(p.crossing))
       }
+      if (onCrossingHover) {
+        layer.on('mouseover', () => onCrossingHover(p.crossing))
+        layer.on('mouseout', () => onCrossingHover(null))
+      }
     },
   })
   return geo
+}
+
+/** Apply fade to ribbon layers per the `emphasized` set. When `emphasized`
+ *  is null, no fade (all bright); otherwise the crossings in the set stay
+ *  at full opacity and the rest fade to a hint. Imperative + per-feature so
+ *  the parent geoJSON layer doesn't rebuild on every hover/pin change. */
+function applyRibbonFade(layer: L.GeoJSON, emphasized: Set<string> | null): void {
+  layer.eachLayer(l => {
+    const f = (l as L.GeoJSON & { feature?: GeoJSON.Feature<GeoJSON.Geometry, FlowProps> }).feature
+    if (!f) return
+    const isMatch = !emphasized || emphasized.has(f.properties.crossing)
+    ;(l as L.Path).setStyle({ fillOpacity: isMatch ? 0.85 : 0.18 })
+  })
+}
+
+/** Toggle the `bt-label-dim` (fade non-emphasized) and `bt-label-pinned`
+ *  (bolded border on the single click-pin) classes on each label marker.
+ *  The label group's iteration order matches the path-having subset of
+ *  `crossings` used to build it (see `crossingLabelsLayer`). */
+function applyLabelStyles(
+  group: L.LayerGroup,
+  crossings: string[],
+  paths: Record<string, LatLon[]>,
+  emphasized: Set<string> | null,
+  pinnedCrossing: string | null,
+): void {
+  const labeled = crossings.filter(c => paths[c])
+  let i = 0
+  group.eachLayer(l => {
+    const crossing = labeled[i++]
+    const el = (l as L.Marker).getElement()
+    if (!el) return
+    const dim = emphasized !== null && !emphasized.has(crossing)
+    el.classList.toggle('bt-label-dim', dim)
+    el.classList.toggle('bt-label-pinned', crossing === pinnedCrossing)
+  })
 }
 
 /** Format a vehicle count for the dst-end label. Three-digit precision
@@ -274,9 +332,12 @@ function crossingLabelsLayer(
     // translate3d(...)` inline on the outer marker element to put it at the
     // tip's lat/lng, so any `transform` on the OUTER class would override
     // Leaflet's positioning and pin the whole label to the map origin.
+    // Inline `--c` so `.bt-label-pinned` can style the border in this
+    // crossing's color without a per-crossing CSS rule.
+    const color = CROSSING_PALETTE[crossing] ?? '#fff'
     const icon = L.divIcon({
       className: `bt-crossing-label bt-label-side-${side}`,
-      html: `<div class="bt-label-inner">` +
+      html: `<div class="bt-label-inner" style="--c:${color}">` +
         `<div class="bt-label-name">${text}</div>${rows}` +
         `</div>`,
       iconSize: undefined as unknown as L.PointExpression,
@@ -446,16 +507,8 @@ function buildEditHandles(
   onPathChange: (crossing: string, path: LatLon[]) => void,
 ): L.LayerGroup {
   const group = L.layerGroup()
-  const palette: Record<string, string> = {
-    'George Washington Bridge': '#636efa',
-    'Lincoln Tunnel': '#EF553B',
-    'Holland Tunnel': '#00cc96',
-    'Bayonne Bridge': '#19d3f3',
-    'Goethals Bridge': '#ab63fa',
-    'Outerbridge Crossing': '#FFA15A',
-  }
   for (const [crossing, path] of Object.entries(paths)) {
-    const color = palette[crossing] ?? '#ffeb3b'
+    const color = CROSSING_PALETTE[crossing] ?? '#ffeb3b'
     const scaled = scalePath(path, bodyLen)
     const endIdx = path.length - 1
     path.forEach((_, idx) => {
@@ -505,7 +558,10 @@ function buildEditHandles(
   return group
 }
 
-export default function BTFlowMap({ rows, selectedCrossings, setSelectedCrossings, selectedTypes, subtitleNode }: Props) {
+export default function BTFlowMap({
+  rows, selectedCrossings, setSelectedCrossings, selectedTypes,
+  subtitleNode, hoverCrossing, setHoverCrossing,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileRef = useRef<L.TileLayer | null>(null)
@@ -550,18 +606,31 @@ export default function BTFlowMap({ rows, selectedCrossings, setSelectedCrossing
   const refLat = (BT_BBOX.minLat + BT_BBOX.maxLat) / 2
   // Empty array (URL state default) = all selected — same convention as the
   // plots above (see `activeCrossings`/`activeTypes` in `BridgeTunnel`).
-  const activeCrossings = useMemo(
-    () => (selectedCrossings && selectedCrossings.length > 0) ? selectedCrossings : null,
-    [selectedCrossings],
-  )
   const activeTypes = useMemo(
     () => (selectedTypes && selectedTypes.length > 0) ? selectedTypes : [...VEHICLE_TYPES],
     [selectedTypes],
   )
-  const crossings = useMemo(
-    () => Object.keys(paths).filter(c => activeCrossings === null || activeCrossings.includes(c)),
-    [paths, activeCrossings],
-  )
+  // Map ALWAYS renders all 6 crossings — narrowing is visual (fade
+  // non-selected ribbons + dim non-selected labels), not data-filtering. The
+  // pinned crossing also gets a colored border on its label to distinguish
+  // "click-pinned" from "hover-highlighted" (mirrors how plot LIs go bold
+  // when click-pinned vs. just fade-others on hover).
+  const crossings = useMemo(() => Object.keys(paths), [paths])
+  const allCrossingsCount = crossings.length
+  // What gets the full-opacity emphasis. Hover beats pin (transient focus
+  // overrides persistent narrowing). When neither is active, no fade.
+  const emphasizedSet = useMemo<Set<string> | null>(() => {
+    if (hoverCrossing) return new Set([hoverCrossing])
+    if (selectedCrossings && selectedCrossings.length > 0 && selectedCrossings.length < allCrossingsCount) {
+      return new Set(selectedCrossings)
+    }
+    return null
+  }, [hoverCrossing, selectedCrossings, allCrossingsCount])
+  // Single-crossing click-pin (or dropdown "Only X") — the bold border on
+  // the label. Independent of hover (the pin status persists during hover).
+  const pinnedCrossing = useMemo<string | null>(() => {
+    return selectedCrossings && selectedCrossings.length === 1 ? selectedCrossings[0] : null
+  }, [selectedCrossings])
   const buildOpts: BuildOpts = useMemo(
     () => ({ maxRibbonPx: BASE_MAX_RIBBON_PX * widthScale, bodyLen, types: activeTypes }),
     [widthScale, bodyLen, activeTypes],
@@ -671,6 +740,8 @@ export default function BTFlowMap({ rows, selectedCrossings, setSelectedCrossing
     setSelectedCrossings(isOnlyThis ? allCrossings : [crossing])
   }
 
+  const onCrossingHover = (crossing: string | null) => setHoverCrossing?.(crossing)
+
   // Draw ribbons whenever volumes, zoom, paths, or control values change.
   useEffect(() => {
     const map = mapRef.current
@@ -678,13 +749,25 @@ export default function BTFlowMap({ rows, selectedCrossings, setSelectedCrossing
     const redraw = () => {
       if (layerRef.current) layerRef.current.remove()
       const features = buildRibbonFeatures(crossings, paths, volumes, maxVol, map.getZoom(), refLat, buildOpts)
-      layerRef.current = ribbonGeoJSONLayer(features, onCrossingClick).addTo(map)
+      layerRef.current = ribbonGeoJSONLayer(features, onCrossingClick, onCrossingHover).addTo(map)
+      // Re-apply current emphasis/pin styling so a data-driven rebuild
+      // doesn't reset the visual state mid-interaction.
+      applyRibbonFade(layerRef.current, emphasizedSet)
     }
     redraw()
     map.on('zoomend', redraw)
     return () => { map.off('zoomend', redraw); if (layerRef.current) layerRef.current.remove() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crossings, paths, volumes, maxVol, latest, refLat, buildOpts, selectedCrossings, setSelectedCrossings])
+  }, [crossings, paths, volumes, maxVol, latest, refLat, buildOpts, selectedCrossings, setSelectedCrossings, setHoverCrossing])
+
+  // Apply emphasis-driven fade + pinned border whenever the shared state
+  // changes (hover OR pin). Hover signal is bi-directional (legend hover on
+  // TrafficPlot also reaches here via the parent), so this responds to
+  // both external and self-originated changes.
+  useEffect(() => {
+    if (layerRef.current) applyRibbonFade(layerRef.current, emphasizedSet)
+    if (labelsRef.current) applyLabelStyles(labelsRef.current, crossings, paths, emphasizedSet, pinnedCrossing)
+  }, [emphasizedSet, pinnedCrossing, crossings, paths])
 
   return (
     <div className="bt-flow-map">
@@ -692,21 +775,29 @@ export default function BTFlowMap({ rows, selectedCrossings, setSelectedCrossing
         Monthly traffic by crossing — {monthLabel}
         <span className="bt-flow-map-dir"> · eastbound (NY-bound) only</span>
       </h2>
-      {subtitleNode && <div className="plot-subtitle">{subtitleNode}</div>}
       <div
-        ref={containerRef}
-        className="bt-flow-single"
+        className="bt-flow-canvas"
         style={{ height }}
         onMouseUp={e => {
-          // CSS `resize: vertical` produces the drag-handle; snapshot the new
-          // height into state + sessionStorage so it survives re-renders.
+          // CSS `resize: vertical` is on this wrapper; capture the new height
+          // on release so the React state matches the user's drag.
           const h = (e.currentTarget as HTMLDivElement).offsetHeight
           if (h !== height) {
             setHeight(h)
             sessionStorage.setItem(MAP_HEIGHT_KEY, String(h))
           }
         }}
-      />
+      >
+        <div ref={containerRef} className="bt-flow-single" />
+        {/* Float the chip overlay OVER the map (top-left, beside zoom controls)
+            instead of inserting it above as an in-flow element — otherwise the
+            chip's height would shift the map down on each hover, the cursor
+            falls off the ribbon, hover clears, map shifts back up, cursor
+            re-enters ribbon — a many-Hz layout-hover-clear loop. */}
+        {subtitleNode && (
+          <div className="bt-flow-subtitle-overlay">{subtitleNode}</div>
+        )}
+      </div>
       <MapControls
         widthScale={widthScale}
         setWidthScale={setWidthScale}

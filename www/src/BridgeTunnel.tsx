@@ -420,6 +420,7 @@ function TrafficPlot({
   selectedTypes, setSelectedTypes,
   activeYear,
   subtitleNode,
+  externalHoverCrossing,
   onEffectiveChange,
 }: {
   allRows: TrafficRow[] | null | undefined
@@ -427,6 +428,10 @@ function TrafficPlot({
   selectedTypes: string[], setSelectedTypes: (v: string[]) => void
   activeYear: string | null
   subtitleNode: React.ReactNode
+  /** Crossing hovered on the map (full name). When set, this plot's bars
+   *  highlight that crossing too (pltly `externalActiveTrace`), and the
+   *  "effective" narrowing folds it in so chips + BTMonthlyPlot brush. */
+  externalHoverCrossing?: string | null
   onEffectiveChange?: (eff: { crossings: string[], types: string[] }) => void
 }) {
   const [mode, setMode] = useUrlState<Mode>("m", modeParam)
@@ -472,19 +477,29 @@ function TrafficPlot({
   // HIGHLIGHT only). In SOLO mode, click writes URL via setSelectedCrossings
   // — activeTraceName stays for hover only.
   const [hoverTraceName, setHoverTraceName] = useState<string | null>(null)
+  // Map's hovered crossing translated to legend abbrev. Folded into the
+  // transient narrowing alongside this plot's own hover so map-hover and
+  // legend-hover behave the same (chip + BTMonthlyPlot brush + bar highlight).
+  const externalHoverAbbrev = useMemo(
+    () => externalHoverCrossing ? (CROSSING_ABBREV[externalHoverCrossing] ?? null) : null,
+    [externalHoverCrossing],
+  )
   const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
 
   // "Effective" narrowing for plot2 brushing + the subtitle badges: includes
   // transient hover (so hovering Holland LI brushes plot2 to Holland) on top
-  // of the URL-bound `selectedCrossings`/`selectedTypes` filter.
+  // of the URL-bound `selectedCrossings`/`selectedTypes` filter. Map-side
+  // hover is folded in via `externalHoverCrossing` (always a crossing, so it
+  // always narrows the crossing dim — even in BY VEHICLE).
   const transientTraceName = hoverTraceName ?? activeTraceName
   const effectiveCrossings = useMemo(() => {
+    if (externalHoverCrossing) return [externalHoverCrossing]
     if (transientTraceName && stackBy === "crossing") {
       const full = ABBREV_TO_CROSSING[transientTraceName]
       if (full) return [full]
     }
     return activeCrossings
-  }, [transientTraceName, stackBy, activeCrossings])
+  }, [externalHoverCrossing, transientTraceName, stackBy, activeCrossings])
   const effectiveTypes = useMemo(() => {
     if (transientTraceName && stackBy === "vehicle") {
       const full = ABBREV_TO_TYPE[transientTraceName]
@@ -699,6 +714,7 @@ function TrafficPlot({
         soloTrace={soloTrace}
         onSoloTraceChange={handleSoloTraceChange}
         onHoverTraceChange={setHoverTraceName}
+        externalActiveTrace={stackBy === "crossing" ? externalHoverAbbrev : null}
         disableSoloDismiss
         {...plotProps as any}
       />
@@ -908,6 +924,11 @@ export default function BridgeTunnel() {
   const [effective, setEffective] = useState<{ crossings: string[], types: string[] }>({
     crossings: [], types: [],
   })
+  // Map-side hover (full crossing name). Lifted here so it can drive both
+  // BTFlowMap's own ribbon styling AND TrafficPlot's `externalActiveTrace`
+  // (which makes the bar chart bold/fade the same crossing and lets the
+  // chip + BTMonthlyPlot brush via TrafficPlot's existing effective flow).
+  const [mapHoverCrossing, setMapHoverCrossing] = useState<string | null>(null)
   const subtitle = btCrossingSubtitle(effective.crossings)
   const typeSuffix = btTypeSuffix(effective.types)
 
@@ -961,6 +982,7 @@ export default function BridgeTunnel() {
       selectedTypes={selectedTypes} setSelectedTypes={setSelectedTypes}
       activeYear={activeYear}
       subtitleNode={subtitleNode}
+      externalHoverCrossing={mapHoverCrossing}
       onEffectiveChange={setEffective}
     />
     <BTMonthlyPlot
@@ -977,6 +999,8 @@ export default function BridgeTunnel() {
         setSelectedCrossings={setSelectedCrossings}
         selectedTypes={selectedTypes}
         subtitleNode={subtitleNode}
+        hoverCrossing={mapHoverCrossing}
+        setHoverCrossing={setMapHoverCrossing}
       />
     )}
     <div className="abp-footer">
