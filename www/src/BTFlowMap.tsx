@@ -451,10 +451,26 @@ const labelPosParam = {
 // `-` (or `+` if positive) and zoom's leading `+` are the delimiters, so
 // e.g. `40.7345-74.0843+10.50` parses cleanly with the regex below.
 type LLZ = { lat: number, lon: number, zoom: number }
-// Chosen at the typical desktop viewport so all 6 crossings fit comfortably
-// at an INTEGER zoom level (no fractional-zoom tile gridline artifacts on
-// CARTO dark tiles). Update if a better view-of-record gets chosen.
-const DEFAULT_LLZ: LLZ = { lat: 40.7171, lon: -74.1570, zoom: 11 }
+// Viewport-responsive initial view. Two anchors hand-picked so each
+// resolves to an INTEGER zoom (no fractional-zoom tile gridline artifacts
+// on CARTO dark tiles): mobile is zoomed-out further west so all 6
+// crossings still fit a narrow phone column; desktop sits tighter on NYC.
+// Lat/lon interpolate linearly between anchors based on viewport width;
+// zoom step-changes at the midpoint of the two breakpoints.
+const LLZ_MOBILE: LLZ  = { lat: 40.7182, lon: -74.2077, zoom: 10 }
+const LLZ_DESKTOP: LLZ = { lat: 40.7171, lon: -74.1570, zoom: 11 }
+const VW_MOBILE = 425
+const VW_DESKTOP = 1280
+function defaultLlzForVw(vw: number): LLZ {
+  const t = Math.max(0, Math.min(1, (vw - VW_MOBILE) / (VW_DESKTOP - VW_MOBILE)))
+  const lat = LLZ_MOBILE.lat + (LLZ_DESKTOP.lat - LLZ_MOBILE.lat) * t
+  const lon = LLZ_MOBILE.lon + (LLZ_DESKTOP.lon - LLZ_MOBILE.lon) * t
+  // Zoom is integer (fractional zoom causes tile-gridline artifacts). Step
+  // at the midpoint so the wider half of the interp range gets the closer
+  // zoom and the narrower half gets the wider-fitting one.
+  const zoom = t < 0.5 ? LLZ_MOBILE.zoom : LLZ_DESKTOP.zoom
+  return { lat, lon, zoom }
+}
 const llzParam = {
   encode: (v: LLZ | null) => {
     if (!v) return undefined
@@ -674,7 +690,8 @@ export default function BTFlowMap({
       attributionControl: false,
       scrollWheelZoom: true,
     })
-    const initial = initialLlzRef.current ?? DEFAULT_LLZ
+    const initial = initialLlzRef.current
+      ?? defaultLlzForVw(typeof window === 'undefined' ? VW_DESKTOP : window.innerWidth)
     map.setView([initial.lat, initial.lon], initial.zoom)
     mapRef.current = map
     const ro = new ResizeObserver(() => map.invalidateSize())
