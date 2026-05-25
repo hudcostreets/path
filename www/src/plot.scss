@@ -545,35 +545,89 @@ html.clean {
   .bt-flow-controls-value { color: #222; }
   input[type='range'] { accent-color: #4f46e5; }
 }
-// Crossing-name labels rendered via Leaflet `L.divIcon`. `iconAnchor=[0,0]`
-// puts the marker's top-left at the lat/lng, so we translate the inner span
-// left/up to anchor the text's right-middle on the NJ-side path endpoint —
-// keeps the label clear of every ribbon (paths all run NJ→east/southeast).
+// Dst-end labels: crossing name + per-vehicle-type count rows.
+// Outer `.bt-crossing-label` is the Leaflet marker element — Leaflet sets
+// `transform: translate3d(...)` inline on it to position at the tip, so all
+// styling/transform happens on the inner `.bt-label-inner` which is free of
+// Leaflet's positioning. `bt-label-side-*` modifier on the outer cascades
+// down to position the inner box into the chosen quadrant.
 .bt-crossing-label {
   background: none;
   border: none;
   pointer-events: none;
-  span {
-    display: inline-block;
-    position: relative;
-    transform: translate(calc(-100% - 6px), -50%);
-    font-size: 11px;
-    font-weight: 600;
-    color: #f0f0f0;
-    text-shadow:
-      0 0 2px rgba(0, 0, 0, 0.95),
-      0 0 4px rgba(0, 0, 0, 0.8),
-      1px 1px 2px rgba(0, 0, 0, 0.9);
-    white-space: nowrap;
+}
+.bt-label-inner {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.82);
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #eee;
+  white-space: nowrap;
+  line-height: 1.25;
+  .bt-label-name {
+    font-weight: 700;
+    margin-bottom: 1px;
     letter-spacing: 0.01em;
   }
+  .bt-label-row {
+    display: grid;
+    grid-template-columns: 8px auto 1fr;
+    align-items: center;
+    gap: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bt-label-sw {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+  .bt-label-type { opacity: 0.8; }
+  .bt-label-val {
+    text-align: right;
+    font-weight: 600;
+  }
 }
-:root[data-theme="light"] .bt-crossing-label span {
+// Anchor-side variants. The inner box's `top: 0; left: 0` (via `position:
+// absolute`) sits at the tip; `translate()` then moves it into the chosen
+// quadrant.
+.bt-crossing-label.bt-label-side-right       .bt-label-inner { transform: translate(8px, -50%); }
+.bt-crossing-label.bt-label-side-left        .bt-label-inner { transform: translate(calc(-100% - 8px), -50%); }
+.bt-crossing-label.bt-label-side-above       .bt-label-inner { transform: translate(-50%, calc(-100% - 6px)); }
+.bt-crossing-label.bt-label-side-below       .bt-label-inner { transform: translate(-50%, 6px); }
+.bt-crossing-label.bt-label-side-above-right .bt-label-inner { transform: translate(8px, calc(-100% + 2px)); }
+.bt-crossing-label.bt-label-side-below-right .bt-label-inner { transform: translate(8px, -2px); }
+
+:root[data-theme="light"] .bt-label-inner {
+  background: rgba(255, 255, 255, 0.92);
   color: #1a1a2e;
-  text-shadow:
-    0 0 2px rgba(255, 255, 255, 0.95),
-    0 0 4px rgba(255, 255, 255, 0.8),
-    1px 1px 2px rgba(255, 255, 255, 0.9);
+}
+// Settings gear: rendered as a small icon-only summary BELOW the map.
+// Defaults closed — click to reveal the Width/Length sliders + Edit mode.
+.bt-flow-controls-wrap {
+  margin: 0.4em 0 0;
+  font-size: 0.85rem;
+  > summary.bt-flow-controls-summary {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    color: #888;
+    padding: 2px 4px;
+    border-radius: 4px;
+    list-style: none;
+    user-select: none;
+    &::-webkit-details-marker { display: none; }
+    &:hover { color: #ddd; }
+  }
+  &[open] > summary.bt-flow-controls-summary { margin-bottom: 0.4em; }
+  .bt-flow-gear {
+    font-size: 1.05em;
+    line-height: 1;
+  }
+}
+:root[data-theme="light"] .bt-flow-controls-wrap > summary.bt-flow-controls-summary {
+  color: #777;
+  &:hover { color: #111; }
 }
 .bt-flow-map-attr {
   margin: 0.5em 0 0;

@@ -970,7 +970,15 @@ export default function BridgeTunnel() {
       subtitleNode={subtitleNode}
       onActiveYearChange={setActiveYear}
     />
-    {allRows && <BTFlowMap rows={allRows} />}
+    {allRows && (
+      <BTFlowMap
+        rows={allRows}
+        selectedCrossings={selectedCrossings}
+        setSelectedCrossings={setSelectedCrossings}
+        selectedTypes={selectedTypes}
+        subtitleNode={subtitleNode}
+      />
+    )}
     <div className="abp-footer">
       <p>
         Data from <a href="https://www.panynj.gov/bridges-tunnels/en/traffic---volume-information---b-t.html">PANYNJ</a> ·

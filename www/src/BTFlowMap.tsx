@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useUrlState } from 'use-prms'
 import {
   ribbonArrow, offsetPath, pxToHalfDeg, pxToDeg, smoothPath,
@@ -45,6 +45,17 @@ const MAX_HEIGHT = 1400
 
 interface Props {
   rows: TrafficRow[]
+  /** Crossings to display — same `c=` URL state as TrafficPlot. Empty
+   *  array is treated as "all selected" (consistent with the plots). */
+  selectedCrossings?: string[]
+  /** Setter for the same `c=` URL state. When provided, clicking a ribbon
+   *  pins that crossing (re-click clears). */
+  setSelectedCrossings?: (crossings: string[]) => void
+  /** Vehicle types to stack in each ribbon — same `v=` URL state. */
+  selectedTypes?: string[]
+  /** Chip-style narrowing badges, lifted from `BridgeTunnel` so the map
+   *  shows the same `Lincoln × Autos ×` indicator as the plots above. */
+  subtitleNode?: React.ReactNode
 }
 
 interface FlowProps {
@@ -86,6 +97,10 @@ function monthYearLabel(latest: { year: number, month: string } | null): string 
 interface BuildOpts {
   maxRibbonPx: number
   bodyLen: number
+  /** Vehicle types to stack in each ribbon. Non-selected types are dropped
+   *  from both width computation and rendering, so a single-type narrowing
+   *  yields a single-band ribbon with no leftover space for the others. */
+  types: readonly string[]
 }
 
 /** Stretch a NJ→NY path back from its destination (NY end held fixed) so the
@@ -109,7 +124,7 @@ function buildRibbonFeatures(
   maxVol: number,
   zoom: number,
   refLat: number,
-  { maxRibbonPx, bodyLen }: BuildOpts,
+  { maxRibbonPx, bodyLen, types }: BuildOpts,
 ): GeoJSON.Feature<GeoJSON.Polygon, FlowProps>[] {
   if (maxVol === 0) return []
   // sqrt scale compresses the GWB-autos-vs-Bayonne-buses dynamic range
@@ -121,13 +136,8 @@ function buildRibbonFeatures(
   for (const crossing of crossings) {
     const baseRaw = paths[crossing]
     if (!baseRaw) continue
-    // Catmull-Rom spline through the 3 user-defined waypoints, then resample
-    // densely so `ribbonArrow` produces a smooth curve (instead of the harsh
-    // mid-path elbow of a 3-point polyline). Edit-mode handles remain at the
-    // original waypoints — they're the spline knots, so the curve passes
-    // through each handle exactly.
     const basePath = smoothPath(scalePath(baseRaw, bodyLen), 12).path
-    const widths = VEHICLE_TYPES.map(t => widthOf(volumes.get(`${crossing}|${t}`) ?? 0))
+    const widths = types.map(t => widthOf(volumes.get(`${crossing}|${t}`) ?? 0))
     // Stack offsets perpendicular to the flow.
     const totalW = widths.reduce((a, b) => a + b, 0)
       + STACK_GAP_PX * Math.max(0, widths.filter(w => w > 0).length - 1)
@@ -140,8 +150,8 @@ function buildRibbonFeatures(
       acc += widths[i] / 2 + STACK_GAP_PX
     }
 
-    for (let i = 0; i < VEHICLE_TYPES.length; i++) {
-      const type = VEHICLE_TYPES[i]
+    for (let i = 0; i < types.length; i++) {
+      const type = types[i]
       const count = volumes.get(`${crossing}|${type}`) ?? 0
       if (count <= 0) continue
       const width = widths[i]
@@ -163,12 +173,13 @@ function buildRibbonFeatures(
 
 function ribbonGeoJSONLayer(
   features: GeoJSON.Feature<GeoJSON.Polygon, FlowProps>[],
+  onCrossingClick?: (crossing: string) => void,
 ): L.GeoJSON {
   const fc: GeoJSON.FeatureCollection<GeoJSON.Polygon, FlowProps> = {
     type: 'FeatureCollection',
     features,
   }
-  return L.geoJSON(fc, {
+  const geo = L.geoJSON(fc, {
     style: (f) => ({
       fillColor: (f!.properties as FlowProps).color,
       fillOpacity: 0.85,
@@ -181,33 +192,97 @@ function ribbonGeoJSONLayer(
         `<strong>${p.crossing}</strong><br>${p.type}: ${p.count.toLocaleString()}`,
         { sticky: true, direction: 'top' },
       )
+      if (onCrossingClick) {
+        layer.on('click', () => onCrossingClick(p.crossing))
+      }
     },
   })
+  return geo
 }
 
-/** Build a layer group of crossing-name labels at each path's NJ end. The
- *  divIcon is anchored to the right edge so the text renders to the WEST of
- *  the NJ approach — out of the ribbon for all six crossings. Labels move
- *  with `bodyLen` so they stay glued to the visible ribbon start. */
+/** Format a vehicle count for the dst-end label. Three-digit precision
+ *  (e.g. 5.2M, 320k, 12k) — labels stay narrow enough to stack 3-deep
+ *  without dominating the map. */
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`
+  return n.toLocaleString()
+}
+
+type LabelSide = 'right' | 'left' | 'above' | 'below' | 'above-right' | 'below-right'
+type LabelPos = 'dst' | 'base'
+
+/** Per-crossing label anchor side. Two configs:
+ *  - `dst` (default): labels at NY-end arrow tips. Anchor side avoids
+ *    cross-crossing overlaps + map-edge clipping.
+ *  - `base`: labels at NJ-end arrow starts. All anchors go `left` (NJ-side
+ *    space) so labels don't sit on top of the arrow bodies. Lincoln/Holland
+ *    stagger above/below to avoid stacking. */
+const CROSSING_LABEL_SIDE_DST: Record<string, LabelSide> = {
+  'George Washington Bridge': 'right',
+  'Lincoln Tunnel': 'above-right',
+  'Holland Tunnel': 'below-right',
+  'Bayonne Bridge': 'right',
+  'Goethals Bridge': 'left',
+  'Outerbridge Crossing': 'above',
+}
+const CROSSING_LABEL_SIDE_BASE: Record<string, LabelSide> = {
+  'George Washington Bridge': 'left',
+  'Lincoln Tunnel': 'left',
+  'Holland Tunnel': 'left',
+  // Bayonne base is just east of Holland base — going `right` separates
+  // them at zoomed-out views where their NJ-side bases otherwise overlap.
+  'Bayonne Bridge': 'right',
+  'Goethals Bridge': 'left',
+  'Outerbridge Crossing': 'left',
+}
+
+/** Build a layer group of dst-end labels: each shows the crossing name + a
+ *  per-vehicle-type breakdown of the latest month's counts (selected types
+ *  only). Anchor side per crossing (see `CROSSING_LABEL_SIDE`) routes
+ *  labels into nearby empty space to avoid mutual overlap and map-edge
+ *  clipping at the default zoom. */
 function crossingLabelsLayer(
   crossings: string[],
   paths: Record<string, LatLon[]>,
   bodyLen: number,
+  volumes: Map<string, number>,
+  types: readonly string[],
+  labelPos: LabelPos,
 ): L.LayerGroup {
   const group = L.layerGroup()
+  const sideMap = labelPos === 'base' ? CROSSING_LABEL_SIDE_BASE : CROSSING_LABEL_SIDE_DST
   for (const crossing of crossings) {
     const baseRaw = paths[crossing]
     if (!baseRaw) continue
     const scaled = scalePath(baseRaw, bodyLen)
-    const [lat, lon] = scaled[0]
+    // `dst` → arrow tip (last point); `base` → NJ-side start (first point,
+    // which scalePath has stretched out to bodyLen× distance from the tip).
+    const anchor = labelPos === 'base' ? scaled[0] : scaled[scaled.length - 1]
     const text = BT_CROSSING_LABELS[crossing] ?? crossing
+    const side = sideMap[crossing] ?? 'right'
+    const rows = types.map(t => {
+      const v = volumes.get(`${crossing}|${t}`) ?? 0
+      const color = VEHICLE_TYPE_COLORS[t]
+      const abbrev = t === 'Automobiles' ? 'Autos' : t
+      return `<div class="bt-label-row"><span class="bt-label-sw" style="background:${color}"></span>` +
+        `<span class="bt-label-type">${abbrev}</span>` +
+        `<span class="bt-label-val">${formatCount(v)}</span></div>`
+    }).join('')
+    // Wrap content in an inner div so we can apply `transform` to position
+    // the label box relative to the marker — Leaflet sets `transform:
+    // translate3d(...)` inline on the outer marker element to put it at the
+    // tip's lat/lng, so any `transform` on the OUTER class would override
+    // Leaflet's positioning and pin the whole label to the map origin.
     const icon = L.divIcon({
-      className: 'bt-crossing-label',
-      html: `<span>${text}</span>`,
+      className: `bt-crossing-label bt-label-side-${side}`,
+      html: `<div class="bt-label-inner">` +
+        `<div class="bt-label-name">${text}</div>${rows}` +
+        `</div>`,
       iconSize: undefined as unknown as L.PointExpression,
       iconAnchor: [0, 0],
     })
-    L.marker([lat, lon], { icon, interactive: false, keyboard: false }).addTo(group)
+    L.marker([anchor[0], anchor[1]], { icon, interactive: false, keyboard: false }).addTo(group)
   }
   return group
 }
@@ -219,13 +294,19 @@ interface ControlsProps {
   setBodyLen: (v: number) => void
   edit: boolean
   setEdit: (v: boolean) => void
+  labelPos: LabelPos
+  setLabelPos: (v: LabelPos) => void
   onExport: () => void
   onReset: () => void
 }
 
 function MapControls(p: ControlsProps) {
   return (
-    <div className="bt-flow-controls">
+    <details className="bt-flow-controls-wrap">
+      <summary className="bt-flow-controls-summary" title="Map display settings">
+        <span className="bt-flow-gear" aria-hidden="true">⚙</span>
+      </summary>
+      <div className="bt-flow-controls">
       <label title="Multiplier on ribbon widths.">
         <span>Width</span>
         <input
@@ -245,6 +326,14 @@ function MapControls(p: ControlsProps) {
         />
         <span className="bt-flow-controls-value">{p.bodyLen.toFixed(1)}×</span>
       </label>
+      <label title="Move per-crossing labels to the NJ-side start of each arrow (out of the arrow body) instead of the NY-side tip.">
+        <input
+          type="checkbox"
+          checked={p.labelPos === 'base'}
+          onChange={e => p.setLabelPos(e.target.checked ? 'base' : 'dst')}
+        />
+        <span>Labels at base</span>
+      </label>
       <label title="Edit mode: drag the per-waypoint handles to reposition each crossing's path. The Length slider is locked while editing — dragend inverse-scales drops back to 1× coords so the JSON export round-trips cleanly.">
         <input
           type="checkbox"
@@ -263,7 +352,8 @@ function MapControls(p: ControlsProps) {
           </button>
         </>
       )}
-    </div>
+      </div>
+    </details>
   )
 }
 
@@ -286,6 +376,13 @@ const bodyLenParam = {
 const editParam = {
   encode: (v: boolean) => v ? '1' : undefined,
   decode: (s: string | undefined) => s === '1',
+}
+// Default is `base` (NJ-side arrow starts) — labels stay clear of the arrow
+// bodies and don't fight for the dense NYC tip area. `dst` is opt-in via the
+// Settings checkbox.
+const labelPosParam = {
+  encode: (v: LabelPos) => v === 'base' ? undefined : v,
+  decode: (s: string | undefined): LabelPos => s === 'dst' ? 'dst' : 'base',
 }
 
 // `llz=<lat><lon><zoom>` with sign-separator encoding (matches the
@@ -408,7 +505,7 @@ function buildEditHandles(
   return group
 }
 
-export default function BTFlowMap({ rows }: Props) {
+export default function BTFlowMap({ rows, selectedCrossings, setSelectedCrossings, selectedTypes, subtitleNode }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileRef = useRef<L.TileLayer | null>(null)
@@ -420,6 +517,7 @@ export default function BTFlowMap({ rows }: Props) {
   const [widthScale, setWidthScale] = useUrlState<number>('ws', widthScaleParam)
   const [bodyLen, setBodyLen] = useUrlState<number>('blen', bodyLenParam)
   const [edit, setEdit] = useUrlState<boolean>('edit', editParam)
+  const [labelPos, setLabelPos] = useUrlState<LabelPos>('lp', labelPosParam)
   const [llz, setLlz] = useUrlState<LLZ | null>('llz', llzParam)
   // Keep the latest setter in a ref so the init-once map effect doesn't need
   // to re-run when use-prms hands back a new setter identity.
@@ -450,10 +548,23 @@ export default function BTFlowMap({ rows }: Props) {
   const { latest, volumes, maxVol } = useLatestVolumes(rows)
   const monthLabel = monthYearLabel(latest)
   const refLat = (BT_BBOX.minLat + BT_BBOX.maxLat) / 2
-  const crossings = useMemo(() => Object.keys(paths), [paths])
+  // Empty array (URL state default) = all selected — same convention as the
+  // plots above (see `activeCrossings`/`activeTypes` in `BridgeTunnel`).
+  const activeCrossings = useMemo(
+    () => (selectedCrossings && selectedCrossings.length > 0) ? selectedCrossings : null,
+    [selectedCrossings],
+  )
+  const activeTypes = useMemo(
+    () => (selectedTypes && selectedTypes.length > 0) ? selectedTypes : [...VEHICLE_TYPES],
+    [selectedTypes],
+  )
+  const crossings = useMemo(
+    () => Object.keys(paths).filter(c => activeCrossings === null || activeCrossings.includes(c)),
+    [paths, activeCrossings],
+  )
   const buildOpts: BuildOpts = useMemo(
-    () => ({ maxRibbonPx: BASE_MAX_RIBBON_PX * widthScale, bodyLen }),
-    [widthScale, bodyLen],
+    () => ({ maxRibbonPx: BASE_MAX_RIBBON_PX * widthScale, bodyLen, types: activeTypes }),
+    [widthScale, bodyLen, activeTypes],
   )
 
   // Stash path edits into SS so a reload doesn't lose them.
@@ -524,8 +635,8 @@ export default function BTFlowMap({ rows }: Props) {
     const map = mapRef.current
     if (!map) return
     if (labelsRef.current) labelsRef.current.remove()
-    labelsRef.current = crossingLabelsLayer(crossings, paths, bodyLen).addTo(map)
-  }, [crossings, paths, bodyLen])
+    labelsRef.current = crossingLabelsLayer(crossings, paths, bodyLen, volumes, activeTypes, labelPos).addTo(map)
+  }, [crossings, paths, bodyLen, volumes, activeTypes, labelPos])
 
   // Edit-mode draggable handles; placed at the scaled (visible) positions so
   // they overlay the rendered ribbons.
@@ -549,6 +660,17 @@ export default function BTFlowMap({ rows }: Props) {
     }).addTo(map)
   }, [dark])
 
+  // Click any ribbon → toggle that crossing as the sole selection (re-click
+  // when it's already the only one clears narrowing). Same `c=` URL state
+  // as TrafficPlot's dropdown / legend-click, so the gesture composes with
+  // the plots above without divergence.
+  const onCrossingClick = (crossing: string) => {
+    if (!setSelectedCrossings) return
+    const allCrossings = Object.keys(BT_CROSSING_PATHS)
+    const isOnlyThis = selectedCrossings?.length === 1 && selectedCrossings[0] === crossing
+    setSelectedCrossings(isOnlyThis ? allCrossings : [crossing])
+  }
+
   // Draw ribbons whenever volumes, zoom, paths, or control values change.
   useEffect(() => {
     const map = mapRef.current
@@ -556,12 +678,13 @@ export default function BTFlowMap({ rows }: Props) {
     const redraw = () => {
       if (layerRef.current) layerRef.current.remove()
       const features = buildRibbonFeatures(crossings, paths, volumes, maxVol, map.getZoom(), refLat, buildOpts)
-      layerRef.current = ribbonGeoJSONLayer(features).addTo(map)
+      layerRef.current = ribbonGeoJSONLayer(features, onCrossingClick).addTo(map)
     }
     redraw()
     map.on('zoomend', redraw)
     return () => { map.off('zoomend', redraw); if (layerRef.current) layerRef.current.remove() }
-  }, [crossings, paths, volumes, maxVol, latest, refLat, buildOpts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crossings, paths, volumes, maxVol, latest, refLat, buildOpts, selectedCrossings, setSelectedCrossings])
 
   return (
     <div className="bt-flow-map">
@@ -569,16 +692,7 @@ export default function BTFlowMap({ rows }: Props) {
         Monthly traffic by crossing — {monthLabel}
         <span className="bt-flow-map-dir"> · eastbound (NY-bound) only</span>
       </h2>
-      <MapControls
-        widthScale={widthScale}
-        setWidthScale={setWidthScale}
-        bodyLen={bodyLen}
-        setBodyLen={setBodyLen}
-        edit={edit}
-        setEdit={setEdit}
-        onExport={exportPaths}
-        onReset={resetPaths}
-      />
+      {subtitleNode && <div className="plot-subtitle">{subtitleNode}</div>}
       <div
         ref={containerRef}
         className="bt-flow-single"
@@ -592,6 +706,18 @@ export default function BTFlowMap({ rows }: Props) {
             sessionStorage.setItem(MAP_HEIGHT_KEY, String(h))
           }
         }}
+      />
+      <MapControls
+        widthScale={widthScale}
+        setWidthScale={setWidthScale}
+        bodyLen={bodyLen}
+        setBodyLen={setBodyLen}
+        edit={edit}
+        setEdit={setEdit}
+        labelPos={labelPos}
+        setLabelPos={setLabelPos}
+        onExport={exportPaths}
+        onReset={resetPaths}
       />
       <p className="bt-flow-map-attr">
         Maps: <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a> ·
@@ -709,7 +835,7 @@ function BTFlowPane({ crossings, viewport, volumes, maxVol, dark, sharedZoom, on
   ]
   const refLat = (viewport.lat[0] + viewport.lat[1]) / 2
   const paneBuildOpts: BuildOpts = useMemo(
-    () => ({ maxRibbonPx: BASE_MAX_RIBBON_PX, bodyLen: 1 }),
+    () => ({ maxRibbonPx: BASE_MAX_RIBBON_PX, bodyLen: 1, types: VEHICLE_TYPES }),
     [],
   )
 
@@ -728,7 +854,7 @@ function BTFlowPane({ crossings, viewport, volumes, maxVol, dark, sharedZoom, on
     })
     map.setView(center, 12)
     mapRef.current = map
-    labelsRef.current = crossingLabelsLayer(crossings, BT_CROSSING_PATHS, 1).addTo(map)
+    labelsRef.current = crossingLabelsLayer(crossings, BT_CROSSING_PATHS, 1, volumes, VEHICLE_TYPES, 'dst').addTo(map)
     const reportZoom = () => {
       map.invalidateSize()
       onIdealZoom(map.getBoundsZoom(bbox, true))
