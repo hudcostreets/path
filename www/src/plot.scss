@@ -464,6 +464,46 @@ html.clean {
   color: #818cf8;
 }
 :root[data-theme="light"] .bt-flow-map-title { color: #4f46e5; }
+// Inline month/year pickers in the map title. Native `<select>` styled to
+// blend with the title text — caret hint, currentColor, transparent bg.
+.bt-flow-ym-picker {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.bt-flow-ym-select {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 1px 4px;
+  cursor: pointer;
+  &:hover { border-color: rgba(255, 255, 255, 0.4); }
+  &:focus { outline: 1px solid rgba(129, 140, 248, 0.6); outline-offset: 1px; }
+  // Render options in the system color (dark popup on macOS, etc.) — but
+  // force a sensible color for theming.
+  option { color: #111; background: #fff; }
+}
+:root[data-theme="light"] .bt-flow-ym-select {
+  border-color: rgba(0, 0, 0, 0.15);
+  &:hover { border-color: rgba(0, 0, 0, 0.4); }
+}
+.bt-flow-ym-reset {
+  font: inherit;
+  font-size: 0.75em;
+  font-weight: 400;
+  color: #888;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  &:hover { color: #ddd; }
+}
+:root[data-theme="light"] .bt-flow-ym-reset {
+  color: #777;
+  &:hover { color: #111; }
+}
 .bt-flow-map-dir {
   font-size: 0.85rem;
   font-weight: 400;

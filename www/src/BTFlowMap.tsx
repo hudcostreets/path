@@ -82,29 +82,69 @@ interface FlowProps {
   color: string
 }
 
-interface LatestVolumeData {
-  latest: { year: number, month: string } | null
+type YM = { year: number, month: string }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+interface VolumesData {
+  /** The (year, month) actually rendered — either the URL-selected one or
+   *  the latest in the data if no URL state. `null` when there are no rows. */
+  shown: YM | null
+  /** Latest (year, month) in the data — used as fallback when no URL state
+   *  and to label the "←latest" reset action. */
+  latest: YM | null
+  /** Per-(crossing, type) volume for the `shown` month. */
   volumes: Map<string, number>
+  /** Max volume across all (crossing, type) for the `shown` month — drives
+   *  ribbon-width scaling. */
   maxVol: number
+  /** All distinct years present in the data, ascending. */
+  yearsAvailable: number[]
+  /** Months available for the `shown` year, in calendar order. */
+  monthsForYear: string[]
+  /** Months available for an arbitrary year — used by the year-change
+   *  handler to snap the month to a valid one when crossing years. */
+  monthsForYearOf: (year: number) => string[]
 }
 
-// Shared data extraction: latest (year, month), per-(crossing, type) volume,
-// and the global max for ribbon-width scaling.
-function useLatestVolumes(rows: TrafficRow[]): LatestVolumeData {
+// Shared data extraction. When `ym` is set AND valid (data exists for that
+// year+month), returns that month's volumes; otherwise falls back to the
+// data's latest month. Invalid URL state is silently coerced — `shown` is
+// always a valid (year, month) tuple (or `null` when there are no rows).
+function useVolumesData(rows: TrafficRow[], ym: YM | null): VolumesData {
   return useMemo(() => {
-    if (!rows.length) return { latest: null, volumes: new Map(), maxVol: 0 }
-    const r = rows[rows.length - 1]
-    const latest = { year: r.year, month: r.month }
+    if (!rows.length) {
+      const empty: VolumesData = {
+        shown: null, latest: null, volumes: new Map(), maxVol: 0,
+        yearsAvailable: [], monthsForYear: [], monthsForYearOf: () => [],
+      }
+      return empty
+    }
+    // Pre-compute available months per year, so we can validate `ym` and
+    // serve `monthsForYearOf` cheaply.
+    const monthsByYear = new Map<number, Set<string>>()
+    for (const row of rows) {
+      let ms = monthsByYear.get(row.year)
+      if (!ms) { ms = new Set(); monthsByYear.set(row.year, ms) }
+      ms.add(row.month)
+    }
+    const last = rows[rows.length - 1]
+    const latest: YM = { year: last.year, month: last.month }
+    const shown: YM = (ym && monthsByYear.get(ym.year)?.has(ym.month)) ? ym : latest
     const volumes = new Map<string, number>()
     for (const row of rows) {
-      if (row.year !== latest.year || row.month !== latest.month) continue
+      if (row.year !== shown.year || row.month !== shown.month) continue
       const key = `${row.crossing}|${row.type}`
       volumes.set(key, (volumes.get(key) ?? 0) + row.count)
     }
     let maxVol = 0
     for (const v of volumes.values()) if (v > maxVol) maxVol = v
-    return { latest, volumes, maxVol }
-  }, [rows])
+    const yearsAvailable = [...monthsByYear.keys()].sort((a, b) => a - b)
+    const monthsForYearOf = (year: number) =>
+      MONTHS.filter(m => monthsByYear.get(year)?.has(m))
+    const monthsForYear = monthsForYearOf(shown.year)
+    return { shown, latest, volumes, maxVol, yearsAvailable, monthsForYear, monthsForYearOf }
+  }, [rows, ym])
 }
 
 function monthYearLabel(latest: { year: number, month: string } | null): string {
@@ -446,6 +486,46 @@ const labelPosParam = {
   decode: (s: string | undefined): LabelPos => s === 'dst' ? 'dst' : 'base',
 }
 
+// `ym=YYMM` URL state for the date the map shows. Absent → fall back to the
+// latest data month (so the "default" is always current without baking a
+// date into the URL on every share). `YY` is interpreted as `20YY` since
+// the data starts in 2011 — no two-century ambiguity in practice.
+// Decode also accepts the legacy `YYYY-MM` form for backward-compat.
+const MONTH_IDX: Record<string, number> = MONTHS.reduce(
+  (acc, m, i) => { acc[m] = i; return acc },
+  {} as Record<string, number>,
+)
+const ymParam = {
+  encode: (v: YM | null) => {
+    if (!v) return undefined
+    const idx = MONTH_IDX[v.month]
+    if (idx === undefined) return undefined
+    const yy = String(v.year % 100).padStart(2, '0')
+    const mm = String(idx + 1).padStart(2, '0')
+    return `${yy}${mm}`
+  },
+  decode: (s: string | undefined): YM | null => {
+    if (!s) return null
+    // New: YYMM
+    let m = s.match(/^(\d{2})(\d{2})$/)
+    if (m) {
+      const year = 2000 + parseInt(m[1], 10)
+      const idx = parseInt(m[2], 10) - 1
+      if (idx < 0 || idx > 11) return null
+      return { year, month: MONTHS[idx] }
+    }
+    // Legacy: YYYY-MM
+    m = s.match(/^(\d{4})-(\d{1,2})$/)
+    if (m) {
+      const year = parseInt(m[1], 10)
+      const idx = parseInt(m[2], 10) - 1
+      if (!Number.isFinite(year) || idx < 0 || idx > 11) return null
+      return { year, month: MONTHS[idx] }
+    }
+    return null
+  },
+}
+
 // Viewport-responsive initial view. Two anchors hand-picked so each
 // resolves to an INTEGER zoom (no fractional-zoom tile gridline artifacts
 // on CARTO dark tiles): mobile is zoomed-out further west so all 6
@@ -606,8 +686,35 @@ export default function BTFlowMap({
     return structuredClone(BT_CROSSING_PATHS)
   })
 
-  const { latest, volumes, maxVol } = useLatestVolumes(rows)
-  const monthLabel = monthYearLabel(latest)
+  const [ym, setYm] = useUrlState<YM | null>('ym', ymParam)
+  const { shown, latest, volumes, maxVol, yearsAvailable, monthsForYear, monthsForYearOf } = useVolumesData(rows, ym)
+  const isLatest = ym === null
+  // If the URL had an invalid `ym` (e.g. `ym=2604` when April 2026 has no
+  // data), `shown` already coerced to `latest`. Sync the URL too so the
+  // address bar matches the rendered state — clearing `ym` if we landed on
+  // `latest` (cleanest URL), or rewriting to the validated value otherwise.
+  useEffect(() => {
+    if (!ym || !shown || !latest) return
+    if (ym.year === shown.year && ym.month === shown.month) return
+    const isLatestNow = shown.year === latest.year && shown.month === latest.month
+    setYm(isLatestNow ? null : shown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ym, shown, latest])
+  // Year-change handler: snap the month to one that exists for the new year
+  // (latest available) so we never end up at an invalid combo.
+  const onYearChange = (newYear: number) => {
+    if (!shown) return
+    const months = monthsForYearOf(newYear)
+    if (!months.length) return
+    const newMonth = months.includes(shown.month) ? shown.month : months[months.length - 1]
+    setYm({ year: newYear, month: newMonth })
+  }
+  // Month-change handler: month dropdown is already constrained to
+  // `monthsForYear`, so the picked value is always valid for `shown.year`.
+  const onMonthChange = (newMonth: string) => {
+    if (!shown) return
+    setYm({ year: shown.year, month: newMonth })
+  }
   const refLat = (BT_BBOX.minLat + BT_BBOX.maxLat) / 2
   // Empty array (URL state default) = all selected — same convention as the
   // plots above (see `activeCrossings`/`activeTypes` in `BridgeTunnel`).
@@ -778,7 +885,34 @@ export default function BTFlowMap({
   return (
     <div className="bt-flow-map">
       <h2 className="bt-flow-map-title">
-        Monthly traffic by crossing — {monthLabel}
+        Monthly traffic by crossing — {shown ? (
+          <span className="bt-flow-ym-picker">
+            <select
+              className="bt-flow-ym-select"
+              value={shown.month}
+              onChange={e => onMonthChange(e.target.value)}
+            >
+              {monthsForYear.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select
+              className="bt-flow-ym-select"
+              value={shown.year}
+              onChange={e => onYearChange(parseInt(e.target.value, 10))}
+            >
+              {yearsAvailable.map(y => <option key={y} value={y}>{`'${String(y).slice(-2)}`}</option>)}
+            </select>
+            {!isLatest && (
+              <button
+                type="button"
+                className="bt-flow-ym-reset"
+                title="Reset to latest data month"
+                onClick={() => setYm(null)}
+              >
+                ← latest
+              </button>
+            )}
+          </span>
+        ) : '—'}
         <span className="bt-flow-map-dir"> · eastbound (NY-bound) only</span>
       </h2>
       <div
@@ -861,7 +995,7 @@ const PANE_GROUPS: {
 
 export function BTFlowMapPanes({ rows }: Props) {
   const dark = useDark()
-  const { latest, volumes, maxVol } = useLatestVolumes(rows)
+  const { latest, volumes, maxVol } = useVolumesData(rows, null)
   const monthLabel = monthYearLabel(latest)
 
   // Each pane reports its highest-fitting zoom; we take the MIN so they all
