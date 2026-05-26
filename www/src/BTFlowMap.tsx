@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useUrlState } from 'use-prms'
+import { useUrlState, llzParam, type LLZ } from 'use-prms'
 import {
   ribbonArrow, offsetPath, pxToHalfDeg, pxToDeg, smoothPath,
   type LatLon,
@@ -446,48 +446,37 @@ const labelPosParam = {
   decode: (s: string | undefined): LabelPos => s === 'dst' ? 'dst' : 'base',
 }
 
-// `llz=<lat><lon><zoom>` with sign-separator encoding (matches the
-// convention in sibling crash-map / household-vehicles apps). Lon's leading
-// `-` (or `+` if positive) and zoom's leading `+` are the delimiters, so
-// e.g. `40.7345-74.0843+10.50` parses cleanly with the regex below.
-type LLZ = { lat: number, lon: number, zoom: number }
 // Viewport-responsive initial view. Two anchors hand-picked so each
 // resolves to an INTEGER zoom (no fractional-zoom tile gridline artifacts
 // on CARTO dark tiles): mobile is zoomed-out further west so all 6
 // crossings still fit a narrow phone column; desktop sits tighter on NYC.
-// Lat/lon interpolate linearly between anchors based on viewport width;
+// Lat/lng interpolate linearly between anchors based on viewport width;
 // zoom step-changes at the midpoint of the two breakpoints.
-const LLZ_MOBILE: LLZ  = { lat: 40.7182, lon: -74.2077, zoom: 10 }
-const LLZ_DESKTOP: LLZ = { lat: 40.7171, lon: -74.1570, zoom: 11 }
+const LLZ_MOBILE: LLZ  = { lat: 40.7182, lng: -74.2077, zoom: 10 }
+const LLZ_DESKTOP: LLZ = { lat: 40.7171, lng: -74.1570, zoom: 11 }
 const VW_MOBILE = 425
 const VW_DESKTOP = 1280
 function defaultLlzForVw(vw: number): LLZ {
   const t = Math.max(0, Math.min(1, (vw - VW_MOBILE) / (VW_DESKTOP - VW_MOBILE)))
   const lat = LLZ_MOBILE.lat + (LLZ_DESKTOP.lat - LLZ_MOBILE.lat) * t
-  const lon = LLZ_MOBILE.lon + (LLZ_DESKTOP.lon - LLZ_MOBILE.lon) * t
+  const lng = LLZ_MOBILE.lng + (LLZ_DESKTOP.lng - LLZ_MOBILE.lng) * t
   // Zoom is integer (fractional zoom causes tile-gridline artifacts). Step
   // at the midpoint so the wider half of the interp range gets the closer
   // zoom and the narrower half gets the wider-fitting one.
   const zoom = t < 0.5 ? LLZ_MOBILE.zoom : LLZ_DESKTOP.zoom
-  return { lat, lon, zoom }
+  return { lat, lng, zoom }
 }
-const llzParam = {
-  encode: (v: LLZ | null) => {
-    if (!v) return undefined
-    const lonSign = v.lon < 0 ? '' : '+'
-    return `${v.lat.toFixed(4)}${lonSign}${v.lon.toFixed(4)}+${v.zoom.toFixed(2)}`
-  },
-  decode: (s: string | undefined): LLZ | null => {
-    if (!s) return null
-    const parts = s.match(/[+-]?\d+(?:\.\d+)?/g)
-    if (!parts || parts.length < 3) return null
-    const lat = parseFloat(parts[0])
-    const lon = parseFloat(parts[1])
-    const zoom = parseFloat(parts[2])
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(zoom)) return null
-    return { lat, lon, zoom }
-  },
-}
+// Wrap use-prms's built-in `llzParam` so a MISSING `llz=` decodes to
+// `null` (lets us fall back to `defaultLlzForVw` at init time) instead of
+// the static default that `llzParam` would otherwise return.
+const llzWrapped = (() => {
+  const inner = llzParam({ default: LLZ_DESKTOP })
+  return {
+    encode: (v: LLZ | null) => v ? inner.encode(v) : undefined,
+    decode: (s: string | undefined): LLZ | null =>
+      s === undefined || s === '' ? null : inner.decode(s),
+  }
+})()
 
 const PATHS_EDIT_KEY = 'bt-flow-paths-edit'
 
@@ -590,7 +579,7 @@ export default function BTFlowMap({
   const [bodyLen, setBodyLen] = useUrlState<number>('blen', bodyLenParam)
   const [edit, setEdit] = useUrlState<boolean>('edit', editParam)
   const [labelPos, setLabelPos] = useUrlState<LabelPos>('lp', labelPosParam)
-  const [llz, setLlz] = useUrlState<LLZ | null>('llz', llzParam)
+  const [llz, setLlz] = useUrlState<LLZ | null>('llz', llzWrapped)
   // Keep the latest setter in a ref so the init-once map effect doesn't need
   // to re-run when use-prms hands back a new setter identity.
   const setLlzRef = useRef(setLlz)
@@ -692,7 +681,7 @@ export default function BTFlowMap({
     })
     const initial = initialLlzRef.current
       ?? defaultLlzForVw(typeof window === 'undefined' ? VW_DESKTOP : window.innerWidth)
-    map.setView([initial.lat, initial.lon], initial.zoom)
+    map.setView([initial.lat, initial.lng], initial.zoom)
     mapRef.current = map
     const ro = new ResizeObserver(() => map.invalidateSize())
     ro.observe(containerRef.current)
@@ -703,7 +692,7 @@ export default function BTFlowMap({
     const onMoveEnd = () => {
       if (skipFirst) { skipFirst = false; return }
       const c = map.getCenter()
-      setLlzRef.current({ lat: c.lat, lon: c.lng, zoom: map.getZoom() })
+      setLlzRef.current({ lat: c.lat, lng: c.lng, zoom: map.getZoom() })
     }
     map.on('moveend', onMoveEnd)
     return () => {
