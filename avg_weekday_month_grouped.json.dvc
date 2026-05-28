@@ -7,19 +7,19 @@ meta:
   computation:
     cmd: path-data months
     deps:
-      data/2012.pqt: ee659c5767e40adcf02d2ee18914fd10
-      data/2013.pqt: 722a5ed4c1f1abe79a73dc1a46e546c7
-      data/2014.pqt: d42b26707c07c2310479390322f60cdc
-      data/2015.pqt: 95e01640c4903430e58e0034017540fa
-      data/2016.pqt: 549cb919b23b5ce7f6501379236c9c09
-      data/2017.pqt: ad8e022e91c7213ad66cdc2ee7657b06
-      data/2018.pqt: 9f91a506ac6aad562c116273bcb519b8
-      data/2019.pqt: 77c14431260253a67302953d07be4458
-      data/2020.pqt: 90f5888f6a5638f577e4aff44243f68f
-      data/2021.pqt: 6e756c9108ac56eec4920f356053b2b6
-      data/2022.pqt: 7aa6a8a04ed812eb5b2ee2aa495b1f9f
-      data/2023.pqt: f5f03974c6ebdfb8394649e510568cd0
-      data/2024.pqt: 5cf774d5cb9c7bd4bd24435cd7b5376a
-      data/2025.pqt: 7f134c2dfdb069b80dff5036cc4ac7f8
+      data/2012.pqt: f228991a3d9c8ef1e1249c95940775b1
+      data/2013.pqt: f0eaf693badb22d34af688518bee37c1
+      data/2014.pqt: 69c5ec477ca546b2fd1774fa26fefcc6
+      data/2015.pqt: 68551e8dedd40f04559aca3b8c81a403
+      data/2016.pqt: b3f8ca4896ac500309165108c66502e2
+      data/2017.pqt: ae97102ae4cf2960a9e5c82a3b1f82fc
+      data/2018.pqt: 18d6fff4e1a7cffc89636228bbdec28f
+      data/2019.pqt: 062d8f54f3651d492016ea5b026be462
+      data/2020.pqt: 764689f43296fe6d79754cf051c3439a
+      data/2021.pqt: b0133f69d2cac6ac3144c5fb6534dede
+      data/2022.pqt: ee4f86036f72cd910bd090d2e849fc3b
+      data/2023.pqt: c5c3d4a1de834ee3b3c8df7a550c253e
+      data/2024.pqt: 145d6167c407fcb5a15871518297008d
+      data/2025.pqt: 95f69d8e56ecccba58fdef58981af4a8
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089
