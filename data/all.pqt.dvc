@@ -1,6 +1,6 @@
 outs:
-- md5: 0bb51d2b7be99870d218a1ea20b2b0e6
-  size: 105807
+- md5: 6c465f62a933dba28535e32d35ed3b50
+  size: 106436
   hash: md5
   path: all.pqt
 meta:
@@ -21,6 +21,6 @@ meta:
       2023.pqt: c5c3d4a1de834ee3b3c8df7a550c253e
       2024.pqt: 145d6167c407fcb5a15871518297008d
       2025.pqt: 95f69d8e56ecccba58fdef58981af4a8
-      2026.pqt: 219f1056b980d1db71795901d3358842
+      2026.pqt: 222e2ff4ad77e4958107fbd8bbcbc924
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089
