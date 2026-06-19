@@ -259,6 +259,24 @@ def _ym_label(ym) -> str | None:
         return None
 
 
+def _staged_in_head(predicate) -> bool:
+    """Return True if any file matching `predicate` differs between HEAD~1 and HEAD.
+
+    Used to gate the "published and deployed" Slack message on whether the
+    artifacts the FE actually reads (`www/public/*.dvc`) changed in the
+    just-pushed commit — not just whether `last_month()` happened to flip.
+    """
+    try:
+        out = subprocess.check_output(
+            ['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'],
+            text=True,
+        )
+    except CalledProcessError as e:
+        err(f"_staged_in_head: git diff failed: {e}")
+        return False
+    return any(predicate(line) for line in out.splitlines() if line)
+
+
 def _safe_last_month():
     """Return `last_month()` or None if the refresh/PDF state doesn't yet
     allow inferring one (e.g. no PDFs locally)."""
@@ -559,8 +577,27 @@ def gha_update():
         # Compare parsed-data snapshots, not staged PDFs: a re-uploaded PDF
         # with the same content can stage a new `.pdf.dvc` (new etag/mtime)
         # without producing any new parsed rows.
-        new_path = bool(curr_label and prev_label and prev_label != curr_label)
-        new_bt = bool(curr_bt and curr_bt != prev_bt)
+        label_flipped_path = bool(curr_label and prev_label and prev_label != curr_label)
+        label_flipped_bt = bool(curr_bt and curr_bt != prev_bt)
+
+        # Only claim "published and deployed" when the FE-facing artifacts
+        # *actually* changed in this commit. `last_month()`/`_bt_latest_month()`
+        # alone can flip while parsing/the dvx run silently no-ops (see the
+        # 2026-06-17 incident: PDF page count flipped April→May, Slack
+        # claimed "through 2026-05 — published and deployed", but
+        # `www/public/all.pqt.dvc` didn't change, so the FE stayed on April).
+        path_outs_changed = _staged_in_head(
+            lambda f: (
+                f.startswith('www/public/')
+                and f.endswith('.dvc')
+                and not basename(f).startswith('bt-')
+            )
+        )
+        bt_outs_changed = _staged_in_head(
+            lambda f: f.startswith('www/public/bt-') and f.endswith('.dvc')
+        )
+        new_path = label_flipped_path and path_outs_changed
+        new_bt = label_flipped_bt and bt_outs_changed
 
         if new_path or new_bt:
             # At least one source has genuinely new upstream data
