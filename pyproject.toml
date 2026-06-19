@@ -12,7 +12,7 @@ dependencies = [
     "numpy>=2",
     "openpyxl==3.1.5",
     "pandas>=3",
-    "plotly",
+    "plotly<6.8",  # 6.8.0 added `defaults.headers={'X-Requested-With': 'plotly.py'}` which propagates into Kaleido kopts → `Chromium.__init__` rejects unknown kwarg ("Chromium.get_cli() received invalid args: dict_keys(['headers'])"), every CI render (og.png + monthly PNGs) silently fails
     "PyPDF2",
     "uv",  # for `uv run parse_bt.py` (inline-metadata isolation: avoids pyarrow polluting the main venv, which triggers pandas's pyarrow-string default and breaks fastparquet's writer)
     "tabula-py",
