@@ -8,6 +8,13 @@ import { codeParam, useUrlState } from "use-prms"
 import { Plot, hovertemplate } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import type { StationGroup } from "./RidesPlot"
+import {
+  DAY_TYPES as PICKER_DAY_TYPES,
+  DAY_TYPE_COLORS as PICKER_DAY_TYPE_COLORS,
+  DAY_TYPE_LABELS as PICKER_DAY_TYPE_LABELS,
+  dayTypesParam,
+  type DayType as PickerDayType,
+} from "./dayTypes"
 
 const height = 450
 
@@ -62,6 +69,15 @@ type Direction = "entry" | "exit"
 type LegendMode = "solo" | "highlight"
 
 const DAY_TYPES: DayType[] = ["weekday", "saturday", "sunday", "holiday"]
+
+// Picker is 3-value (Weekday/Weekend/Holiday) shared via URL `?d=` with
+// RidesPlot + EntriesVsExitsBars. We expand "weekend" → ["saturday","sunday"]
+// at the data-aggregation step so the underlying 4-value model still works.
+const PICKER_TO_RAW: Record<PickerDayType, DayType[]> = {
+  weekday: ["weekday"],
+  weekend: ["saturday", "sunday"],
+  holiday: ["holiday"],
+}
 
 const groupByParam = codeParam<GroupBy>("station", { station: "s", daytype: "d", direction: "r" })
 const directionParam = codeParam<Direction>("entry", { entry: "n", exit: "x" })
@@ -135,7 +151,14 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
   const [legendMode, setLegendMode] = useUrlState<LegendMode>("hl", legendModeParam)
   const [selectedStations, setSelectedStations] = useState<string[]>([...STATIONS])
-  const [selectedDayTypes, setSelectedDayTypes] = useState<DayType[]>([...DAY_TYPES])
+  // Shared 3-value URL state (Weekday/Weekend/Holiday) — synced with RidesPlot + EvE.
+  const [pickerDayTypes, setPickerDayTypes] = useUrlState<string[]>("d", dayTypesParam)
+  // Derived 4-value list (weekend expanded to sat+sun) for the existing data
+  // aggregation code that operates on raw day-types.
+  const selectedDayTypes = useMemo<DayType[]>(
+    () => (pickerDayTypes as PickerDayType[]).flatMap(d => PICKER_TO_RAW[d] ?? []),
+    [pickerDayTypes],
+  )
 
   const activeStations = useMemo(() => {
     if (externalStations && externalStations.length > 0) {
@@ -319,28 +342,19 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         </span>
       )
     }
-    if (selectedDayTypes.length < DAY_TYPES.length) {
-      const hasSat = selectedDayTypes.includes("saturday")
-      const hasSun = selectedDayTypes.includes("sunday")
-      const parts: string[] = []
-      if (hasSat && hasSun) {
-        if (selectedDayTypes.includes("weekday")) parts.push("Weekday")
-        parts.push("Weekend")
-        if (selectedDayTypes.includes("holiday")) parts.push("Holiday")
-      } else {
-        for (const dt of selectedDayTypes) parts.push(DAY_TYPE_LABELS[dt])
-      }
+    if (pickerDayTypes.length < PICKER_DAY_TYPES.length) {
+      const parts = pickerDayTypes.map(dt => PICKER_DAY_TYPE_LABELS[dt] ?? dt)
       badges.push(
         <span key="daytypes" className="filter-badge">
           {parts.join(", ")}
-          <span className="clear-filter" onClick={() => setSelectedDayTypes([...DAY_TYPES])}>&times;</span>
+          <span className="clear-filter" onClick={() => setPickerDayTypes([...PICKER_DAY_TYPES])}>&times;</span>
         </span>
       )
     }
     const staticText = "all months averaged (2017–present)"
     if (badges.length === 0) return staticText
     return <>{badges} · {staticText}</>
-  }, [activeTraceName, externalActiveStation, groupBy, selectedDayTypes, onSoloStationChange])
+  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onSoloStationChange, setPickerDayTypes])
 
   // Controlled solo: map full station name <-> trace name (with period abbreviation).
   const soloTraceName = useMemo(() => {
@@ -416,18 +430,12 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
           regionGroups={REGION_GROUPS}
         />
         <StationDropdown
-          label="Sat / Sun"
-          stations={[...DAY_TYPES]}
-          colors={DAY_TYPE_COLORS}
-          selected={selectedDayTypes}
-          lineGroups={[
-            { label: "Weekday", color: DAY_TYPE_COLORS.weekday, stations: ["weekday"] },
-            { label: "Weekend", color: DAY_TYPE_COLORS.weekend, stations: ["saturday", "sunday"] },
-            { label: "Holiday", color: DAY_TYPE_COLORS.holiday, stations: ["holiday"] },
-          ]}
-          lineGroupsLabel="Day Types"
-          nameMap={DAY_TYPE_LABELS}
-          onChange={v => setSelectedDayTypes(v as DayType[])}
+          label="Day Types"
+          stations={[...PICKER_DAY_TYPES]}
+          colors={PICKER_DAY_TYPE_COLORS}
+          selected={pickerDayTypes}
+          nameMap={PICKER_DAY_TYPE_LABELS}
+          onChange={v => setPickerDayTypes(v)}
         />
       </div>
     </div>

@@ -12,6 +12,14 @@ import type { RepelLineObstacle, RepelPoint, RepelRectObstacle } from "pltly/plo
 import { Plot, blendAvgColor, clean, hovertemplate, hovertemplatePct, isDark, rollingAvg, url, useDark } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
+import {
+  DAY_TYPES,
+  DAY_TYPE_COLORS,
+  DAY_TYPE_LABELS,
+  DAY_TYPE_FROM_LABEL,
+  dayTypesParam,
+  type DayType,
+} from "./dayTypes"
 
 
 const STATIONS = [
@@ -210,46 +218,6 @@ const stationsParam: Param<string[]> = {
       return STATIONS.filter(s => !excludedCodes.has(STATION_CODES[s]))
     }
     return encoded.split('').map(c => CODE_TO_STATION[c]).filter(Boolean)
-  },
-}
-
-const DAY_TYPES = ["weekday", "weekend", "holiday"] as const
-type DayType = typeof DAY_TYPES[number]
-
-const DAY_TYPE_COLORS: Record<string, string> = {
-  weekday: "#ef4444",
-  weekend: "#3b82f6",
-  holiday: "#10b981",
-}
-const DAY_TYPE_LABELS: Record<string, string> = {
-  weekday: "Weekday",
-  weekend: "Weekend",
-  holiday: "Holiday",
-}
-
-const DAY_TYPE_FROM_LABEL: Record<string, string> = Object.fromEntries(
-  Object.entries(DAY_TYPE_LABELS).map(([k, v]) => [v, k])
-)
-
-const DAY_TYPE_CODES: Record<string, string> = {
-  weekday: "w",
-  weekend: "e",
-  holiday: "h",
-}
-const CODE_TO_DAY_TYPE: Record<string, string> = Object.fromEntries(
-  Object.entries(DAY_TYPE_CODES).map(([k, v]) => [v, k])
-)
-
-const dayTypesParam: Param<string[]> = {
-  encode(types: string[]): string | undefined {
-    if (types.length === 2 && types.includes("weekday") && types.includes("weekend")) return undefined
-    if (types.length === 0) return ''
-    return types.map(t => DAY_TYPE_CODES[t]).join('')
-  },
-  decode(encoded: string | undefined): string[] {
-    if (encoded === undefined) return ["weekday", "weekend"]
-    if (encoded === '') return []
-    return encoded.split('').map(c => CODE_TO_DAY_TYPE[c]).filter(Boolean)
   },
 }
 
@@ -935,6 +903,19 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     clearTimeout(dayTypeUrlTimerRef.current)
     dayTypeUrlTimerRef.current = setTimeout(() => setUrlDayTypes(dayTypes), 300)
   }, [setUrlDayTypes])
+  // Pull external URL changes (e.g. from EvE) back into local state. Skip when
+  // we're mid-debounce on our own write (timerRef set) — otherwise our own
+  // setUrlDayTypes flush would race the external change.
+  useEffect(() => {
+    if (dayTypeUrlTimerRef.current) return
+    if (urlDayTypes.join(',') === selectedDayTypes.join(',')) return
+    setSelectedDayTypesRaw(urlDayTypes)
+  }, [urlDayTypes, selectedDayTypes])
+  useEffect(() => {
+    if (stationUrlTimerRef.current) return
+    if (urlStations.join(',') === selectedStations.join(',')) return
+    setSelectedStationsRaw(urlStations)
+  }, [urlStations, selectedStations])
   const [baselineYears, setBaselineYears] = useUrlState<number>("b", baselineYearsParam)
   const [exclusions, setExclusions] = useUrlState<Exclusion[]>("x", exclusionsParam)
   // Force time range to recent when pct2019

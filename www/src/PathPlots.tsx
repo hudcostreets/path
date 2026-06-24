@@ -64,6 +64,6 @@ export default function PathPlots() {
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
       <StationsMap embedded onDateRangeChange={setMapDateRange} />
     </Suspense>
-    <EntriesVsExitsBars />
+    <EntriesVsExitsBars soloStation={soloStation} />
   </>
 }
