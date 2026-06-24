@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useEffect, useMemo, useState } from "react"
 import { Data, Layout } from "plotly.js"
 import { useUrlState } from "use-prms"
+import { resolve as dvcResolve } from "virtual:dvc-data"
 
 import { Plot, isDark } from "./plot-utils"
 import { YmInput } from "./YmInput"
@@ -79,7 +80,7 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
     queryKey: ['entries-vs-exits'],
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    queryFn: async () => (await fetch('/entries_vs_exits.json')).json(),
+    queryFn: async () => (await fetch(dvcResolve('entries_vs_exits.json'))).json(),
   })
 
   const allYms = data?.all_yms ?? []
