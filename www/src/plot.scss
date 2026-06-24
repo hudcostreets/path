@@ -258,6 +258,17 @@ html.clean {
   flex-shrink: 0;
 }
 
+// `.kbd-speed-dial-action` items with `href` render as `<a>`. Our dark-mode
+// `a { color: #818cf8 }` (specificity 0,2,0) beats use-kbd's own
+// `.kbd-speed-dial-action { color: var(--kbd-text) }` (0,1,0), so the icons
+// (which use `fill="currentColor"`) tint purple. Re-pin to the SpeedDial fg.
+.kbd-speed-dial-primary,
+.kbd-speed-dial-action,
+.kbd-speed-dial-chevron {
+  color: var(--kbd-text);
+  &:hover { color: var(--kbd-text); }
+}
+
 // Floating UI tooltips
 .fui-tooltip {
   --tooltip-bg: #333;
