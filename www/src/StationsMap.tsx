@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { Param, codeParam, useUrlState } from 'use-prms'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { STATION_COORDS } from './stations-geo'
+import { YmInput } from './YmInput'
 
 const resolved = dvcResolve('hourly.pqt')
 const hourlyUrl = resolved.startsWith('/') ? `${window.location.origin}${resolved}` : resolved
@@ -564,63 +565,6 @@ const selectStyle: React.CSSProperties = {
   borderRadius: 4,
   padding: '0.15em 0.4em',
   fontSize: '0.85rem',
-}
-
-// Parse "YY-?MM" / "YYYY-?MM" → "YYYY-MM". Accepts "26-2", "2602", "2026-02".
-// Returns null when no available month matches.
-function parseYmInput(s: string, allYms: string[]): string | null {
-  const t = s.trim()
-  if (!t) return null
-  const m4 = t.match(/^(\d{4})-?(\d{1,2})$/)
-  const m2 = t.match(/^(\d{2})-?(\d{1,2})$/)
-  let yyyy: number, mm: number
-  if (m4) { yyyy = parseInt(m4[1]); mm = parseInt(m4[2]) }
-  else if (m2) { yyyy = 2000 + parseInt(m2[1]); mm = parseInt(m2[2]) }
-  else return null
-  if (mm < 1 || mm > 12) return null
-  const ym = `${yyyy}-${String(mm).padStart(2, '0')}`
-  return allYms.includes(ym) ? ym : null
-}
-const ymToInput = (ym: string) => ym ? `${ym.slice(2, 4)}-${ym.slice(5, 7)}` : ''
-
-function YmInput({ value, onChange, allYms }: {
-  value: string
-  onChange: (v: string) => void
-  allYms: string[]
-}) {
-  const [text, setText] = useState(ymToInput(value))
-  // Resync when external value changes (URL nav, reset).
-  useEffect(() => { setText(ymToInput(value)) }, [value])
-  // Read raw text from the DOM at commit time — stale-closure-safe — and
-  // either accept (notify parent + canonicalize) or revert to last valid.
-  const commit = (raw: string) => {
-    const parsed = parseYmInput(raw, allYms)
-    if (parsed) {
-      onChange(parsed)
-      setText(ymToInput(parsed))
-    } else {
-      setText(ymToInput(value))
-    }
-  }
-  return (
-    <input
-      type="text"
-      value={text}
-      onChange={e => setText(e.target.value)}
-      onBlur={e => commit(e.currentTarget.value)}
-      onKeyDown={e => {
-        if (e.key === 'Enter') { e.currentTarget.blur() }
-        else if (e.key === 'Escape') { setText(ymToInput(value)); e.currentTarget.blur() }
-      }}
-      placeholder="YY-MM"
-      style={{
-        ...selectStyle,
-        width: '4.5em',
-        textAlign: 'center',
-        fontFamily: 'ui-monospace, monospace',
-      }}
-    />
-  )
 }
 
 const playButtonStyle: React.CSSProperties = {
