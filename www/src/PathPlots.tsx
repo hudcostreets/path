@@ -3,6 +3,7 @@ import RidesPlot, { stationSubtitle } from "./RidesPlot"
 import type { Metric } from "./RidesPlot"
 import MonthlyPlots from "./MonthlyPlots"
 import HourlyPlot from "./HourlyPlot"
+import EntriesVsExitsBars from "./EntriesVsExitsBars"
 
 type DateRange = { from: string, to: string }
 
@@ -63,5 +64,6 @@ export default function PathPlots() {
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
       <StationsMap embedded onDateRangeChange={setMapDateRange} />
     </Suspense>
+    <EntriesVsExitsBars />
   </>
 }
