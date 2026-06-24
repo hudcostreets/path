@@ -12,9 +12,9 @@ import {
   DAY_TYPES as PICKER_DAY_TYPES,
   DAY_TYPE_COLORS as PICKER_DAY_TYPE_COLORS,
   DAY_TYPE_LABELS as PICKER_DAY_TYPE_LABELS,
-  dayTypesParam,
   type DayType as PickerDayType,
 } from "./dayTypes"
+import { STATIONS as CANONICAL_STATIONS } from "./stations"
 
 const height = 450
 
@@ -133,26 +133,33 @@ function colKey(dayType: DayType, direction: Direction): keyof HourlyRow {
   return `avg_${dayType}_${direction}` as keyof HourlyRow
 }
 
-export default function HourlyPlot({ stations: externalStations, onActiveStationChange, soloStation, onSoloStationChange, externalActiveStation, dateRange }: {
-  stations?: string[]
+export default function HourlyPlot({ activeStations, onActiveStationsChange, activeDayTypes, onActiveDayTypesChange, onActiveStationChange, externalActiveStation, dateRange }: {
+  /** Page-level station filter; pin = single-element subset. */
+  activeStations: string[]
+  onActiveStationsChange: (stations: string[]) => void
+  activeDayTypes: string[]
+  onActiveDayTypesChange: (dayTypes: string[]) => void
   onActiveStationChange?: (station: string | null) => void
-  /** Controlled solo/pin (full station name). Pair with `onSoloStationChange`
-   *  to share pin state across plots. */
-  soloStation?: string | null
-  onSoloStationChange?: (station: string | null) => void
-  /** Cross-plot active signal (from another plot's local hover/pin). Fills in
-   *  the visual brush when there's no local hover/pin. */
+  /** Cross-plot active signal (from another plot's local hover/pin). */
   externalActiveStation?: string | null
-  /** "YYYY-MM" range filter from sibling plot (e.g. plot4 / map). When set,
-   *  rows outside [from, to] are excluded before aggregation. */
+  /** "YYYY-MM" range filter from sibling plot (e.g. plot4 / map). */
   dateRange?: { from: string, to: string }
 }) {
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("hg", groupByParam)
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
   const [legendMode, setLegendMode] = useUrlState<LegendMode>("hl", legendModeParam)
-  const [selectedStations, setSelectedStations] = useState<string[]>([...STATIONS])
-  // Shared 3-value URL state (Weekday/Weekend/Holiday) — synced with RidesPlot + EvE.
-  const [pickerDayTypes, setPickerDayTypes] = useUrlState<string[]>("d", dayTypesParam)
+  // Aliases mapping page-level state into the names the rest of the file uses.
+  // Empty `activeStations` → "all" for chart aggregation; "Christopher Street"
+  // arrives in canonical form and gets shortened to "Christopher St." inline.
+  const selectedStations = useMemo(
+    () => activeStations.length > 0
+      ? activeStations.map(s => s === "Christopher Street" ? "Christopher St." : s)
+      : [...STATIONS] as string[],
+    [activeStations],
+  )
+  const setSelectedStations = onActiveStationsChange
+  const pickerDayTypes = activeDayTypes
+  const setPickerDayTypes = onActiveDayTypesChange
   // Derived 4-value list (weekend expanded to sat+sun) for the existing data
   // aggregation code that operates on raw day-types.
   const selectedDayTypes = useMemo<DayType[]>(
@@ -160,14 +167,9 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     [pickerDayTypes],
   )
 
-  const activeStations = useMemo(() => {
-    if (externalStations && externalStations.length > 0) {
-      return externalStations
-        .map(s => s === "Christopher Street" ? "Christopher St." : s)
-        .filter(s => (STATIONS as readonly string[]).includes(s))
-    }
-    return selectedStations
-  }, [externalStations, selectedStations])
+  // What the chart aggregates over: the page-level station filter (already
+  // abbreviated). Kept as a named alias for clarity in the rest of the file.
+  const chartStations = selectedStations
 
   const { data: allRows } = useQuery({
     queryKey: ['hourly-by-station', hourlyUrl],
@@ -207,7 +209,11 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
           return ym >= dateRange.from && ym <= dateRange.to
         }
       : () => true
-    const filtered = allRows.filter(r => activeStations.includes(r.station) && inRange(r))
+    // For aggregating views (direction/daytype), narrow rows to active
+    // stations. BY STATION renders one trace per station and uses all rows
+    // (legendonly hides the non-active ones — see below).
+    const inDateRange = allRows.filter(inRange)
+    const filtered = inDateRange.filter(r => chartStations.includes(r.station))
     const hours = Array.from({ length: 24 }, (_, i) => i)
 
     if (groupBy === "direction") {
@@ -235,9 +241,10 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     }
 
     if (groupBy === "station") {
-      // One trace per station, sum across selected day types
+      // One trace per station, sum across selected day types. Use all
+      // date-ranged rows so legendonly traces still have real data.
       const stationHourSums = new Map<string, { sum: number, count: number }>()
-      for (const r of filtered) {
+      for (const r of inDateRange) {
         for (const dt of selectedDayTypes) {
           const key = `${r.station}-${r.hour}`
           const prev = stationHourSums.get(key) ?? { sum: 0, count: 0 }
@@ -246,22 +253,25 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
           stationHourSums.set(key, prev)
         }
       }
-      return [...STATIONS]
-        .filter(s => activeStations.includes(s))
-        .map(station => {
-          const y = hours.map(h => {
-            const entry = stationHourSums.get(`${station}-${h}`)
-            return entry ? Math.round(entry.sum / entry.count) : 0
-          })
-          return {
-            name: station,
-            type: "bar",
-            x: hours,
-            y,
-            marker: { color: STATION_COLORS[station] },
-            hovertemplate,
-          } as Data
+      // Render all stations so legend stays a discovery surface; hide
+      // non-active ones via `visible: 'legendonly'` (matches pltly's solo
+      // behavior). When activeStations is the full set, all show.
+      const activeSet = new Set(chartStations)
+      return [...STATIONS].map(station => {
+        const y = hours.map(h => {
+          const entry = stationHourSums.get(`${station}-${h}`)
+          return entry ? Math.round(entry.sum / entry.count) : 0
         })
+        return {
+          name: station,
+          type: "bar",
+          x: hours,
+          y,
+          marker: { color: STATION_COLORS[station] },
+          hovertemplate,
+          visible: activeSet.has(station) ? true : 'legendonly' as any,
+        } as Data
+      })
     } else {
       // One trace per day type, merging sat+sun into "Weekend" when both selected
       const hasSat = selectedDayTypes.includes("saturday")
@@ -303,7 +313,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
         } as Data
       })
     }
-  }, [allRows, activeStations, selectedDayTypes, groupBy, direction, dateRange])
+  }, [allRows, chartStations, selectedDayTypes, groupBy, direction, dateRange])
 
   const dirLabel = direction === "entry" ? "entries" : "exits"
   const groupLabel = groupBy === "station" ? "by station" : groupBy === "daytype" ? "by day type" : "by direction"
@@ -338,7 +348,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
       badges.push(
         <span key="station" className="filter-badge">
           {displayStation}
-          <span className="clear-filter" onClick={() => onSoloStationChange?.(null)}>&times;</span>
+          <span className="clear-filter" onClick={() => onActiveStationsChange([...CANONICAL_STATIONS] as string[])}>&times;</span>
         </span>
       )
     }
@@ -354,22 +364,23 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
     const staticText = "all months averaged (2017–present)"
     if (badges.length === 0) return staticText
     return <>{badges} · {staticText}</>
-  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onSoloStationChange, setPickerDayTypes])
+  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onActiveStationsChange, setPickerDayTypes])
 
-  // Controlled solo: map full station name <-> trace name (with period abbreviation).
+  // Pin = page-level `activeStations.length === 1`. Map full → trace display name.
   const soloTraceName = useMemo(() => {
-    if (soloStation === undefined) return undefined
-    if (!soloStation || groupBy !== "station") return null
-    const mapped = soloStation === "Christopher Street" ? "Christopher St." : soloStation
+    if (groupBy !== "station") return null
+    if (activeStations.length !== 1) return null
+    const s = activeStations[0]
+    const mapped = s === "Christopher Street" ? "Christopher St." : s
     return (STATIONS as readonly string[]).includes(mapped) ? mapped : null
-  }, [soloStation, groupBy])
+  }, [activeStations, groupBy])
 
   const handleSoloTraceChange = useCallback((name: string | null) => {
-    if (!onSoloStationChange) return
-    if (!name) { onSoloStationChange(null); return }
     if (groupBy !== "station") return
-    onSoloStationChange(name === "Christopher St." ? "Christopher Street" : name)
-  }, [onSoloStationChange, groupBy])
+    if (!name) { onActiveStationsChange([...CANONICAL_STATIONS] as string[]); return }
+    const canonical = name === "Christopher St." ? "Christopher Street" : name
+    onActiveStationsChange([canonical])
+  }, [onActiveStationsChange, groupBy])
 
   // External active-trace: map full station name → trace name (with abbrev).
   const externalActiveTrace = useMemo(() => {
@@ -425,7 +436,7 @@ export default function HourlyPlot({ stations: externalStations, onActiveStation
           stations={[...STATIONS]}
           colors={STATION_COLORS}
           selected={selectedStations}
-          onChange={setSelectedStations}
+          onChange={stations => setSelectedStations(stations.map(s => s === "Christopher St." ? "Christopher Street" : s))}
           lineGroups={LINE_GROUPS}
           regionGroups={REGION_GROUPS}
         />

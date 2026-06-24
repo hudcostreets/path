@@ -514,6 +514,7 @@ function buildByStation(
 
   if (metric === "pct2019") {
     const vs2019Months = months.slice(firstPostBaselineIdx)
+    const activeSet = new Set(activeStns)
     const traces: Data[] = (STATIONS as readonly string[]).map(station => {
         const sd = stations.get(station)
         const bl = baselines.get(station)
@@ -534,6 +535,7 @@ function buildByStation(
           mode: "lines",
           line: { color: STATION_COLORS[station] },
           hovertemplate: hovertemplatePct,
+          visible: activeSet.has(station) ? true : 'legendonly' as any,
         } as Data
       }).filter((d): d is Data => d !== null)
 
@@ -561,6 +563,7 @@ function buildByStation(
 
   if (metric === "total") {
     const yearNum = activeYear ? parseInt(activeYear) : null
+    const activeSet = new Set(activeStns)
     const barData: Data[] = (STATIONS as readonly string[]).map(station => {
       const sd = stations.get(station)
       if (!sd) return null
@@ -578,6 +581,7 @@ function buildByStation(
           ...(yearOpacity ? { opacity: yearOpacity } : {}),
         },
         hovertemplate,
+        visible: activeSet.has(station) ? true : 'legendonly' as any,
       } as Data
     }).filter((d): d is Data => d !== null)
 
@@ -625,7 +629,11 @@ function buildByStation(
     }
   }
 
-  // metric === "avg", grouped by station: lines per station
+  // metric === "avg", grouped by station: lines per station. Render ALL
+  // stations as traces so the legend stays a discovery surface, but flip
+  // non-active stations to `visible: 'legendonly'` (matches pltly's solo
+  // behavior). When the page filter is "all", everything renders.
+  const activeSet = new Set(activeStns)
   const traces: Data[] = (STATIONS as readonly string[]).map(station => {
       const sd = stations.get(station)
       if (!sd) return null
@@ -638,6 +646,7 @@ function buildByStation(
         mode: "lines",
         line: { color: STATION_COLORS[station] },
         hovertemplate,
+        visible: activeSet.has(station) ? true : 'legendonly' as any,
       } as Data
     }).filter((d): d is Data => d !== null)
 
@@ -865,57 +874,34 @@ function buildByDayType(
   }
 }
 
-export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTypesChange, onMetricChange, activeYear, soloStation, onSoloStationChange, onActiveStationChange, externalActiveStation }: {
-  onEffectiveStationsChange?: (stations: string[]) => void
-  onEffectiveDayTypesChange?: (dayTypes: string[]) => void
+export default function RidesPlot({ activeStations, onActiveStationsChange, activeDayTypes, onActiveDayTypesChange, onMetricChange, activeYear, onActiveStationChange, externalActiveStation }: {
+  /** Page-level station filter. Empty/full = all stations; non-empty subset
+   *  narrows the chart. Single-element subset is the "pin" state. */
+  activeStations: string[]
+  onActiveStationsChange: (stations: string[]) => void
+  activeDayTypes: string[]
+  onActiveDayTypesChange: (dayTypes: string[]) => void
   onMetricChange?: (metric: Metric) => void
   activeYear?: string | null
-  /** Controlled solo/pin (full station name like "Newark"). Pair with
-   *  `onSoloStationChange` to share pin state across plots. */
-  soloStation?: string | null
-  onSoloStationChange?: (station: string | null) => void
   /** Fires when local hover/pin active trace changes (full station name). */
   onActiveStationChange?: (station: string | null) => void
   /** Cross-plot active signal: fills in the visual brush when there's no
    *  local hover/pin (for bidirectional hover brushing). */
   externalActiveStation?: string | null
-} = {}) {
+}) {
   // Subscribe to theme so the component re-renders on changes; helpers below
   // call `isDark()` to read the current value.
   useDark()
   const [metric, setMetric] = useUrlState<Metric>("m", metricParam)
   const [groupBy, setGroupBy] = useUrlState<GroupBy>("g", groupByParam)
   const [timeRange, setTimeRange] = useUrlState<TimeRange>("t", timeRangeParam)
-  const [urlStations, setUrlStations] = useUrlState<string[]>("s", stationsParam)
-  const [urlDayTypes, setUrlDayTypes] = useUrlState<string[]>("d", dayTypesParam)
-  // Immediate local state for UI; URL syncs on a debounce
-  const [selectedStations, setSelectedStationsRaw] = useState<string[]>(urlStations)
-  const [selectedDayTypes, setSelectedDayTypesRaw] = useState<string[]>(urlDayTypes)
-  const stationUrlTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const dayTypeUrlTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const setSelectedStations = useCallback((stations: string[]) => {
-    setSelectedStationsRaw(stations)
-    clearTimeout(stationUrlTimerRef.current)
-    stationUrlTimerRef.current = setTimeout(() => setUrlStations(stations), 300)
-  }, [setUrlStations])
-  const setSelectedDayTypes = useCallback((dayTypes: string[]) => {
-    setSelectedDayTypesRaw(dayTypes)
-    clearTimeout(dayTypeUrlTimerRef.current)
-    dayTypeUrlTimerRef.current = setTimeout(() => setUrlDayTypes(dayTypes), 300)
-  }, [setUrlDayTypes])
-  // Pull external URL changes (e.g. from EvE) back into local state. Skip when
-  // we're mid-debounce on our own write (timerRef set) — otherwise our own
-  // setUrlDayTypes flush would race the external change.
-  useEffect(() => {
-    if (dayTypeUrlTimerRef.current) return
-    if (urlDayTypes.join(',') === selectedDayTypes.join(',')) return
-    setSelectedDayTypesRaw(urlDayTypes)
-  }, [urlDayTypes, selectedDayTypes])
-  useEffect(() => {
-    if (stationUrlTimerRef.current) return
-    if (urlStations.join(',') === selectedStations.join(',')) return
-    setSelectedStationsRaw(urlStations)
-  }, [urlStations, selectedStations])
+  // Treat empty `activeStations` as "all" for the chart's aggregation purposes
+  // (the URL param uses empty-set explicitly but UI-wise it reads as "no
+  // filter"). Same for day-types.
+  const selectedStations = activeStations.length > 0 ? activeStations : [...STATIONS] as string[]
+  const selectedDayTypes = activeDayTypes
+  const setSelectedStations = onActiveStationsChange
+  const setSelectedDayTypes = onActiveDayTypesChange
   const [baselineYears, setBaselineYears] = useUrlState<number>("b", baselineYearsParam)
   const [exclusions, setExclusions] = useUrlState<Exclusion[]>("x", exclusionsParam)
   // Force time range to recent when pct2019
@@ -1076,16 +1062,8 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
   }, [activeTraceName, groupBy, selectedDayTypes])
 
   useEffect(() => {
-    onEffectiveStationsChange?.(brushedStations)
-  }, [brushedStations, onEffectiveStationsChange])
-
-  useEffect(() => {
     onMetricChange?.(metric)
   }, [metric, onMetricChange])
-
-  useEffect(() => {
-    onEffectiveDayTypesChange?.(brushedDayTypes)
-  }, [brushedDayTypes, onEffectiveDayTypesChange])
 
   // Subtitle: badge-style facets with individual × clear buttons.
   // Station badge reflects brushedStations (picker ∪ active legend trace), so
@@ -1097,10 +1075,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
       badges.push(
         <span key="stations" className="filter-badge">
           {stSub}
-          <span className="clear-filter" onClick={() => {
-            setSelectedStations([...STATIONS])
-            onSoloStationChange?.(null)
-          }}>&times;</span>
+          <span className="clear-filter" onClick={() => setSelectedStations([...STATIONS])}>&times;</span>
         </span>
       )
     }
@@ -1115,7 +1090,7 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [brushedStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes, onSoloStationChange])
+  }, [brushedStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes])
 
   const baselines = useMemo(
     () => processed ? computeBaselines(processed.stations, baselineYears, exclusions) : new Map<string, StationBaseline>(),
@@ -1140,19 +1115,20 @@ export default function RidesPlot({ onEffectiveStationsChange, onEffectiveDayTyp
     return `${metricLabel} ${groupLabel}`
   }, [metric, groupBy, baselineYears])
 
-  // Controlled solo: map full station name <-> pltly trace display name.
+  // Pin = `activeStations.length === 1`. Map full station name → pltly's
+  // trace display name (e.g. "Christopher Street" → "Christopher St").
   const soloTraceName = useMemo(() => {
-    if (soloStation === undefined) return undefined
-    if (!soloStation || groupBy !== "station") return null
-    return displayName(soloStation)
-  }, [soloStation, groupBy])
+    if (groupBy !== "station") return null
+    if (activeStations.length !== 1) return null
+    return displayName(activeStations[0])
+  }, [activeStations, groupBy])
 
   const handleSoloTraceChange = useCallback((name: string | null) => {
-    if (!onSoloStationChange) return
-    if (!name) { onSoloStationChange(null); return }
     if (groupBy !== "station") return
-    onSoloStationChange(STATION_FROM_DISPLAY[name] ?? null)
-  }, [onSoloStationChange, groupBy])
+    if (!name) { onActiveStationsChange([...STATIONS]); return }
+    const station = STATION_FROM_DISPLAY[name]
+    if (station) onActiveStationsChange([station])
+  }, [onActiveStationsChange, groupBy])
 
   // External active-trace (from another plot's local hover/pin). Map full
   // station name → pltly display name.

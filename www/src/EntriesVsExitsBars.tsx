@@ -63,11 +63,18 @@ const chipActive: React.CSSProperties = {
 
 /** Mirror bars + gap line, with date-range + day-type filters and
  *  live system-wide totals. */
-export default function EntriesVsExitsBars({ soloStation }: {
-  soloStation?: string | null
+export default function EntriesVsExitsBars({ activeStations = [] }: {
+  /** Page-level station filter. Empty/full set → all stations; non-empty
+   *  subset → filter to those (single = pin). */
+  activeStations?: string[]
 } = {}) {
-  // Map RidesPlot's "Christopher Street" to our "Christopher St." spelling.
-  const pinnedStation = soloStation === "Christopher Street" ? "Christopher St." : soloStation
+  // Translate canonical names ("Christopher Street") to our short form.
+  const toShort = (s: string) => s === "Christopher Street" ? "Christopher St." : s
+  // When the page-level filter is a strict subset, narrow EvE to those stations.
+  const STATION_COUNT = 13  // total PATH stations
+  const filterStations = activeStations.length > 0 && activeStations.length < STATION_COUNT
+    ? activeStations.map(toShort)
+    : null  // null = no filter, render all
   const { data } = useQuery<Payload>({
     queryKey: ['entries-vs-exits'],
     refetchOnWindowFocus: false,
@@ -109,15 +116,14 @@ export default function EntriesVsExitsBars({ soloStation }: {
     const allStations = Array.from(totalsByStation.entries())
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => (b.entries + b.exits) - (a.entries + a.exits))
-    // When a station is pinned (legend click on RidesPlot/HourlyPlot), narrow
-    // the chart to that one station — matches MonthlyPlots' filter behavior.
-    const stations = pinnedStation
-      ? allStations.filter(s => s.name === pinnedStation)
+    // When the page-level filter is a strict subset, narrow EvE to those stations.
+    const stations = filterStations
+      ? allStations.filter(s => filterStations.includes(s.name))
       : allStations
     const sysEntries = stations.reduce((s, r) => s + r.entries, 0)
     const sysExits = stations.reduce((s, r) => s + r.exits, 0)
     return { stations, sysEntries, sysExits, totalDays, selectedYms }
-  }, [data, fromYm, toYm, activeDayTypes, pinnedStation])
+  }, [data, fromYm, toYm, activeDayTypes, filterStations])
 
   const plot = useMemo(() => {
     if (!agg) return null
@@ -196,7 +202,7 @@ export default function EntriesVsExitsBars({ soloStation }: {
       margin: { l: 90, r: 90, t: 30, b: 100 },
     }
     return { data: [entriesTrace, exitsTrace, ratioTrace], layout }
-  }, [agg, pinnedStation])
+  }, [agg])
 
   const sysSubtitle = useMemo(() => {
     if (!agg) return ' '

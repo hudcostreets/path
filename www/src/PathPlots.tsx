@@ -1,24 +1,32 @@
 import { lazy, Suspense, useCallback, useRef, useState } from "react"
+import { useUrlState } from "use-prms"
 import RidesPlot, { stationSubtitle } from "./RidesPlot"
 import type { Metric } from "./RidesPlot"
 import MonthlyPlots from "./MonthlyPlots"
 import HourlyPlot from "./HourlyPlot"
 import EntriesVsExitsBars from "./EntriesVsExitsBars"
+import { stationsParam } from "./stations"
+import { dayTypesParam } from "./dayTypes"
 
 type DateRange = { from: string, to: string }
 
 // Lazy: leaflet + tile basemap only loads when user scrolls to the map.
 const StationsMap = lazy(() => import("./StationsMap"))
 
+/** Page-level state for cross-plot filters. Single source of truth:
+ *   - `activeStations` (?s=): which stations are "in focus" — empty/full set
+ *     means "all stations" and renders the unfiltered view; non-empty subset
+ *     narrows every plot to those stations. Legend clicks set it to
+ *     [clickedStation] (toggle back to default on second click).
+ *   - `activeDayTypes` (?d=): the same idea for day types.
+ *  Both flow down to every plot as controlled props. No local debounced
+ *  copies, no separate "soloStation" / "selectedStations" / etc. */
 export default function PathPlots() {
-  const [plot1Stations, setPlot1Stations] = useState<string[]>([])
+  const [activeStations, setActiveStations] = useUrlState<string[]>("s", stationsParam)
+  const [activeDayTypes, setActiveDayTypes] = useUrlState<string[]>("d", dayTypesParam)
   const [plot1ActiveStation, setPlot1ActiveStation] = useState<string | null>(null)
   const [plot3ActiveStation, setPlot3ActiveStation] = useState<string | null>(null)
-  const [effectiveDayTypes, setEffectiveDayTypes] = useState<string[]>(["weekday", "weekend"])
   const [activeYear, setActiveYear] = useState<string | null>(null)
-  // Bidirectional pin: either plot's legend-click writes `soloStation`; both
-  // plots read it via pltly's controlled `soloTrace` and render it as pinned.
-  const [soloStation, setSoloStation] = useState<string | null>(null)
   // Date range owned by plot4 (StationsMap). Plot3 (HourlyPlot) follows it
   // for cross-plot brushing.
   const [mapDateRange, setMapDateRange] = useState<DateRange | undefined>()
@@ -31,39 +39,43 @@ export default function PathPlots() {
       setPlot2Metric(metric)
     }
   }, [])
-  // Plot3 can also brush plot2 on hover: when it has an active (non-pinned)
-  // station, prefer that over plot1's reported stations. Plot3 itself gets
-  // plot1's brush (not its own, to avoid narrowing data to one station that
-  // pltly's soloMode already visually isolates).
-  const plot2Stations = plot3ActiveStation ? [plot3ActiveStation] : plot1Stations
+  // MonthlyPlots narrows to hovered station (from either RidesPlot or
+  // HourlyPlot) if any, otherwise follows the page-level activeStations filter.
+  const plot2Stations = plot3ActiveStation
+    ? [plot3ActiveStation]
+    : plot1ActiveStation
+    ? [plot1ActiveStation]
+    : activeStations
   return <>
     <RidesPlot
-      onEffectiveStationsChange={setPlot1Stations}
-      onEffectiveDayTypesChange={setEffectiveDayTypes}
+      activeStations={activeStations}
+      onActiveStationsChange={setActiveStations}
+      activeDayTypes={activeDayTypes}
+      onActiveDayTypesChange={setActiveDayTypes}
       onMetricChange={onMetricChange}
       activeYear={activeYear}
-      soloStation={soloStation}
-      onSoloStationChange={setSoloStation}
       onActiveStationChange={setPlot1ActiveStation}
       externalActiveStation={plot3ActiveStation}
     />
     <MonthlyPlots
       stations={plot2Stations}
-      dayTypes={effectiveDayTypes}
+      dayTypes={activeDayTypes}
       metric={plot2Metric}
       subtitle={stationSubtitle(plot2Stations)}
       onActiveYearChange={setActiveYear}
     />
     <HourlyPlot
+      activeStations={activeStations}
+      onActiveStationsChange={setActiveStations}
+      activeDayTypes={activeDayTypes}
+      onActiveDayTypesChange={setActiveDayTypes}
       onActiveStationChange={setPlot3ActiveStation}
-      soloStation={soloStation}
-      onSoloStationChange={setSoloStation}
       externalActiveStation={plot1ActiveStation}
       dateRange={mapDateRange}
     />
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
       <StationsMap embedded onDateRangeChange={setMapDateRange} />
     </Suspense>
-    <EntriesVsExitsBars soloStation={soloStation} />
+    <EntriesVsExitsBars activeStations={activeStations} />
   </>
 }
