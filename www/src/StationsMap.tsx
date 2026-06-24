@@ -70,12 +70,27 @@ function formatCompactNum(n: number): string {
   return Math.round(n / 1000) + 'k'
 }
 
-export default function StationsMap({ embedded = false, onDateRangeChange }: {
+export default function StationsMap({ embedded = false, onDateRangeChange, activeStations }: {
   embedded?: boolean
   /** Fires whenever the date range changes (after auto-init or user edit).
    *  Lets the parent share the range with sibling plots (plot3 brushing). */
   onDateRangeChange?: (range: { from: string, to: string }) => void
+  /** Page-level station filter (canonical names like "Christopher Street").
+   *  When a strict subset, non-active markers fade + drop below active ones in
+   *  z-order so the focused stations pop. */
+  activeStations?: string[]
 } = {}) {
+  // Active set in this file's name convention ("Christopher St.") — null means
+  // "no filter, all stations full brightness".
+  const activeSet = useMemo<Set<string> | null>(() => {
+    if (!activeStations) return null
+    // Canonical "Christopher Street" → "Christopher St." for matching.
+    const mapped = activeStations.map(s => s === "Christopher Street" ? "Christopher St." : s)
+    // Treat empty or full-set as "no filter".
+    if (mapped.length === 0) return null
+    if (mapped.length >= Object.keys(STATION_COORDS).length) return null
+    return new Set(mapped)
+  }, [activeStations])
   // Two L.map instances side by side (NJ outer + core cluster) with a `//`
   // divider in between. Each pane fits its own subset's bounds. All markers
   // share `markersRef` keyed by station name; the data update effect mutates
@@ -421,6 +436,11 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
       const markerEl = marker.getElement()
       const el = markerEl?.querySelector<HTMLElement>('.station-glyph')
       if (!el || !markerEl) continue
+      // Page-level station filter: fade non-active markers and drop them
+      // below active ones in z-order.
+      const isFaded = activeSet !== null && !activeSet.has(station)
+      markerEl.style.opacity = isFaded ? '0.28' : '1'
+      marker.setZIndexOffset(isFaded ? -500 : 500)
       // Set `--anim-ms` on the marker root so both `.station-glyph` (transform,
       // bar heights, etc.) and `.station-name` (top position) inherit it.
       // Use `linear` easing during play so consecutive hour steps blend into
@@ -473,7 +493,7 @@ export default function StationsMap({ embedded = false, onDateRangeChange }: {
         `<strong>${station}</strong><br/>Avg entries: ${Math.round(t.entries).toLocaleString()}<br/>Avg exits: ${Math.round(t.exits).toLocaleString()}`
       )
     }
-  }, [rangeAvg, maxTotal, shape, animMs, playing])
+  }, [rangeAvg, maxTotal, shape, animMs, playing, activeSet])
 
 
   const hourLabel = effectiveHour === ALL_HOURS ? 'All hours' : formatHourRange(effectiveHour)

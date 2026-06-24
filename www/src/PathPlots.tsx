@@ -74,7 +74,7 @@ export default function PathPlots() {
       dateRange={mapDateRange}
     />
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
-      <StationsMap embedded onDateRangeChange={setMapDateRange} />
+      <StationsMap embedded onDateRangeChange={setMapDateRange} activeStations={activeStations} />
     </Suspense>
     <EntriesVsExitsBars activeStations={activeStations} />
   </>
