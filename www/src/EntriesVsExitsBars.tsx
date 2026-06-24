@@ -132,7 +132,10 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
     const names = stations.map(s => s.name)
     const entries = stations.map(s => s.entries)
     const exits = stations.map(s => s.exits)
-    const ratios = stations.map(s => s.entries > 0 ? s.exits / s.entries - 1 : 0)
+    // Negate so the line goes BELOW the x-axis when exits dominate (matches
+    // the orange exit bars below 0). Positive = entries dominant (matches
+    // the green entry bars above 0).
+    const ratios = stations.map(s => s.entries > 0 ? 1 - s.exits / s.entries : 0)
     const pctLabels = ratios.map(r => `${r >= 0 ? '+' : ''}${(r * 100).toFixed(0)}%`)
 
     const entriesTrace: Data = {
@@ -156,7 +159,7 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
 
     const ratioTrace: Data = {
       type: 'scatter',
-      name: 'Exits / entries − 1',
+      name: '1 − exits/entries',
       x: names,
       y: ratios,
       yaxis: 'y2',
@@ -189,7 +192,7 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
         zerolinecolor: isDark() ? '#888' : '#444',
       },
       yaxis2: {
-        title: { text: 'Exits / entries − 1', font: { color: RATIO_YELLOW } },
+        title: { text: '1 − exits/entries', font: { color: RATIO_YELLOW } },
         tickformat: '+.0%',
         tickfont: { color: RATIO_YELLOW },
         overlaying: 'y',
@@ -208,7 +211,9 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
   const sysSubtitle = useMemo(() => {
     if (!agg) return ' '
     const { sysEntries, sysExits, totalDays, selectedYms } = agg
-    const ratio = sysEntries > 0 ? sysExits / sysEntries - 1 : 0
+    // Same convention as the y2 line: positive = entries dominate, negative
+    // = exits dominate (matches the +/- sign of the bars above/below 0).
+    const ratio = sysEntries > 0 ? 1 - sysExits / sysEntries : 0
     const totalDaysN = (Object.values(totalDays) as number[]).reduce((a, b) => a + b, 0)
     const SHORT: Record<RawDayType, string> = { weekday: 'wkdy', saturday: 'Sat', sunday: 'Sun', holiday: 'hol' }
     const dayBreakdown = (Object.entries(totalDays) as [RawDayType, number][])

@@ -232,33 +232,69 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
     if (fromYm && toYm) onDateRangeChange?.({ from: fromYm, to: toYm })
   }, [fromYm, toYm, onDateRangeChange])
 
-  const rangeAvg = useMemo<RangeAvg[]>(() => {
-    if (!rows || !fromYm || !toYm) return []
+  // Per-(station, hour) entries/exits averaged across months in the date
+  // range. Computed once and reused for both `rangeAvg` and `maxTotal` so
+  // pie sizes stay absolute across hour scrubbing.
+  const perStationHour = useMemo(() => {
+    const result = new Map<string, Map<number, { e: number, x: number }>>()
+    if (!rows || !fromYm || !toYm) return result
     const inRange = rows.filter(r => r.ym >= fromYm && r.ym <= toYm)
-    const perYm = new Map<string, Map<string, { e: number, x: number }>>()
+    // Bucket by (station, hour, ym) summing rows, then average across yms.
+    const accum = new Map<string, Map<number, Map<string, { e: number, x: number }>>>()
     for (const r of inRange) {
-      if (effectiveHour !== ALL_HOURS && r.hour !== effectiveHour) continue
-      const s = perYm.get(r.station) ?? new Map()
-      const cur = s.get(r.ym) ?? { e: 0, x: 0 }
+      let byHr = accum.get(r.station)
+      if (!byHr) { byHr = new Map(); accum.set(r.station, byHr) }
+      let byYm = byHr.get(r.hour)
+      if (!byYm) { byYm = new Map(); byHr.set(r.hour, byYm) }
+      const cur = byYm.get(r.ym) ?? { e: 0, x: 0 }
       cur.e += r.entries; cur.x += r.exits
-      s.set(r.ym, cur); perYm.set(r.station, s)
+      byYm.set(r.ym, cur)
     }
-    const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / Math.max(1, a.length)
-    return Array.from(perYm.entries()).map(([station, m]) => ({
-      station,
-      entries: mean(Array.from(m.values()).map(v => v.e)),
-      exits: mean(Array.from(m.values()).map(v => v.x)),
-    }))
-  }, [rows, fromYm, toYm, effectiveHour])
+    for (const [station, byHr] of accum) {
+      const stn = new Map<number, { e: number, x: number }>()
+      for (const [hour, byYm] of byHr) {
+        const vals = Array.from(byYm.values())
+        const n = Math.max(1, vals.length)
+        stn.set(hour, {
+          e: vals.reduce((s, v) => s + v.e, 0) / n,
+          x: vals.reduce((s, v) => s + v.x, 0) / n,
+        })
+      }
+      result.set(station, stn)
+    }
+    return result
+  }, [rows, fromYm, toYm])
 
-  // Per-view max: the biggest station in the current (date-range, hour) slice
-  // fills MAX_RADIUS. Off-peak hours would otherwise render as tiny dots if we
-  // pegged the scale to the daily-sum max.
+  const rangeAvg = useMemo<RangeAvg[]>(() => {
+    return Array.from(perStationHour.entries()).map(([station, byHr]) => {
+      if (effectiveHour === ALL_HOURS) {
+        let e = 0, x = 0
+        for (const v of byHr.values()) { e += v.e; x += v.x }
+        return { station, entries: e, exits: x }
+      }
+      const v = byHr.get(effectiveHour) ?? { e: 0, x: 0 }
+      return { station, entries: v.e, exits: v.x }
+    })
+  }, [perStationHour, effectiveHour])
+
+  // Absolute pie scale: in hour-scrubbing mode, peg `maxTotal` to the largest
+  // (station, hour) pair across ALL hours in the date range — so a station's
+  // pie size stays consistent as the user scrubs through hours (smaller pies
+  // at off-peak vs larger at rush, instead of every hour's max filling
+  // MAX_RADIUS). In All-hours mode, use the all-day sum max.
   const maxTotal = useMemo(() => {
-    let max = 1
-    for (const r of rangeAvg) max = Math.max(max, r.entries + r.exits)
-    return max
-  }, [rangeAvg])
+    let hourlyMax = 1, dailyMax = 1
+    for (const byHr of perStationHour.values()) {
+      let stnDaily = 0
+      for (const v of byHr.values()) {
+        const h = v.e + v.x
+        if (h > hourlyMax) hourlyMax = h
+        stnDaily += h
+      }
+      if (stnDaily > dailyMax) dailyMax = stnDaily
+    }
+    return effectiveHour === ALL_HOURS ? dailyMax : hourlyMax
+  }, [perStationHour, effectiveHour])
 
   // Container for the clock control rendered into the map's top-right corner
   // via React portal. Set once Leaflet's L.control creates its DOM.
@@ -370,10 +406,13 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       const shift = L.point(size.x / 2, size.y / 2).subtract(target)
       map.setView(map.unproject(centerPx.add(shift), zoom), zoom, { animate: false })
     }
-    // NJ pane: clock occupies top-left ~140×130; tight margins otherwise.
-    const njPad = { left: 140, top: 30, right: 30, bottom: 60 }
-    // Core pane: no clock — pad just for marker extents.
-    const corePad = { left: 30, top: 30, right: 60, bottom: 60 }
+    // NJ pane: clock occupies top-left ~140×130, so reserve the upper-left
+    // via `top` (covers the clock's full height) rather than `left` (which
+    // would push stations far right). Inner (right) padding matches the core
+    // pane's inner padding so the divider area reads as a single big gap of
+    // ~equal width to each pane's outer edge buffer.
+    const njPad = { left: 30, top: 130, right: 60, bottom: 60 }
+    const corePad = { left: 60, top: 30, right: 60, bottom: 60 }
     const fitAll = () => {
       // Both panes share a zoom level: pick the smaller-fitting zoom across
       // panes so neither clips. In practice that's the core pane (its bbox
@@ -747,7 +786,9 @@ function HourClock({ hour, onChange, onHoverChange, animMs = 400, playing = fals
           style={{
             transform: `rotate(${handAngleDeg}deg)`,
             transformOrigin: `${cx}px ${cy}px`,
-            transition: `transform ${animMs}ms linear`,
+            // Snappy on hover (preview should track the cursor), smooth on
+            // play (consecutive ticks blend into continuous rotation).
+            transition: isHover ? 'transform 100ms ease-out' : `transform ${animMs}ms linear`,
           }}
           pointerEvents="none"
         >
