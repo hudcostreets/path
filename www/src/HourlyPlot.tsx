@@ -361,10 +361,12 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
         </span>
       )
     }
-    const staticText = "all months averaged (2017–present)"
-    if (badges.length === 0) return staticText
-    return <>{badges} · {staticText}</>
-  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onActiveStationsChange, setPickerDayTypes])
+    const rangeText = dateRange
+      ? `${dateRange.from} – ${dateRange.to}, averaged`
+      : "all months averaged (2017–present)"
+    if (badges.length === 0) return rangeText
+    return <>{badges} · {rangeText}</>
+  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onActiveStationsChange, setPickerDayTypes, dateRange])
 
   // Pin = page-level `activeStations.length === 1`. Map full → trace display name.
   const soloTraceName = useMemo(() => {
