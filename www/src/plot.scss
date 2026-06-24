@@ -89,7 +89,8 @@
   position: absolute;
   top: 100%;
   left: 0;
-  z-index: 100;
+  // Leaflet's map panes use z-index up to ~700; sit comfortably above them.
+  z-index: 1000;
   background: #2a2a3e;
   border: 1px solid #555;
   border-radius: 4px;
@@ -292,6 +293,14 @@ html.clean {
   &:hover {
     opacity: 0.8;
   }
+}
+
+// Leaflet tiles render at fractional pixel sizes (255.99×255.99 instead of
+// exact 256) on high-DPR / sub-integer zoom — leaving faint horizontal /
+// vertical hairlines between adjacent tiles. Force a 0.5px overlap to mask.
+.leaflet-tile {
+  width: 256.5px !important;
+  height: 256.5px !important;
 }
 
 // Elide divider between the NJ-outer pane and the core/NYC pane. Renders

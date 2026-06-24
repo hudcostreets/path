@@ -34,7 +34,7 @@ const hourParam: Param<number> = {
 
 const ENTRY_COLOR = '#22c55e'
 const EXIT_COLOR = '#f97316'
-const MAX_RADIUS = 56
+const MAX_RADIUS = 80
 
 // Geographic elide: NJ outer (Newark, Harrison) sit ~10km west of the Jersey
 // City / NYC core, with no PATH stations between. Rendering both at one
@@ -150,7 +150,8 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
   const [hoveredHour, setHoveredHour] = useState<number | null>(null)
   const effectiveHour = hoveredHour ?? hour
   const [shape, setShape] = useUrlState<Shape>('ms', shapeParam)
-  const [animMs, setAnimMs] = useState<number>(800)
+  // 300ms gives a nice "daily heartbeat" cadence when playing through 24 hours.
+  const [animMs, setAnimMs] = useState<number>(300)
   const [playing, setPlaying] = useState<boolean>(urlHour === ALL_HOURS)
   // Mirror external URL edits → liveHour while paused. (Ignored during play
   // so animation isn't disrupted by our own `setUrlHour(ALL_HOURS)` clear.)
@@ -406,13 +407,10 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       const shift = L.point(size.x / 2, size.y / 2).subtract(target)
       map.setView(map.unproject(centerPx.add(shift), zoom), zoom, { animate: false })
     }
-    // NJ pane: clock occupies top-left ~140×130, so reserve the upper-left
-    // via `top` (covers the clock's full height) rather than `left` (which
-    // would push stations far right). Inner (right) padding matches the core
-    // pane's inner padding so the divider area reads as a single big gap of
-    // ~equal width to each pane's outer edge buffer.
-    const njPad = { left: 30, top: 130, right: 60, bottom: 60 }
-    const corePad = { left: 60, top: 30, right: 60, bottom: 60 }
+    // NJ pane: clock occupies top-left ~140×130; tight margins otherwise.
+    const njPad = { left: 140, top: 30, right: 30, bottom: 60 }
+    // Core pane: no clock — pad just for marker extents.
+    const corePad = { left: 30, top: 30, right: 60, bottom: 60 }
     const fitAll = () => {
       // Both panes share a zoom level: pick the smaller-fitting zoom across
       // panes so neither clips. In practice that's the core pane (its bbox
@@ -528,11 +526,15 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
           labelX.style.setProperty('--ly', `${exitFrac * MAX_RADIUS * scale + 9}px`)
         }
       }
+      const popupHourLabel = effectiveHour === ALL_HOURS ? 'All hours' : formatHourRange(effectiveHour)
       marker.bindPopup(
-        `<strong>${station}</strong><br/>Avg entries: ${Math.round(t.entries).toLocaleString()}<br/>Avg exits: ${Math.round(t.exits).toLocaleString()}`
+        `<strong>${station}</strong>`
+        + `<br/><span style="opacity:0.7">${popupHourLabel}</span>`
+        + `<br/>Avg entries: ${Math.round(t.entries).toLocaleString()}`
+        + `<br/>Avg exits: ${Math.round(t.exits).toLocaleString()}`
       )
     }
-  }, [rangeAvg, maxTotal, shape, animMs, playing, activeSet])
+  }, [rangeAvg, maxTotal, shape, animMs, playing, activeSet, effectiveHour])
 
 
   const hourLabel = effectiveHour === ALL_HOURS ? 'All hours' : formatHourRange(effectiveHour)
