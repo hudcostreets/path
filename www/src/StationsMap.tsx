@@ -407,20 +407,57 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       const shift = L.point(size.x / 2, size.y / 2).subtract(target)
       map.setView(map.unproject(centerPx.add(shift), zoom), zoom, { animate: false })
     }
-    // NJ pane: clock occupies top-left ~140×130; tight margins otherwise.
-    const njPad = { left: 140, top: 30, right: 30, bottom: 60 }
-    // Core pane: no clock — pad just for marker extents.
-    const corePad = { left: 30, top: 30, right: 60, bottom: 60 }
+    // Base paddings — clock floats top-left of NJ (reserved via `top`).
+    // Inside-edge pads are computed dynamically below to achieve a
+    // 3-equal-pad layout (left-outer == middle == right-outer).
+    const njPadBase = { top: 130, bottom: 60 }
+    const corePadBase = { top: 30, bottom: 60 }
+    const MIN_PAD = 30  // breathing room at the closest edge
+
     const fitAll = () => {
-      // Both panes share a zoom level: pick the smaller-fitting zoom across
-      // panes so neither clips. In practice that's the core pane (its bbox
-      // is ~10× wider than NJ's). Result: stations on both sides render at
-      // the same physical scale.
-      const zNj = computeZoom(njMap, njBounds, njPad)
-      const zCore = computeZoom(coreMap, coreBounds, corePad)
-      const zoom = Math.min(zNj, zCore)
-      placePaneAtZoom(njMap, njBounds, zoom, njPad)
-      placePaneAtZoom(coreMap, coreBounds, zoom, corePad)
+      // First pass: compute shared zoom from a generous-pad estimate so the
+      // zoom isn't biased by whatever pane widths the DOM currently has.
+      const njPadInit = { ...njPadBase, left: MIN_PAD, right: MIN_PAD }
+      const corePadInit = { ...corePadBase, left: MIN_PAD, right: MIN_PAD }
+      const zoom = Math.min(
+        computeZoom(njMap, njBounds, njPadInit),
+        computeZoom(coreMap, coreBounds, corePadInit),
+      )
+
+      // Compute bbox pixel widths at this zoom.
+      const bboxPxWidth = (b: L.LatLngBounds) =>
+        Math.abs(coreMap.project(b.getNorthEast(), zoom).x - coreMap.project(b.getSouthWest(), zoom).x)
+      const njBboxPx = bboxPxWidth(njBounds)
+      const coreBboxPx = bboxPxWidth(coreBounds)
+
+      // Responsive 3-equal-pad: container = 3X + njBbox + coreBbox.
+      // Middle pad X includes the 28px divider; each middle-half = (X-28)/2.
+      const container = njContainerRef.current!.parentElement!.getBoundingClientRect().width
+      const X = (container - njBboxPx - coreBboxPx) / 3
+      const DIVIDER = 28
+
+      if (X >= 2 * MIN_PAD + DIVIDER) {
+        // Wide enough for 3-equal-pad. Compute target pane widths.
+        const middleHalf = (X - DIVIDER) / 2
+        const njPaneWidth = X + njBboxPx + middleHalf
+        // Set NJ pane width via inline style; Core flex-fills the rest.
+        njContainerRef.current!.style.flexBasis = `${njPaneWidth}px`
+        coreContainerRef.current!.style.flexBasis = `${container - njPaneWidth - DIVIDER}px`
+        njMap.invalidateSize()
+        coreMap.invalidateSize()
+        // Shift bbox within each pane via asymmetric left/right pad so the
+        // bbox center lands at the target position derived from X.
+        // pad.left − pad.right = 2*desired_center_in_pane − pane_width
+        // NJ desired_center = X + njBboxPx/2  →  diff = 0.5X + 14
+        // Core desired_center = (X-28)/2 + coreBboxPx/2  →  diff = -(0.5X + 14)
+        const shift = 0.5 * X + 14
+        placePaneAtZoom(njMap, njBounds, zoom, { ...njPadBase, left: MIN_PAD + shift, right: MIN_PAD })
+        placePaneAtZoom(coreMap, coreBounds, zoom, { ...corePadBase, left: MIN_PAD, right: MIN_PAD + shift })
+      } else {
+        // Narrow viewport: fall back to baseline 27/73 split with simple pads.
+        placePaneAtZoom(njMap, njBounds, zoom, { ...njPadBase, left: MIN_PAD, right: MIN_PAD })
+        placePaneAtZoom(coreMap, coreBounds, zoom, { ...corePadBase, left: MIN_PAD, right: MIN_PAD })
+      }
     }
     fitAll()
 

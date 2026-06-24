@@ -11,7 +11,8 @@
     "clean": "rm -rf dist node_modules/.vite",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tc": "tsc"
+    "tc": "tsc",
+    "build-and-serve": "rm -rf dist && pnpm build && (lsof -ti:8859 | xargs kill -9 2>/dev/null; true) && npx http-server dist -p 8859 -s"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
