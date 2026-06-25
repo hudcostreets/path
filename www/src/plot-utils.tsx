@@ -66,7 +66,9 @@ export function Loading({ height = DefaultHeight }: { height?: number }) {
 
 type PlotOwnProps = {
   id: string
-  title: string
+  /** Heading text. Omit (or pass empty) when the plot lives under a shared
+   *  section heading rendered by the caller, to avoid a duplicate `<h2>`. */
+  title?: string
   subtitle?: React.ReactNode
 }
 
@@ -89,7 +91,7 @@ function useNarrow(threshold = 600): boolean {
 export function Plot(
   { id, title, subtitle, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
 ) {
-  const h2 = <H2 id={id}>{title}</H2>
+  const h2 = title ? <H2 id={id}>{title}</H2> : null
   const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
   const narrow = useNarrow()
   const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: narrow ? 20 : 0, t: 0, b: narrow ? 50 : 40 }), [narrow])

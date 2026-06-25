@@ -272,7 +272,6 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
       {controls}
       <Plot
         id="entries-vs-exits-bars"
-        title="Faregate entries vs exits, by station"
         subtitle={sysSubtitle}
         data={plot?.data}
         layout={plot?.layout}

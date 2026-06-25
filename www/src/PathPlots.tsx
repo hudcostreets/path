@@ -5,6 +5,7 @@ import type { Metric } from "./RidesPlot"
 import MonthlyPlots from "./MonthlyPlots"
 import HourlyPlot from "./HourlyPlot"
 import EntriesVsExitsBars from "./EntriesVsExitsBars"
+import { H2 } from "./plot-utils"
 import { stationsParam } from "./stations"
 import { dayTypesParam } from "./dayTypes"
 
@@ -73,6 +74,10 @@ export default function PathPlots() {
       externalActiveStation={plot1ActiveStation}
       dateRange={mapDateRange}
     />
+    {/* Shared section heading: covers both the pie-map (entries vs exits per
+     *  station, animated by hour) and the bar chart (same data summed across
+     *  the date-range, per station). One heading instead of two duplicates. */}
+    <H2 id="entries-vs-exits">Faregate entries vs exits, by station</H2>
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
       <StationsMap embedded onDateRangeChange={setMapDateRange} activeStations={activeStations} />
     </Suspense>
