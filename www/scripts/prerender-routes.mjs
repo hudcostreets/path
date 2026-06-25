@@ -18,6 +18,13 @@ const ROUTES = [
     ogTitle: 'PANYNJ Bridge & Tunnel Traffic',
     ogImage: `${ORIGIN}/og.png`,
   },
+  {
+    path: '/map',
+    title: 'PATH Ridership – Hourly Pie-Map – Hudson County Complete Streets',
+    description: 'Interactive map of PATH faregate entries (green) and exits (orange) per station, animated through 24 hours.',
+    ogTitle: 'PATH Ridership – Hourly Pie-Map',
+    ogImage: `${ORIGIN}/og.png`,
+  },
 ]
 
 function rewrite(html, route) {

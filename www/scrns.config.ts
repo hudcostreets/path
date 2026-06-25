@@ -57,6 +57,9 @@ const screens: Screens = {
     gifQuality: 10,
     loop: true,
   },
+  // pie-map's 24-hour cycle is recorded by scripts/record-map.mjs — driving
+  // the hour deterministically via the `?record` window hook is much more
+  // reliable than capturing live playback inside headless chromium.
 }
 
 export default screens

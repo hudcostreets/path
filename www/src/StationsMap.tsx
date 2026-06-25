@@ -19,16 +19,32 @@ type StationRow = {
   entries: number
   exits: number
 }
-type RangeAvg = { station: string, entries: number, exits: number }
+type RangeAvg = {
+  station: string
+  // Linearly interpolated between bracketing integer hours — drives pie size,
+  // wedge angles, and bar heights so visuals stay smooth at sub-hour steps.
+  entries: number
+  exits: number
+  // Snapped to the floor integer hour — drives text labels (pie numbers,
+  // popup body, hour label) so the *numbers* the user reads only change on
+  // hour ticks, matching the live animation semantics.
+  bucketEntries: number
+  bucketExits: number
+}
 type Shape = 'pie' | 'bars'
 const shapeParam = codeParam<Shape>('pie', { pie: 'p', bars: 'b' })
 const ALL_HOURS = -1
 const hourParam: Param<number> = {
   encode(h) { return h === ALL_HOURS ? undefined : String(h) },
+  // Accept `8` / `8.5` (decimal hours) or `8:30` (HH:MM). Range is [0, 24);
+  // fractional values are valid (sub-hour scrubbing + recorder steps).
   decode(s) {
     if (s === undefined) return ALL_HOURS
-    const n = parseInt(s)
-    return Number.isFinite(n) && n >= 0 && n <= 23 ? n : ALL_HOURS
+    const colon = s.indexOf(':')
+    const n = colon >= 0
+      ? Number(s.slice(0, colon)) + Number(s.slice(colon + 1)) / 60
+      : Number(s)
+    return Number.isFinite(n) && n >= 0 && n < 24 ? n : ALL_HOURS
   },
 }
 
@@ -54,12 +70,15 @@ const HOUR_LABELS = [
   '12p', '1p', '2p', '3p', '4p', '5p', '6p', '7p', '8p', '9p', '10p', '11p',
 ]
 
-/** "9-10am", "11am-12pm", "12-1pm", "11pm-12am". */
+/** "9-10am", "11am-12pm", "12-1pm", "11pm-12am". For fractional inputs
+ *  (sub-hour recorder steps) we floor — the label tracks the integer
+ *  hour bucket, not the clock hand's exact position. */
 function formatHourRange(h: number): string {
-  const n = (h + 1) % 24
+  const lo = Math.floor(h) % 24
+  const hi = (lo + 1) % 24
   const fmt = (x: number) => x === 0 || x === 12 ? '12' : String(x % 12)
   const ap = (x: number) => x < 12 ? 'am' : 'pm'
-  return ap(h) === ap(n) ? `${fmt(h)}-${fmt(n)}${ap(h)}` : `${fmt(h)}${ap(h)}-${fmt(n)}${ap(n)}`
+  return ap(lo) === ap(hi) ? `${fmt(lo)}-${fmt(hi)}${ap(lo)}` : `${fmt(lo)}${ap(lo)}-${fmt(hi)}${ap(hi)}`
 }
 
 /** Compact integer formatter for in-marker labels: 0-999 raw, 1k-9.9k one
@@ -228,6 +247,45 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
     if (allYms.length && !toYm) setToYm(allYms[allYms.length - 1])
   }, [allYms, fromYm, toYm])
 
+  // Record-mode hook: external scripts (scripts/record-map.mjs) drive the
+  // hour deterministically rather than recording live playback.
+  const recordMode = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).has('record')
+  // `?desc[=...]` adds a title overlay on the map for shareable
+  // captures. Bare `?desc` uses the defaults below; `?desc=My+title`
+  // overrides the title; `?desc=Title|Subtitle` overrides both lines.
+  const descParam = typeof window === 'undefined' ? null
+    : new URLSearchParams(window.location.search).get('desc')
+  const showDesc = descParam !== null
+  const [descTitle, descSubtitle] = (() => {
+    // Compact range label: "Jan 2025 – Dec 2025"; or "Mar 2025" for single month.
+    const rangeLabel = (() => {
+      if (!fromYm || !toYm) return ''
+      const fmt = (ym: string) => {
+        const [y, m] = ym.split('-')
+        const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m - 1]
+        return `${month} ${y}`
+      }
+      return fromYm === toYm ? fmt(fromYm) : `${fmt(fromYm)} – ${fmt(toYm)}`
+    })()
+    const defaults: [string, string] = [
+      'PATH faregate ridership, by hour',
+      rangeLabel ? `green = entries · orange = exits · ${rangeLabel} avg` : 'green = entries · orange = exits · area ∝ volume',
+    ]
+    if (!descParam) return defaults
+    const [t, s] = descParam.split('|')
+    return [t || defaults[0], s ?? defaults[1]]
+  })()
+  useEffect(() => {
+    if (!recordMode) return
+    ;(window as { __pathMap?: unknown }).__pathMap = {
+      setHour: (h: number) => { setPlaying(false); setHour(h) },
+      setAnimMs: (ms: number) => setAnimMs(ms),
+      setShape: (s: Shape) => setShape(s),
+      setRange: (from: string, to: string) => { setFromYm(from); setToYm(to) },
+    }
+  }, [recordMode, setHour, setShape])
+
   // Notify parent on every (validated) range change so sibling plots can brush.
   useEffect(() => {
     if (fromYm && toYm) onDateRangeChange?.({ from: fromYm, to: toYm })
@@ -271,10 +329,25 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       if (effectiveHour === ALL_HOURS) {
         let e = 0, x = 0
         for (const v of byHr.values()) { e += v.e; x += v.x }
-        return { station, entries: e, exits: x }
+        return { station, entries: e, exits: x, bucketEntries: e, bucketExits: x }
       }
-      const v = byHr.get(effectiveHour) ?? { e: 0, x: 0 }
-      return { station, entries: v.e, exits: v.x }
+      // Visuals (size/wedge angles) interpolate between the bracketing integer
+      // hours so sub-hour recorder steps tween smoothly. The `bucket*` fields
+      // snap to the floor hour and drive text labels (pie numbers + popup) so
+      // numeric readouts only change on hour ticks. For integer `effectiveHour`
+      // both pairs collapse to the same value (t=0).
+      const lo = Math.floor(effectiveHour) % 24
+      const hi = (lo + 1) % 24
+      const t = effectiveHour - Math.floor(effectiveHour)
+      const v0 = byHr.get(lo) ?? { e: 0, x: 0 }
+      const v1 = byHr.get(hi) ?? { e: 0, x: 0 }
+      return {
+        station,
+        entries: v0.e * (1 - t) + v1.e * t,
+        exits: v0.x * (1 - t) + v1.x * t,
+        bucketEntries: v0.e,
+        bucketExits: v0.x,
+      }
     })
   }, [perStationHour, effectiveHour])
 
@@ -542,8 +615,12 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       const labelE = markerEl.querySelector<HTMLElement>('.value-label-entry')
       const labelX = markerEl.querySelector<HTMLElement>('.value-label-exit')
       if (labelE && labelX) {
-        labelE.textContent = formatCompactNum(t.entries)
-        labelX.textContent = formatCompactNum(t.exits)
+        // Text content tracks the integer-hour bucket so on-pie numbers don't
+        // wobble across sub-hour recorder steps. Position (`--lx`/`--ly`)
+        // below follows the interpolated wedge angles so labels stay aligned
+        // with the tweening fill — content snaps, anchor slides.
+        labelE.textContent = formatCompactNum(t.bucketEntries)
+        labelX.textContent = formatCompactNum(t.bucketExits)
         if (shape === 'pie') {
           const entryFrac = total > 0 ? t.entries / total : 0.5
           const angE = -Math.PI / 2 + entryFrac * Math.PI
@@ -567,8 +644,8 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       marker.bindPopup(
         `<strong>${station}</strong>`
         + `<br/><span style="opacity:0.7">${popupHourLabel}</span>`
-        + `<br/>Avg entries: ${Math.round(t.entries).toLocaleString()}`
-        + `<br/>Avg exits: ${Math.round(t.exits).toLocaleString()}`
+        + `<br/>Avg entries: ${Math.round(t.bucketEntries).toLocaleString()}`
+        + `<br/>Avg exits: ${Math.round(t.bucketExits).toLocaleString()}`
       )
     }
   }, [rangeAvg, maxTotal, shape, animMs, playing, activeSet, effectiveHour])
@@ -591,10 +668,25 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
           <h1 style={{ margin: 0, fontSize: '1.25rem' }}>PATH stations — avg daily entries & exits</h1>
         </div>
       )}
-      <div style={mapRowStyle}>
+      <div style={{ ...mapRowStyle, position: 'relative' }}>
         <div ref={njContainerRef} className="map-pane-nj" style={{ ...paneStyle, flex: '0 0 27%' }} />
         <div className="map-elide-divider" aria-hidden style={{ ...paneStyle, flex: '0 0 28px' }} />
         <div ref={coreContainerRef} className="map-pane-core" style={{ ...paneStyle, flex: '1 1 auto' }} />
+        {showDesc && (
+          // pointer-events: none so the overlay never blocks map interaction.
+          // z-index above Leaflet's default panes (~400) but below the clock
+          // control (which uses Leaflet's own control z-index ~800).
+          <div style={{
+            position: 'absolute', top: 10, left: 0, right: 0,
+            textAlign: 'center', pointerEvents: 'none', zIndex: 500,
+            color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.85)',
+          }}>
+            <div style={{ fontSize: '1.4rem', fontWeight: 600, lineHeight: 1.15 }}>{descTitle}</div>
+            {descSubtitle && (
+              <div style={{ fontSize: '0.95rem', opacity: 0.92, marginTop: 4 }}>{descSubtitle}</div>
+            )}
+          </div>
+        )}
       </div>
       {clockHost && createPortal(
         <div className="map-clock-panel">
@@ -607,7 +699,10 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
               hour={hour}
               onChange={h => { setHour(h); setPlaying(false) }}
               onHoverChange={setHoveredHour}
-              animMs={Math.max(animMs, 120)}
+              // Record mode bypasses the 120ms floor so each `setHour` is
+              // captured at its settled state — otherwise the recorder
+              // screenshots the arrow mid-tween (non-monotonic frames).
+              animMs={recordMode ? 0 : Math.max(animMs, 120)}
               playing={playing}
             />
             <button type="button"
@@ -620,7 +715,7 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
         </div>,
         clockHost,
       )}
-      <div style={{
+      {!recordMode && <div style={{
         padding: '0.4rem 0',
         fontSize: '0.85rem',
         color: '#888',
@@ -651,7 +746,7 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
             style={{ verticalAlign: 'middle', width: '10em' }} />
         </span>
         {!embedded && <a href="/">← PATH ridership</a>}
-      </div>
+      </div>}
     </div>
   )
 }
