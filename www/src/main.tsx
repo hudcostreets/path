@@ -3,7 +3,7 @@ import { createTheme, ThemeProvider as MuiThemeProvider } from "@mui/material"
 import A from "@rdub/base/a"
 import { Theme } from "@rdub/icons/Tooltip"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { HotkeysProvider, Omnibar, SequenceModal, ShortcutsModal, SpeedDial, type SpeedDialAction } from "use-kbd"
+import { HotkeysProvider, LookupModal, Omnibar, SequenceModal, ShortcutsModal, SpeedDial, type SpeedDialAction } from "use-kbd"
 import { PlotlyProvider } from "pltly/react"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import "use-kbd/styles.css"
@@ -105,6 +105,11 @@ createRoot(document.getElementById('root')!).render(
               {/* SpeedDial's "Shortcuts" builtin calls `ctx.openModal()`, which
                   the `ShortcutsModal` listens for — without this it noops. */}
               <ShortcutsModal />
+              {/* `LookupModal` registers the `__hotkeys:lookup` action +
+                  its default `meta+shift+k` binding; without it that key
+                  combo (and the "Key lookup" search-by-action-name modal)
+                  is unbound. */}
+              <LookupModal />
               <AppSpeedDial />
             </HotkeysProvider>
           </PlotlyProvider>
