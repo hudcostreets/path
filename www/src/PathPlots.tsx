@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react"
 import { useUrlState } from "use-prms"
 import RidesPlot, { stationSubtitle } from "./RidesPlot"
 import type { Metric } from "./RidesPlot"
@@ -8,8 +8,7 @@ import EntriesVsExitsBars from "./EntriesVsExitsBars"
 import { H2 } from "./plot-utils"
 import { stationsParam } from "./stations"
 import { dayTypesParam } from "./dayTypes"
-
-type DateRange = { from: string, to: string }
+import { ymRangeParam, type YmRange } from "./ymRange"
 
 // Lazy: leaflet + tile basemap only loads when user scrolls to the map.
 const StationsMap = lazy(() => import("./StationsMap"))
@@ -28,9 +27,23 @@ export default function PathPlots() {
   const [plot1ActiveStation, setPlot1ActiveStation] = useState<string | null>(null)
   const [plot3ActiveStation, setPlot3ActiveStation] = useState<string | null>(null)
   const [activeYear, setActiveYear] = useState<string | null>(null)
-  // Date range owned by plot4 (StationsMap). Plot3 (HourlyPlot) follows it
-  // for cross-plot brushing.
-  const [mapDateRange, setMapDateRange] = useState<DateRange | undefined>()
+  // Shared date range across pies + EvE bars + HourlyPlot:
+  //  - `urlYmRange` (URL `?ym=YY-MM,YY-MM`) is the explicit user choice; null
+  //    means "no override" so plots fall back to data-derived defaults.
+  //  - `dataDefaultRange` is whichever plot loaded data first; both plots'
+  //    `setDataDefault` callbacks only fire when this is still null.
+  //  - `effectiveRange` is what plots actually consume: URL choice wins,
+  //    else the shared default. Both keep pickers in sync.
+  const [urlYmRange, setUrlYmRange] = useUrlState<YmRange | null>("ym", ymRangeParam)
+  const [dataDefaultRange, setDataDefaultRange] = useState<YmRange | null>(null)
+  const setDataDefault = useCallback((r: YmRange) => {
+    setDataDefaultRange(prev => prev ?? r)
+  }, [])
+  const effectiveRange = urlYmRange ?? dataDefaultRange
+  const mapDateRange = useMemo(
+    () => effectiveRange ? { from: effectiveRange[0], to: effectiveRange[1] } : undefined,
+    [effectiveRange],
+  )
   // Plot2 metric: follows plot1 for avg/total, stays put when plot1 switches to pct2019
   const [plot2Metric, setPlot2Metric] = useState<"avg" | "total">("avg")
   const plot2MetricRef = useRef<"avg" | "total">("avg")
@@ -79,8 +92,19 @@ export default function PathPlots() {
      *  the date-range, per station). One heading instead of two duplicates. */}
     <H2 id="entries-vs-exits">Faregate entries vs exits, by station</H2>
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
-      <StationsMap embedded onDateRangeChange={setMapDateRange} activeStations={activeStations} />
+      <StationsMap
+        embedded
+        activeStations={activeStations}
+        dateRange={effectiveRange}
+        onDateRangeChange={setUrlYmRange}
+        onDataDefault={setDataDefault}
+      />
     </Suspense>
-    <EntriesVsExitsBars activeStations={activeStations} />
+    <EntriesVsExitsBars
+      activeStations={activeStations}
+      dateRange={effectiveRange}
+      onDateRangeChange={setUrlYmRange}
+      onDataDefault={setDataDefault}
+    />
   </>
 }

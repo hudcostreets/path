@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { Data, Layout } from "plotly.js"
 import { useUrlState } from "use-prms"
 import { resolve as dvcResolve } from "virtual:dvc-data"
@@ -64,10 +64,22 @@ const chipActive: React.CSSProperties = {
 
 /** Mirror bars + gap line, with date-range + day-type filters and
  *  live system-wide totals. */
-export default function EntriesVsExitsBars({ activeStations = [] }: {
+export default function EntriesVsExitsBars({
+  activeStations = [],
+  dateRange,
+  onDateRangeChange,
+  onDataDefault,
+}: {
   /** Page-level station filter. Empty/full set → all stations; non-empty
    *  subset → filter to those (single = pin). */
   activeStations?: string[]
+  /** Shared `(fromYm, toYm)` from parent (URL-backed). `null` = no user
+   *  override; report bounds via `onDataDefault` once data loads. */
+  dateRange?: [string, string] | null
+  /** Picker writes back to parent's URL state. */
+  onDateRangeChange?: (r: [string, string] | null) => void
+  /** Called once per session with the data-derived default range. */
+  onDataDefault?: (r: [string, string]) => void
 } = {}) {
   // Translate canonical names ("Christopher Street") to our short form.
   const toShort = (s: string) => s === "Christopher Street" ? "Christopher St." : s
@@ -84,16 +96,15 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
   })
 
   const allYms = data?.all_yms ?? []
-  const [fromYm, setFromYm] = useState('')
-  const [toYm, setToYm] = useState('')
+  const [fromYm, toYm] = dateRange ?? ['', '']
+  const setFromYm = (v: string) => onDateRangeChange?.([v, toYm])
+  const setToYm = (v: string) => onDateRangeChange?.([fromYm, v])
   // Shared URL state with RidesPlot (param "d") — 3-value picker.
   const [activeDayTypes, setActiveDayTypes] = useUrlState<string[]>("d", dayTypesParam)
 
-  // Initialize range to full span when data lands.
   useEffect(() => {
-    if (allYms.length && !fromYm) setFromYm(allYms[0])
-    if (allYms.length && !toYm) setToYm(allYms[allYms.length - 1])
-  }, [allYms, fromYm, toYm])
+    if (allYms.length) onDataDefault?.([allYms[0], allYms[allYms.length - 1]])
+  }, [allYms, onDataDefault])
 
   const agg = useMemo(() => {
     if (!data || !fromYm || !toYm) return null
@@ -210,7 +221,7 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
 
   const sysSubtitle = useMemo(() => {
     if (!agg) return ' '
-    const { sysEntries, sysExits, totalDays, selectedYms } = agg
+    const { sysEntries, sysExits, totalDays } = agg
     // Same convention as the y2 line: positive = entries dominate, negative
     // = exits dominate (matches the +/- sign of the bars above/below 0).
     const ratio = sysEntries > 0 ? 1 - sysExits / sysEntries : 0
@@ -220,10 +231,11 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
       .filter(([, n]) => n > 0)
       .map(([dt, n]) => `${n} ${SHORT[dt]}`)
       .join(' + ')
-    const range = selectedYms.length === 1 ? selectedYms[0] : `${selectedYms[0]} – ${selectedYms[selectedYms.length - 1]}`
+    // Date range is shown by the picker chips immediately above — omit it
+    // here rather than echoing it.
     return (
       <span>
-        <strong>{range}</strong> · {totalDaysN} days ({dayBreakdown}) · system:{' '}
+        {totalDaysN} days ({dayBreakdown}) · system:{' '}
         <strong>{fmtInt(sysEntries)}</strong> entries ·{' '}
         <strong>{fmtInt(sysExits)}</strong> exits · gap{' '}
         <strong style={{ color: RATIO_YELLOW }}>{`${ratio >= 0 ? '+' : ''}${(ratio * 100).toFixed(1)}%`}</strong>

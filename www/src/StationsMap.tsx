@@ -89,15 +89,26 @@ function formatCompactNum(n: number): string {
   return Math.round(n / 1000) + 'k'
 }
 
-export default function StationsMap({ embedded = false, onDateRangeChange, activeStations }: {
+export default function StationsMap({
+  embedded = false,
+  activeStations,
+  dateRange,
+  onDateRangeChange,
+  onDataDefault,
+}: {
   embedded?: boolean
-  /** Fires whenever the date range changes (after auto-init or user edit).
-   *  Lets the parent share the range with sibling plots (plot3 brushing). */
-  onDateRangeChange?: (range: { from: string, to: string }) => void
   /** Page-level station filter (canonical names like "Christopher Street").
    *  When a strict subset, non-active markers fade + drop below active ones in
    *  z-order so the focused stations pop. */
   activeStations?: string[]
+  /** Shared `(fromYm, toYm)` from parent (URL-backed). `null` = no user
+   *  override, fall back to data-derived defaults via `onDataDefault`. */
+  dateRange?: [string, string] | null
+  /** Picker writes back to parent's URL state. */
+  onDateRangeChange?: (r: [string, string] | null) => void
+  /** Called once per session with the data-derived default range; parent
+   *  ignores all but the first caller so plots don't fight over defaults. */
+  onDataDefault?: (r: [string, string]) => void
 } = {}) {
   // Active set in this file's name convention ("Christopher St.") — null means
   // "no filter, all stations full brightness".
@@ -155,8 +166,12 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
     return Array.from(new Set(rows.map(r => r.ym))).sort()
   }, [rows])
 
-  const [fromYm, setFromYm] = useState<string>('')
-  const [toYm, setToYm] = useState<string>('')
+  // Date range comes from the parent (URL-backed shared state). Picker
+  // changes go up via `onDateRangeChange`; on first data load we report
+  // our bounds to `onDataDefault` (parent dedups so the first caller wins).
+  const [fromYm, toYm] = dateRange ?? ['', '']
+  const setFromYm = (v: string) => onDateRangeChange?.([v, toYm])
+  const setToYm = (v: string) => onDateRangeChange?.([fromYm, v])
   // `mh` URL param holds the paused hour for shareable URLs. While the clock
   // is animating we drive `liveHour` internally (no URL writes) so the param
   // doesn't churn on every tick; pausing commits `liveHour` to the URL, and
@@ -243,9 +258,8 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
   }, [playing, animMs, setHour])
 
   useEffect(() => {
-    if (allYms.length && !fromYm) setFromYm(allYms[0])
-    if (allYms.length && !toYm) setToYm(allYms[allYms.length - 1])
-  }, [allYms, fromYm, toYm])
+    if (allYms.length) onDataDefault?.([allYms[0], allYms[allYms.length - 1]])
+  }, [allYms, onDataDefault])
 
   // Record-mode hook: external scripts (scripts/record-map.mjs) drive the
   // hour deterministically rather than recording live playback.
@@ -285,11 +299,6 @@ export default function StationsMap({ embedded = false, onDateRangeChange, activ
       setRange: (from: string, to: string) => { setFromYm(from); setToYm(to) },
     }
   }, [recordMode, setHour, setShape])
-
-  // Notify parent on every (validated) range change so sibling plots can brush.
-  useEffect(() => {
-    if (fromYm && toYm) onDateRangeChange?.({ from: fromYm, to: toYm })
-  }, [fromYm, toYm, onDateRangeChange])
 
   // Per-(station, hour) entries/exits averaged across months in the date
   // range. Computed once and reused for both `rangeAvg` and `maxTotal` so
