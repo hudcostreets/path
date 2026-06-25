@@ -34,7 +34,7 @@ export function ann({ x, ax, ...a }: Partial<Omit<Annotations, 'x' | 'ax'> & { x
   }
 }
 
-export const { H2 } = Headings({ className: "heading" })
+export const { H2, H3 } = Headings({ className: "heading" })
 
 /** Blend a hex color toward white (dark mode) or black (light mode) by `t` (0–1).
  *  Reads the live theme from the document; callers re-rendering on theme
@@ -69,6 +69,9 @@ type PlotOwnProps = {
   /** Heading text. Omit (or pass empty) when the plot lives under a shared
    *  section heading rendered by the caller, to avoid a duplicate `<h2>`. */
   title?: string
+  /** Heading level for `title`. `2` (default) for section heads; `3` for
+   *  a plot that lives under a shared `<h2>` section heading. */
+  level?: 2 | 3
   subtitle?: React.ReactNode
 }
 
@@ -89,9 +92,10 @@ function useNarrow(threshold = 600): boolean {
 }
 
 export function Plot(
-  { id, title, subtitle, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
+  { id, title, level = 2, subtitle, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
 ) {
-  const h2 = title ? <H2 id={id}>{title}</H2> : null
+  const H = level === 3 ? H3 : H2
+  const h2 = title ? <H id={id}>{title}</H> : null
   const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
   const narrow = useNarrow()
   const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: narrow ? 20 : 0, t: 0, b: narrow ? 50 : 40 }), [narrow])

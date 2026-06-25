@@ -272,6 +272,8 @@ export default function EntriesVsExitsBars({ activeStations = [] }: {
       {controls}
       <Plot
         id="entries-vs-exits-bars"
+        title="Entry vs. Exit disparity, by station"
+        level={3}
         subtitle={sysSubtitle}
         data={plot?.data}
         layout={plot?.layout}
