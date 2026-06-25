@@ -1,0 +1,5 @@
+outs:
+- md5: dda2e11868d80c09ff4c0b665c95f0a4
+  size: 96068
+  hash: md5
+  path: 2024-hourly.pqt

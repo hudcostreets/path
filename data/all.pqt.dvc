@@ -22,5 +22,9 @@ meta:
       2024.pqt: 145d6167c407fcb5a15871518297008d
       2025.pqt: 95f69d8e56ecccba58fdef58981af4a8
       2026.pqt: 222e2ff4ad77e4958107fbd8bbcbc924
+      data/2023.pqt: null
+      data/2024.pqt: null
+      data/2025.pqt: null
+      data/2026.pqt: null
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089

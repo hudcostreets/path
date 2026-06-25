@@ -1,0 +1,8 @@
+outs:
+- path: 2026-hourly-system.pqt
+meta:
+  computation:
+    cmd: path-data parse-hourly -y 2026
+    git_deps:
+      2026-PATH-Hourly-Ridership-Report.pdf: null
+      /path_data/parse_hourly.py: null
