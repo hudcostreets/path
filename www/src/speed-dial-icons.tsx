@@ -1,16 +1,17 @@
-// Simplified icons for SpeedDial actions (small, monochrome)
+// SpeedDial icons (small, ~1em). HCCS is brand-color (rendered as <img> so
+// its native green isn't tinted by SpeedDial's `currentColor: --kbd-text`);
+// the rest are monochrome SVGs that inherit currentColor.
 
 export function HccsIcon() {
-  return (
-    <svg viewBox="30 30 204 204" style={{ width: '1em', height: '1em' }} fill="currentColor">
-      <g transform="matrix(1.3333333,0,0,-1.3333333,0,264)">
-        <g transform="scale(0.1)">
-          <path d="m 990,1742.29 c -414.812,0 -752.289,-337.47 -752.289,-752.29 0,-414.82 337.477,-752.289 752.289,-752.289 414.81,0 752.29,337.469 752.29,752.289 0,414.82 -337.48,752.29 -752.29,752.29" fill="currentColor" opacity="0.15" />
-          <path d="m 990,1722.57 c -403.941,0 -732.57,-328.63 -732.57,-732.57 0,-403.941 328.629,-732.57 732.57,-732.57 403.94,0 732.57,328.629 732.57,732.57 0,403.94 -328.63,732.57 -732.57,732.57 z M 990,225 c -421.82,0 -765,343.18 -765,765 0,421.82 343.18,765 765,765 421.82,0 765,-343.18 765,-765 0,-421.82 -343.18,-765 -765,-765" />
-        </g>
-      </g>
-    </svg>
-  )
+  // Cropped from `abp-partnership.svg` (viewBox tightened around the HCCS
+  // green-circle badge + `overflow:hidden` on the source SVG to drop the
+  // adjacent vertical divider). `<img>` keeps the brand green.
+  //
+  // 1.45em compensates for the fact that the badge doesn't fill its 145×145
+  // viewBox edge-to-edge (the perimeter text adds margin inside the disk's
+  // bounding box). Without it, the visible green disk reads as ~70% of the
+  // GH octocat's apparent radius in adjacent SpeedDial buttons.
+  return <img src="/hccs.svg" alt="" style={{ width: '1.45em', height: '1.45em', verticalAlign: 'middle' }} />
 }
 
 /** Theme-cycler icon: sun (light), moon (dark), or A (system/auto). */

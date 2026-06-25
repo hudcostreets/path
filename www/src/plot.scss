@@ -260,12 +260,14 @@ html.clean {
 }
 
 // `.kbd-speed-dial-action` items with `href` render as `<a>`. Our dark-mode
-// `a { color: #818cf8 }` (specificity 0,2,0) beats use-kbd's own
-// `.kbd-speed-dial-action { color: var(--kbd-text) }` (0,1,0), so the icons
-// (which use `fill="currentColor"`) tint purple. Re-pin to the SpeedDial fg.
-.kbd-speed-dial-primary,
-.kbd-speed-dial-action,
-.kbd-speed-dial-chevron {
+// link rule `:root[data-theme="dark"] a` has specificity (0,2,1) — `:root`
+// (pseudo-class) + `[data-theme]` (attribute) + `a` (type). Both `.kbd-…` and
+// `.kbd-… .kbd-…-action` are too low ((0,1,0) and (0,2,0)), so the link icons
+// tint purple via `fill="currentColor"`. Chain the container class twice to
+// push specificity to (0,3,0), which beats the dark-mode link rule.
+.kbd-speed-dial.kbd-speed-dial .kbd-speed-dial-primary,
+.kbd-speed-dial.kbd-speed-dial .kbd-speed-dial-action,
+.kbd-speed-dial.kbd-speed-dial .kbd-speed-dial-chevron {
   color: var(--kbd-text);
   &:hover { color: var(--kbd-text); }
 }
