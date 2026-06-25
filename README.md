@@ -5,6 +5,8 @@ Interactive versions of the plots below:
 - [ire.runsascoded.com/#gl=hudcostreets/path-data/-/main/months.ipynb](https://ire.runsascoded.com/#gl=hudcostreets/path-data/-/main/months.ipynb)
 - [path.hudcostreets.org](https://path.hudcostreets.org/)
 
+![PATH faregate entries (green) and exits (orange) per station, animated through 24 hours, 2025 avg](https://path.hudcostreets.org/pie-map-24h.gif)
+
 Contents:
 <!-- toc -->
 - [Cleaned data](#data)
