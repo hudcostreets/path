@@ -84,25 +84,44 @@ def ensure_year_pipeline(year: int):
     for dvc_path in dvc_files:
         with open(dvc_path) as f:
             dvc_data = yaml.safe_load(f)
-        deps = dvc_data.get('meta', {}).get('computation', {}).get('deps', {})
-        if deps is None:
-            continue
-        # Detect whether this .dvc depends on monthly or hourly parquets
-        has_monthly = any(k.endswith('.pqt') and '-hourly' not in k for k in deps)
-        has_hourly = any('-hourly.pqt' in k for k in deps)
+        comp = dvc_data.get('meta', {}).get('computation', {})
+        deps = comp.get('deps', {})
+        git_deps = comp.get('git_deps', {})
         added = False
-        if has_monthly:
-            dep_key = f'data/{year}.pqt'
-            if dep_key not in deps:
-                err(f'\tadding {dep_key} to {dvc_path} deps')
-                deps[dep_key] = None
-                added = True
-        if has_hourly and year >= 2017:
-            dep_key = f'data/{year}-hourly.pqt'
-            if dep_key not in deps:
-                err(f'\tadding {dep_key} to {dvc_path} deps')
-                deps[dep_key] = None
-                added = True
+        if deps:
+            # Detect whether this .dvc depends on monthly or hourly parquets
+            has_monthly = any(k.endswith('.pqt') and '-hourly' not in k for k in deps)
+            has_hourly = any('-hourly.pqt' in k for k in deps)
+            if has_monthly:
+                dep_key = f'data/{year}.pqt'
+                if dep_key not in deps:
+                    err(f'\tadding {dep_key} to {dvc_path} deps')
+                    deps[dep_key] = None
+                    added = True
+            if has_hourly and year >= 2017:
+                dep_key = f'data/{year}-hourly.pqt'
+                if dep_key not in deps:
+                    err(f'\tadding {dep_key} to {dvc_path} deps')
+                    deps[dep_key] = None
+                    added = True
+        # Stages that parse PDFs directly (e.g. entries_vs_exits) carry the
+        # per-year PDFs in `git_deps`. Extend any such set so a new year's PDFs
+        # invalidate the cache.
+        if git_deps:
+            has_monthly_pdf = any('-PATH-Monthly-Ridership-Report.pdf' in k for k in git_deps)
+            has_hourly_pdf = any('-PATH-hourly-Ridership-Report.pdf' in k.lower() for k in git_deps)
+            if has_monthly_pdf:
+                dep_key = f'/data/{year}-PATH-Monthly-Ridership-Report.pdf'
+                if dep_key not in git_deps:
+                    err(f'\tadding {dep_key} to {dvc_path} git_deps')
+                    git_deps[dep_key] = None
+                    added = True
+            if has_hourly_pdf and year >= 2017:
+                dep_key = f'/data/{year}-PATH-Hourly-Ridership-Report.pdf'
+                if dep_key not in git_deps:
+                    err(f'\tadding {dep_key} to {dvc_path} git_deps')
+                    git_deps[dep_key] = None
+                    added = True
         if added:
             with open(dvc_path, 'w') as f:
                 yaml.dump(dvc_data, f, default_flow_style=False, sort_keys=False)
