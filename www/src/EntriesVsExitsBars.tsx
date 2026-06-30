@@ -185,7 +185,15 @@ export default function EntriesVsExitsBars({
 
     const maxAbs = Math.max(...entries, ...exits, 1) * 1.1
     // Symmetric y-axis tick set for "magnitude" reading on both sides.
-    const tickStep = maxAbs > 5_000_000 ? 2_000_000 : maxAbs > 2_000_000 ? 1_000_000 : 500_000
+    // Aim for ~5-10 ticks per side regardless of magnitude (10-year totals
+    // hit ~100M, single-month totals hit ~5M).
+    const niceStep = (m: number) => {
+      const exp = Math.floor(Math.log10(m))
+      const mantissa = m / 10 ** exp
+      const niceMantissa = mantissa < 1.5 ? 1 : mantissa < 3.5 ? 2 : mantissa < 7.5 ? 5 : 10
+      return niceMantissa * 10 ** exp
+    }
+    const tickStep = niceStep(maxAbs / 6)
     const tickvals: number[] = []
     for (let v = -Math.floor(maxAbs / tickStep) * tickStep; v <= maxAbs; v += tickStep) tickvals.push(v)
     const ticktext = tickvals.map(v => fmt(Math.abs(v)))
