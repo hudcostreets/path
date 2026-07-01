@@ -56,7 +56,17 @@
   "pnpm": {
     "overrides": {
       "vite": "^5.4.21",
-      "vite@<5.4.21": "^5.4.21"
+      "@babel/runtime": ">=7.26.10",
+      "basic-ftp": ">=5.2.2",
+      "flatted": ">=3.4.2",
+      "immutable": ">=5.1.5",
+      "ip-address": ">=10.1.1",
+      "js-yaml": ">=4.2.0",
+      "mdast-util-to-hast": ">=13.2.1",
+      "picomatch": ">=4.0.4",
+      "postcss": ">=8.5.10",
+      "protocol-buffers-schema": ">=3.6.1",
+      "rollup": ">=4.22.4"
     }
   }
 }
