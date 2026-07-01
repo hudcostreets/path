@@ -39,11 +39,18 @@ STATIONS = [
 STATION_OFFSETS = {station: idx for idx, station in enumerate(STATIONS)}
 SECTION_PAGES = len(STATIONS) + 1  # stations + title page
 
-# 2017–2023 PDFs say "(Based on <Month> <Year> Turnstile Count)".
-# 2024+ rephrased to "(Based on <Month> <Year> Legacy and TAPP Faregates Count)"
-# to reflect the faregate hardware migration.
+# Three historical formats for the per-page "Based on" line:
+#   2017-2023: "(Based on <Month> <Year> Turnstile Count)"
+#   2024-2025: "(Based on <Month> <Year> Legacy and TAPP Faregates Count)"
+#              (rephrased to reflect the faregate hardware migration)
+#   2026+:     "(Based on <Year>-<Mon> Legacy and TAPP Faregates Count)"
+#              (year-first + 3-letter month, e.g. "2026-Jan")
 BASED_ON_RE = re.compile(
-    r'\(Based on (?P<month>\w+) (?P<year>\d{4}) (?:Turnstile|Legacy and TAPP Faregates) Count\)'
+    r'\(Based on (?:'
+    r'(?P<month>\w+) (?P<year>\d{4})'
+    r'|'
+    r'(?P<year2>\d{4})-(?P<month2>[A-Za-z]{3})'
+    r') (?:Turnstile|Legacy and TAPP Faregates) Count\)'
 )
 # 2024+ rephrased "Cross-honor Entry Count not Included" → "Cross-honor and
 # Freewheeled Entry Counts not Included" (also "Counts" pluralized).
@@ -67,8 +74,10 @@ def _month_page_range(month: int) -> tuple[int, int]:
 
 
 def _clean(s: str) -> str:
-    """Normalize U+2010 (‐, 8210) → ASCII hyphen. Appears in various titles."""
-    return s.replace('‐', '-')
+    """Normalize U+2010 (‐, 8210) → ASCII hyphen. Appears in various titles.
+    Also insert the missing hyphen in 2026+'s `Systemwide` (was `System-wide`
+    through 2025)."""
+    return s.replace('‐', '-').replace('Systemwide', 'System-wide')
 
 
 def _realign_columns(raw: pd.DataFrame) -> pd.DataFrame:
@@ -176,14 +185,18 @@ def _to_hour(r) -> int:
 
 def _coerce_numeric(hrs: pd.DataFrame) -> pd.DataFrame:
     """Column dtypes vary across PDFs/pandas versions; coerce the non-key
-    columns (everything after Year/Month/Station/Hour) to int."""
+    columns (everything after Year/Month/Station/Hour) to int.
+
+    2026+ leaves "Avg Holiday {Entries,Exits}" blank for months without
+    any holidays (older PDFs printed `0`). Blanks arrive as NaN — treat
+    them as 0 before the int cast to avoid `IntCastingNaNError`."""
     for k in hrs.columns[4:]:
         col = hrs[k]
         dt = col.dtype
         if pd.api.types.is_object_dtype(dt) or pd.api.types.is_string_dtype(dt):
-            hrs[k] = col.astype(str).str.replace(',', '').astype(float).astype(int)
+            hrs[k] = col.astype(str).str.replace(',', '').replace('nan', '0').astype(float).fillna(0).astype(int)
         elif pd.api.types.is_float_dtype(dt):
-            hrs[k] = col.astype(int)
+            hrs[k] = col.fillna(0).astype(int)
         elif pd.api.types.is_integer_dtype(dt):
             pass
         else:
@@ -206,10 +219,10 @@ def parse_station_month(pdf: str, rects: list[dict], year: int, month: int, stat
     m = BASED_ON_RE.fullmatch(based_on_msg)
     if not m:
         raise RuntimeError(f'Unrecognized "based on" message: {based_on_msg!r}')
-    parsed_year = int(m['year'])
+    parsed_year = int(m['year'] or m['year2'])
     if year != parsed_year:
         raise RuntimeError(f"Parsed year {parsed_year} != {year}")
-    parsed_month = m['month']
+    parsed_month = m['month'] or m['month2']
     dt = to_dt(f'{year:d}-{month:02d}')
     month_full = dt.strftime('%B')
     month_abbr = dt.strftime('%b')
@@ -268,6 +281,13 @@ def run_parse_hourly(year: int, last_month: int | None = None, n_jobs: int = 4, 
         raise FileNotFoundError(f"Hourly PDF not found: {pdf}")
     with open(TEMPLATE_PATH) as f:
         rects = json.load(f)
+    # 2026+ hourly PDFs dropped ~3 blank lines between the "Cross-honor…"
+    # message and both the station name and the main table's column headers,
+    # shifting both up ~28pt. rect3 (station name) and rect1 (main table)
+    # need adjusted y-ranges; rect2 (page-top header) is unchanged.
+    if year >= 2026:
+        rects[0] = {**rects[0], 'y1': 100.0, 'height': rects[0]['y2'] - 100.0}
+        rects[2] = {**rects[2], 'y1': 70.0, 'y2': 100.0, 'height': 30.0}
 
     if last_month is None:
         # 2022's PDF only has data through October (historical quirk).
