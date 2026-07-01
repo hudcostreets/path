@@ -27,14 +27,14 @@
     "geo-sankey": "https://github.com/runsascoded/geo-sankey#3af38f772fd03a5455a24f222d90a66e52f93f52",
     "hyparquet": "^1.25.1",
     "leaflet": "^1.9.4",
-    "plotly.js": "https://github.com/runsascoded/plotly.js#9ac2a26771d21b1fa665d8762b7b15890b46193b",
+    "plotly.js": "https://github.com/runsascoded/plotly.js#cf90c76e0398a19b429a573fac5fabcec44d0606",
     "plotly.js-dist-min": "^3.4.0",
-    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/e7b1bca64756b2b3e7dbec719e314eebb2b7ee39/pltly-e7b1bca64756b2b3e7dbec719e314eebb2b7ee39.tar.gz",
+    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/0edf371f940ae549a6511d74b98b96d96048cdd8/pltly-0edf371f940ae549a6511d74b98b96d96048cdd8.tar.gz",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.1",
     "use-kbd": "^0.12.0",
-    "use-prms": "https://github.com/runsascoded/use-prms#3db90a820b4372cea3efb7e02bac317dc049fa04"
+    "use-prms": "https://github.com/runsascoded/use-prms#2cc362372ae5cfb056b16df127870ae1db615fb8"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -46,11 +46,17 @@
     "eslint": "^9",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
-    "pnpm-dep-source": "https://github.com/runsascoded/pnpm-dep-source#3b079581473bf9e1654cfb2cd944e01d259ffdb8",
+    "pnpm-dep-source": "https://github.com/runsascoded/pnpm-dep-source#bfeca07d8c1f037468950cb4eaf73f628d40b009",
     "sass-embedded": "^1.81.0",
     "scrns": "https://gitlab.com/runsascoded/js/scrns/-/archive/17a7273a3d08d7b50e519dcecdbbfd42bf1623e9/scrns-17a7273a3d08d7b50e519dcecdbbfd42bf1623e9.tar.gz",
     "typescript": "^5.5.3",
     "vite": "^5.4.21",
     "vite-plugin-dvc": "https://github.com/runsascoded/vite-plugin-dvc#f2e511db003444748913609583e8c3404ceb67fc"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "^5.4.21",
+      "vite@<5.4.21": "^5.4.21"
+    }
   }
 }
