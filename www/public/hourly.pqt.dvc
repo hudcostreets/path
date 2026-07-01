@@ -1,19 +1,19 @@
 outs:
-- md5: f3b3e88061c1bc8334c6a361caa0bf61
-  size: 782525
+- md5: 04a77878629b1020181476d6e0586dc7
+  size: 803457
   hash: md5
   path: hourly.pqt
 meta:
   computation:
     cmd: path-data combine-hourly
     deps:
-      data/2017-hourly.pqt: 7eac0844fe8493d8d52661201833ac12
+      data/2017-hourly.pqt: fc2210a80f3be9ea0208b06c24a8ec48
       data/2018-hourly.pqt: 2f9e3129640511b6d4e3264f964fa23e
       data/2019-hourly.pqt: ebec231bd49b7dba9d5693326591a452
       data/2020-hourly.pqt: b892967122d5642a6e9500471c19b339
       data/2021-hourly.pqt: 7aca57d296d34a1128fe5387c6487316
-      data/2022-hourly.pqt: 6bcc3c3287c500b7a0e2d09acab93e07
-      data/2023-hourly.pqt: 9bc3351a467b728916221cd67bc633d0
-      data/2024-hourly.pqt: dda2e11868d80c09ff4c0b665c95f0a4
-      data/2025-hourly.pqt: e8e98734c5f52ab9f1c0358d1c0db335
-      data/2026-hourly.pqt: b52d40c15560cbdbaca3f772da948fd4
+      data/2022-hourly.pqt: f3aa18f4ffe8009b4309b11a3d322998
+      data/2023-hourly.pqt: c502a9e7a33a03179efdd202c86a2329
+      data/2024-hourly.pqt: 89f1901c12e51fee77f2778ab262cb52
+      data/2025-hourly.pqt: cecfc3b4628901155ecea0143fec6e32
+      data/2026-hourly.pqt: 1008708cbf532e8cf7f0540c73f36e6c

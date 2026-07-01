@@ -1,8 +1,11 @@
 outs:
-- path: 2023-hourly-total.pqt
+- md5: 2004d4dfc59415b6475843e44431b914
+  size: 9718
+  hash: md5
+  path: 2023-hourly-total.pqt
 meta:
   computation:
     cmd: path-data parse-hourly -y 2023
     git_deps:
-      2023-PATH-Hourly-Ridership-Report.pdf: null
-      /path_data/parse_hourly.py: null
+      2023-PATH-Hourly-Ridership-Report.pdf: 85d2533c78f22def5be7a13f9ff94d85259e56b8
+      /path_data/parse_hourly.py: bb90766d8d463f3f24ccd20542d3fb816012e903
