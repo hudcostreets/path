@@ -25,9 +25,13 @@ dependencies = [
     "mistune>=3.2.1",          # ReDoS + XSS (nbconvert transitive)
     "orjson>=3.11.6",          # DoS (papermill transitive)
     "Pygments>=2.20.0",        # ReDoS (nbconvert transitive)
+    "asyncssh>=2.23.0",        # AuthorizedKeysFile %u path traversal
+    "pydantic-settings>=2.14.2", # NestedSecretsSettingsSource symlink follow
+    "pytest>=9.0.3",           # vulnerable tmpdir handling
+    "python-dotenv>=1.2.2",    # symlink follow in `set_key`
     "requests>=2.33.0",        # cred forwarding across redirects
     "urllib3>=2.7.0",          # 4 high CVEs (redirect header leak + decompression bombs)
-    "uv",  # for `uv run parse_bt.py` (inline-metadata isolation: avoids pyarrow polluting the main venv, which triggers pandas's pyarrow-string default and breaks fastparquet's writer)
+    "uv>=0.11.15",  # arbitrary file write through entry points; also for `uv run parse_bt.py` inline-metadata isolation
     "tabula-py",
     "thrds @ git+https://github.com/runsascoded/thrds@3cb9a0f",
     "utz",
