@@ -9,7 +9,7 @@ from os.path import join
 from pathlib import Path
 
 from click import option
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from utz import err, now
 
 from path_data.cli.base import path_data

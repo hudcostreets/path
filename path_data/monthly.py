@@ -5,7 +5,7 @@ from datetime import date
 import json
 
 import pandas as pd
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from click import option
 from tabula import read_pdf
 from utz import err, now, relpath, sxs

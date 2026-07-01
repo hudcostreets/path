@@ -13,7 +13,7 @@ dependencies = [
     "openpyxl==3.1.5",
     "pandas>=3",
     "plotly<6.8",  # 6.8.0 added `defaults.headers={'X-Requested-With': 'plotly.py'}` which propagates into Kaleido kopts → `Chromium.__init__` rejects unknown kwarg ("Chromium.get_cli() received invalid args: dict_keys(['headers'])"), every CI render (og.png + monthly PNGs) silently fails
-    "PyPDF2",
+    "pypdf",  # maintained successor to PyPDF2 (`PdfReader` API is compatible)
     # Transitive pins to clear Dependabot alerts — s3fs/aiobotocore/dvc chain.
     # Grouped here (not per-line comments) since none of these are used directly.
     "aiohttp>=3.14.1",         # 20 CVEs on <3.14.1 (dvx[s3] → s3fs → aiobotocore)

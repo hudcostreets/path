@@ -3,7 +3,7 @@ from glob import glob
 from os.path import basename
 
 import requests
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from dateutil.parser import parse
 from utz import YM, check
 

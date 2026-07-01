@@ -12,7 +12,7 @@ from os.path import basename, dirname, exists, join, relpath
 import pandas as pd
 from click import option
 from joblib import Parallel, delayed
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from tabula import read_pdf
 from utz import err, to_dt
 
