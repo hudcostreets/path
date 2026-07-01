@@ -43,9 +43,10 @@ def _append_summary(md: str) -> None:
         f.write(md.rstrip() + '\n')
 
 
-def _slack(text: str, emoji: str = ':train:', thread_ts: str | None = None) -> str | None:
+def _slack(text: str, emoji: str = ':train:', thread_ts: str | None = None, blocks: list | None = None) -> str | None:
     """Post a Slack message; return the message's `ts` (for threading
-    follow-ups), or None if posting was skipped/failed."""
+    follow-ups), or None if posting was skipped/failed. Pass `blocks` for
+    Block Kit rich rendering; `text` is then the notification fallback."""
     if environ.get('PATH_DATA_SKIP_SLACK'):
         suffix = f" [thread reply to {thread_ts}]" if thread_ts else ""
         err(f"Slack skipped ($PATH_DATA_SKIP_SLACK){suffix}: {text}")
@@ -63,11 +64,70 @@ def _slack(text: str, emoji: str = ':train:', thread_ts: str | None = None) -> s
             icon_emoji=emoji,
             username='PATH Data',
             thread_ts=thread_ts,
+            blocks=blocks,
         )
         return result.get('ts')
     except Exception as e:
         err(f"Slack post failed: {e}")
         return None
+
+
+_BOLD_INLINE = re.compile(r'\*([^*\n]+)\*')
+_CODE_INLINE = re.compile(r'`([^`\n]+)`')
+
+
+def _rich_text_section_elements(text: str) -> list:
+    """Split prose text into Block Kit inline elements, honoring `*bold*`
+    and `` `code` `` markers. Everything else is plain text."""
+    out: list = []
+    i = 0
+    while i < len(text):
+        # Find the earliest `*...*` or `` `...` `` match starting at i
+        best = None
+        for pat, style in [(_BOLD_INLINE, 'bold'), (_CODE_INLINE, 'code')]:
+            m = pat.search(text, i)
+            if m and (best is None or m.start() < best[0].start()):
+                best = (m, style)
+        if best is None:
+            out.append({'type': 'text', 'text': text[i:]})
+            break
+        m, style = best
+        if m.start() > i:
+            out.append({'type': 'text', 'text': text[i:m.start()]})
+        if style == 'code':
+            out.append({'type': 'text', 'text': m.group(1), 'style': {'code': True}})
+        else:
+            out.append({'type': 'text', 'text': m.group(1), 'style': {'bold': True}})
+        i = m.end()
+    return out
+
+
+def _diagnostic_blocks(details: str) -> list:
+    """Convert a diagnostic markdown string (produced by `_rerun_failing_dvc`
+    or `_notebook_errors`) into Slack Block Kit rich_text so the code fences
+    render reliably. Slack's mrkdwn parser drops `### heading` and treats
+    triple-backticks inconsistently in threaded replies; Block Kit
+    `rich_text_preformatted` sections render as proper code blocks.
+
+    Splits `details` on triple-backtick fences: even-index chunks are prose
+    (with `*bold*` and `` `code` `` markers rendered via `style` flags), odd-index
+    chunks are code blocks.
+    """
+    parts = details.split('```')
+    elements: list = []
+    for i, chunk in enumerate(parts):
+        text = chunk.strip('\n')
+        if not text:
+            continue
+        if i % 2 == 0:
+            inline = _rich_text_section_elements(text + '\n')
+            elements.append({'type': 'rich_text_section', 'elements': inline})
+        else:
+            elements.append({
+                'type': 'rich_text_preformatted',
+                'elements': [{'type': 'text', 'text': text}],
+            })
+    return [{'type': 'rich_text', 'elements': elements}]
 
 
 def _staged_paths(path_filter: str | None = None) -> list[str]:
@@ -208,17 +268,21 @@ def _rerun_failing_dvc(captured_output: str = '') -> str | None:
             return s
         return s[:head_n] + f'\n\n…[{len(s) - head_n - tail_n} chars omitted]…\n\n' + s[-tail_n:]
 
+    # Slack's mrkdwn doesn't render `###` headings and treats triple-backtick
+    # fences inconsistently in threaded replies (see the 2026-07-01 incident
+    # where `### stderr` showed raw and the code fences vanished). Use plain
+    # `stderr:` / `stdout:` labels and Slack-native `*bold*` — this renders
+    # readably on both Slack and GitHub Step Summary (where `*bold*` italicizes,
+    # which is fine; the important thing is the section is delimited).
     return dedent("""\
         Re-ran `{cmd}` directly (exit {rc}); no cell-error in `out/*.ipynb`.
 
-        ### stderr
-
+        *stderr:*
         ```
         {stderr}
         ```
 
-        ### stdout
-
+        *stdout:*
         ```
         {stdout}
         ```
@@ -664,15 +728,17 @@ def gha_update():
         )
         details = nb_err or rerun_err
         if ts and details:
-            # Don't outer-wrap in `\`\`\``: `details` already contains its own
-            # `\`\`\`` blocks (stderr/stdout sections of `rerun_err`, source/
-            # traceback of `nb_err`), and Slack doesn't support nested fences
-            # — the inner `\`\`\`` would close the outer, leaving content
-            # flapping in/out of code mode.
+            # Post via Block Kit rich_text so code fences reliably render as
+            # code blocks (Slack mrkdwn drops `### heading` and rendered
+            # triple-backticks inconsistently in threaded replies — see the
+            # 2026-07-01 incident where `### stderr` showed raw and stderr
+            # content lost monospace styling).
+            truncated = details[:2800]
             _slack(
-                details[:2800],
+                truncated,
                 emoji=':rotating_light:',
                 thread_ts=ts,
+                blocks=_diagnostic_blocks(truncated),
             )
         exit(e.returncode or 1)
     except Exception:
@@ -695,7 +761,13 @@ def gha_update():
             emoji=':rotating_light:',
         )
         if ts:
-            _slack(f"```\n{tb[-2800:]}\n```", emoji=':rotating_light:', thread_ts=ts)
+            tb_tail = tb[-2800:]
+            _slack(
+                tb_tail,
+                emoji=':rotating_light:',
+                thread_ts=ts,
+                blocks=_diagnostic_blocks(f"```\n{tb_tail}\n```"),
+            )
         exit(1)
 
 

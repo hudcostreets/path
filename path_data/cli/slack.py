@@ -29,10 +29,15 @@ def post_message(
     username: str | None = None,
     icon_emoji: str | None = None,
     thread_ts: str | None = None,
+    blocks: list | None = None,
 ):
     """Post a message to Slack via the Bot API. Pass `thread_ts` to reply
-    in an existing thread (use the `ts` of the parent message)."""
+    in an existing thread (use the `ts` of the parent message). Pass `blocks`
+    to render Block Kit rich content — `text` then acts as the notification
+    fallback but is not displayed."""
     payload = dict(channel=channel, text=text)
+    if blocks:
+        payload['blocks'] = blocks
     if username:
         payload['username'] = username
     if icon_emoji:
