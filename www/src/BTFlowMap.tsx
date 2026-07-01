@@ -884,7 +884,7 @@ export default function BTFlowMap({
 
   return (
     <div className="bt-flow-map">
-      <h2 className="bt-flow-map-title">
+      <h2 id="flow-map" className="bt-flow-map-title">
         Monthly traffic by crossing — {shown ? (
           <span className="bt-flow-ym-picker">
             <select
@@ -1013,7 +1013,7 @@ export function BTFlowMapPanes({ rows }: Props) {
 
   return (
     <div className="bt-flow-map">
-      <h2 className="bt-flow-map-title">
+      <h2 id="flow-map" className="bt-flow-map-title">
         Monthly traffic by crossing — {monthLabel}
       </h2>
       <div className="bt-flow-map-row">

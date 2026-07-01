@@ -4,6 +4,7 @@ import { Data, Layout } from "plotly.js"
 import { useUrlState } from "use-prms"
 import { resolve as dvcResolve } from "virtual:dvc-data"
 
+import { niceStep } from "./nice-step"
 import { Plot, isDark } from "./plot-utils"
 import { YmInput } from "./YmInput"
 import { DAY_TYPES, DAY_TYPE_LABELS, dayTypesParam, type DayType } from "./dayTypes"
@@ -187,12 +188,6 @@ export default function EntriesVsExitsBars({
     // Symmetric y-axis tick set for "magnitude" reading on both sides.
     // Aim for ~5-10 ticks per side regardless of magnitude (10-year totals
     // hit ~100M, single-month totals hit ~5M).
-    const niceStep = (m: number) => {
-      const exp = Math.floor(Math.log10(m))
-      const mantissa = m / 10 ** exp
-      const niceMantissa = mantissa < 1.5 ? 1 : mantissa < 3.5 ? 2 : mantissa < 7.5 ? 5 : 10
-      return niceMantissa * 10 ** exp
-    }
     const tickStep = niceStep(maxAbs / 6)
     const tickvals: number[] = []
     for (let v = -Math.floor(maxAbs / tickStep) * tickStep; v <= maxAbs; v += tickStep) tickvals.push(v)
@@ -291,7 +286,7 @@ export default function EntriesVsExitsBars({
     <div className="plot-container">
       {controls}
       <Plot
-        id="entries-vs-exits-bars"
+        id="eve-bars"
         title="Entry vs. Exit disparity, by station"
         level={3}
         subtitle={sysSubtitle}

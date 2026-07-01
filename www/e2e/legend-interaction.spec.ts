@@ -159,8 +159,8 @@ test.describe('Plot position stable on hover/pin', () => {
   const cases = [
     { name: '/ plot1 (RidesPlot) hover station', url: '/', origin: 'rides', hover: 'Journal Square', check: ['rides', 'monthly', 'hourly'] },
     { name: '/ plot3 (HourlyPlot) hover station', url: '/', origin: 'hourly', hover: 'Newark', check: ['rides', 'monthly', 'hourly'] },
-    { name: '/bt plot1 (TrafficPlot) hover crossing', url: '/bt', origin: 'bt-traffic', hover: 'GWB', check: ['bt-traffic', 'bt-monthly'] },
-    { name: '/bt plot2 (BTMonthlyPlot) hover year', url: '/bt', origin: 'bt-monthly', hover: '2020', check: ['bt-traffic', 'bt-monthly'] },
+    { name: '/bt plot1 (TrafficPlot) hover crossing', url: '/bt', origin: 'traffic', hover: 'GWB', check: ['traffic', 'monthly'] },
+    { name: '/bt plot2 (BTMonthlyPlot) hover year', url: '/bt', origin: 'monthly', hover: '2020', check: ['traffic', 'monthly'] },
   ] as const
 
   for (const c of cases) {
@@ -434,7 +434,7 @@ test.describe('Mobile viewport legend below', () => {
 
   for (const [name, url, plotId] of [
     ['/ rides', '/', 'rides'],
-    ['/bt traffic', '/bt', 'bt-traffic'],
+    ['/bt traffic', '/bt', 'traffic'],
   ] as const) {
     test(`${name} has horizontal legend`, async ({ page }) => {
       await page.goto(url)

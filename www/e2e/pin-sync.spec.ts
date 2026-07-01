@@ -21,7 +21,7 @@ async function clickLegendByText(page: Page, plotId: string, name: string) {
 
 /** Read EvE's currently-rendered x-axis station list from Plotly's `_fullData`. */
 async function eveStations(page: Page): Promise<string[]> {
-  return await plotById(page, 'entries-vs-exits-bars').evaluate(el => {
+  return await plotById(page, 'eve-bars').evaluate(el => {
     const plotly = el.querySelector('.js-plotly-plot') as any
     const data = plotly?._fullData
     return data?.[0]?.x ?? []

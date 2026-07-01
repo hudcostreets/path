@@ -705,7 +705,7 @@ function TrafficPlot({
   return (
     <div className="plot-container">
       <Plot
-        id="bt-traffic"
+        id="traffic"
         title={title}
         subtitle={subtitleNode}
         soloMode={legendMode === "solo" ? "hide" : "fade"}
@@ -881,7 +881,7 @@ function BTMonthlyPlot({
   return (
     <div className="plot-container">
       <Plot
-        id="bt-monthly"
+        id="monthly"
         title="Monthly traffic, by month"
         subtitle={subtitleNode}
         data={styledData ?? undefined}

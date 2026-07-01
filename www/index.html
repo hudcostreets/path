@@ -1,6 +1,17 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // If the URL has a hash, hide `<html>` until `useScrollAnchor` scrolls
+      // the target section into view. Prevents flash of page-top content
+      // before the scroll lands. `useScrollAnchor` reveals immediately after
+      // `scrollIntoView`; the 5s timeout is a fallback in case the hook
+      // never runs (JS failure) or the target id doesn't exist.
+      if (window.location.hash) {
+        document.documentElement.style.visibility = 'hidden';
+        setTimeout(function() { document.documentElement.style.visibility = ''; }, 5000);
+      }
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

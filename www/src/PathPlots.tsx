@@ -90,7 +90,7 @@ export default function PathPlots() {
     {/* Shared section heading: covers both the pie-map (entries vs exits per
      *  station, animated by hour) and the bar chart (same data summed across
      *  the date-range, per station). One heading instead of two duplicates. */}
-    <H2 id="entries-vs-exits">Faregate entries vs exits, by station</H2>
+    <H2 id="eve">Faregate entries vs exits, by station</H2>
     <Suspense fallback={<div className="loading" style={{ height: 250 }}>Loading map…</div>}>
       <StationsMap
         embedded

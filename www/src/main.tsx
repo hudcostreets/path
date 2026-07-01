@@ -14,6 +14,7 @@ import './plot.scss'
 import Body from './Body.mdx'
 import { HccsIcon, GhIcon, ThemeCycleIcon } from './speed-dial-icons'
 import { applyTheme, ThemeProvider, useTheme } from './ThemeContext'
+import { useScrollAnchor } from './useScrollAnchor'
 
 const BridgeTunnel = lazy(() => import('./BridgeTunnel'))
 const BannerPage = lazy(() => import('./ABPBanner').then(m => ({ default: m.BannerPage })))
@@ -69,6 +70,14 @@ function AppSpeedDial() {
   return <SpeedDial actions={[themeAction, ...staticSpeedDialActions]} chevronMode="badge" />
 }
 
+/** Effect-only wrapper: `useScrollAnchor` restores scroll to the URL hash on
+ *  load, then keeps the hash in sync with the nearest `h2[id]` above the
+ *  viewport as the user scrolls. */
+function ScrollAnchor() {
+  useScrollAnchor()
+  return null
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
@@ -77,6 +86,7 @@ createRoot(document.getElementById('root')!).render(
           <PlotlyProvider loader={() => import('plotly.js/basic').then(m => (m as any).default ?? m)}>
             <HotkeysProvider>
               <BrowserRouter>
+                <ScrollAnchor />
                 <Routes>
                   <Route path="/banner" element={
                     <Suspense fallback={null}>
