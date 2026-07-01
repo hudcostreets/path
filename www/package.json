@@ -12,6 +12,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tc": "tsc",
+    "test": "playwright test --reporter=list",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
     "build-and-serve": "rm -rf dist && pnpm build && (lsof -ti:8859 | xargs kill -9 2>/dev/null; true) && npx http-server dist -p 8859 -s"
   },
   "dependencies": {
@@ -51,7 +54,8 @@
     "scrns": "https://gitlab.com/runsascoded/js/scrns/-/archive/17a7273a3d08d7b50e519dcecdbbfd42bf1623e9/scrns-17a7273a3d08d7b50e519dcecdbbfd42bf1623e9.tar.gz",
     "typescript": "^5.5.3",
     "vite": "^5.4.21",
-    "vite-plugin-dvc": "https://github.com/runsascoded/vite-plugin-dvc#f2e511db003444748913609583e8c3404ceb67fc"
+    "vite-plugin-dvc": "https://github.com/runsascoded/vite-plugin-dvc#f2e511db003444748913609583e8c3404ceb67fc",
+    "vitest": "^2.1.9"
   },
   "pnpm": {
     "overrides": {

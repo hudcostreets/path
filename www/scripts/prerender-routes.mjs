@@ -5,12 +5,11 @@
 // previews + tab titles that match the page being shared.
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const ROOT = new URL('..', import.meta.url).pathname
-const DIST = join(ROOT, 'dist')
-const ORIGIN = 'https://path.hudcostreets.org'
+export const ORIGIN = 'https://path.hudcostreets.org'
 
-const ROUTES = [
+export const ROUTES = [
   {
     path: '/bt',
     title: 'PANYNJ Bridge & Tunnel Traffic – Hudson County Complete Streets',
@@ -27,7 +26,7 @@ const ROUTES = [
   },
 ]
 
-function rewrite(html, route) {
+export function rewrite(html, route) {
   const url = ORIGIN + route.path
   const subs = [
     [/<title>[^<]*<\/title>/, `<title>${route.title}</title>`],
@@ -45,10 +44,15 @@ function rewrite(html, route) {
   return out
 }
 
-const index = await readFile(join(DIST, 'index.html'), 'utf8')
-for (const route of ROUTES) {
-  const out = join(DIST, route.path.replace(/^\//, ''), 'index.html')
-  await mkdir(dirname(out), { recursive: true })
-  await writeFile(out, rewrite(index, route))
-  console.log(`prerender-routes: wrote ${out}`)
+// CLI entry: only run when invoked directly, not when imported (e.g. by tests).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const ROOT = new URL('..', import.meta.url).pathname
+  const DIST = join(ROOT, 'dist')
+  const index = await readFile(join(DIST, 'index.html'), 'utf8')
+  for (const route of ROUTES) {
+    const out = join(DIST, route.path.replace(/^\//, ''), 'index.html')
+    await mkdir(dirname(out), { recursive: true })
+    await writeFile(out, rewrite(index, route))
+    console.log(`prerender-routes: wrote ${out}`)
+  }
 }
