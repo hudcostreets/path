@@ -32,7 +32,7 @@
     "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/e7b1bca64756b2b3e7dbec719e314eebb2b7ee39/pltly-e7b1bca64756b2b3e7dbec719e314eebb2b7ee39.tar.gz",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "^7.18.1",
     "use-kbd": "^0.12.0",
     "use-prms": "https://github.com/runsascoded/use-prms#3db90a820b4372cea3efb7e02bac317dc049fa04"
   },
