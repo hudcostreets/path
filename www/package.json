@@ -22,7 +22,6 @@
     "@mui/material": "^6.1.9",
     "@rdub/base": "0.7.1",
     "@rdub/icons": "0.1.0",
-    "@rdub/next-params": "0.3.0",
     "@tanstack/react-query": "^5.60.5",
     "@types/leaflet": "^1.9.21",
     "geo-sankey": "https://github.com/runsascoded/geo-sankey#3af38f772fd03a5455a24f222d90a66e52f93f52",
