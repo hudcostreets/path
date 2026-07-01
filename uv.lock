@@ -1114,8 +1114,8 @@ wheels = [
 
 [[package]]
 name = "dvx"
-version = "0.4.1.dev4+g6156acc0b"
-source = { git = "https://github.com/runsascoded/dvx?rev=6156acc0b#6156acc0b8c4370b0b96f6e9359a3c543f02216c" }
+version = "0.5.1.dev7+g9f462bf19"
+source = { git = "https://github.com/runsascoded/dvx?rev=9f462bf19#9f462bf19c11b85dd6a415c3c8a045a9acfff8b1" }
 dependencies = [
     { name = "click" },
     { name = "dffs" },
@@ -2632,7 +2632,7 @@ eda = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dvx", extras = ["s3"], git = "https://github.com/runsascoded/dvx?rev=6156acc0b" },
+    { name = "dvx", extras = ["s3"], git = "https://github.com/runsascoded/dvx?rev=9f462bf19" },
     { name = "fastparquet", specifier = "==2024.11.0" },
     { name = "ipython" },
     { name = "joblib" },
@@ -2643,7 +2643,7 @@ requires-dist = [
     { name = "openpyxl", specifier = "==3.1.5" },
     { name = "pandas", specifier = ">=3" },
     { name = "papermill", marker = "extra == 'eda'" },
-    { name = "plotly" },
+    { name = "plotly", specifier = "<6.8" },
     { name = "pypdf2" },
     { name = "tabula-py" },
     { name = "thrds", git = "https://github.com/runsascoded/thrds?rev=3cb9a0f" },
