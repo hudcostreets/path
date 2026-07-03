@@ -8,4 +8,4 @@ meta:
     cmd: path-data monthly -y 2026
     git_deps:
       2026-PATH-Monthly-Ridership-Report.pdf: 4478c80fabb180b885e5b89b552ffbaaaa79f7d1
-      /path_data/monthly.py: 3ef26b7d2c1920c514a87b46c5be3ca4cf497168
+      /path_data/monthly.py: eed41a67bf8a39b5de796a8d832c149b0ba87f84
