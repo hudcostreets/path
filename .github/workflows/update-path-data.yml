@@ -37,6 +37,9 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
+      - name: Install poppler-utils (`pdftotext`)
+        run: sudo apt-get install -y poppler-utils
+
       - run: pip install -e .
 
       - name: Run daily update
