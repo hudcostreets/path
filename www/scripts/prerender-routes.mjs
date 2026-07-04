@@ -15,14 +15,20 @@ export const ROUTES = [
     title: 'PANYNJ Bridge & Tunnel Traffic – Hudson County Complete Streets',
     description: 'Interactive visualizations of monthly vehicle counts at the six PANYNJ bridges and tunnels (GWB, Lincoln, Holland, Bayonne, Goethals, Outerbridge), 2011–present.',
     ogTitle: 'PANYNJ Bridge & Tunnel Traffic',
-    ogImage: `${ORIGIN}/og.png`,
+    // Dedicated dark-mode preview (`scripts/capture-og.ts`, DVX-tracked as
+    // `og-bt.png`). PNG beats JPG here — the plot is dominated by flat
+    // stacked-bar regions that compress well as PNG (~55 KB vs ~220 KB JPG).
+    ogImage: `${ORIGIN}/og-bt.png`,
   },
   {
     path: '/map',
     title: 'PATH Ridership – Hourly Pie-Map – Hudson County Complete Streets',
     description: 'Interactive map of PATH faregate entries (green) and exits (orange) per station, animated through 24 hours.',
     ogTitle: 'PATH Ridership – Hourly Pie-Map',
-    ogImage: `${ORIGIN}/og.png`,
+    // Dedicated preview with map tiles + station pies at 8-9am peak. JPG here
+    // — the photo-like tile imagery dominates and cuts the file in half
+    // vs. PNG (~244 KB vs ~522 KB).
+    ogImage: `${ORIGIN}/og-map.jpg`,
   },
 ]
 
