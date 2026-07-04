@@ -13,7 +13,8 @@ import { join, dirname } from 'node:path'
 import { chromium } from '@playwright/test'
 
 // CLI flags:
-//   --per-hour, -p N    Frames per integer hour (default 2). Higher = smoother.
+//   --per-hour, -p N    Frames per integer hour (default 4 = every 15min).
+//                       Higher = smoother.
 //   --loop-seconds, -l S Target GIF playback seconds (default 6). FPS = frames/S.
 //   --workers, -w N     Parallel render workers (default 1). Each worker owns
 //                       its own playwright page in the same browser, picking
@@ -33,7 +34,7 @@ import { chromium } from '@playwright/test'
 function parseArgs(argv) {
   // `desc` sentinel: undefined = not passed, null = bare flag (use page
   // defaults), string = explicit value (empty string disables overlay).
-  const args = { perHour: 2, loopSeconds: 6, workers: 1, suffix: null, desc: undefined, range: null }
+  const args = { perHour: 4, loopSeconds: 6, workers: 1, suffix: null, desc: undefined, range: null }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], next = argv[i + 1]
     if (a === '--per-hour' || a === '-p') { args.perHour = Number(next); i++ }
@@ -73,8 +74,8 @@ const FRAMES_DIR = join(OUT_DIR, 'frames')
 const VIEWPORT = { width: 1200, height: 700 }
 const TILE_SETTLE_MS = 1500
 // `perHour` frames per integer hour. Examples: 1 = 24 frames at hour ticks
-// (no interpolation visible); 2 = half-hour; 3 = every 20min; 4 = every
-// 15min. FPS scales so each full revolution lasts `loopSeconds`.
+// (no interpolation visible); 2 = every 30min; 3 = every 20min; 4 (default)
+// = every 15min. FPS scales so each full revolution lasts `loopSeconds`.
 const HOUR_STEP = 1 / perHour
 const FRAME_COUNT = Math.round(24 * perHour)
 const FPS = Math.max(2, Math.round(FRAME_COUNT / loopSeconds))
