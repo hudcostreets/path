@@ -1,8 +1,8 @@
 outs:
-- md5: bbb4efcd11fc8336be9f1dff1785f459
-  size: 782859
+- md5: d6408bd4aa1b03fd6a90a82e32c96295
+  size: 31671
   hash: md5
-  path: entries_vs_exits.json
+  path: entries_vs_exits.pqt
 meta:
   computation:
     cmd: path-data entries-vs-exits

@@ -360,6 +360,23 @@ html.clean {
   align-items: center;
   gap: 0.4em;
 }
+// Recording mode: no play button, centered dial + a jumbo hour label under
+// the dial so the frame-by-frame hour is legible in the exported GIF/MP4.
+.map-clock-panel--record {
+  .map-clock-row { justify-content: center; }
+  .map-clock-big-label {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-top: 6px;
+    color: #fff;
+    // Reserve width for the widest hour label ("11pm-12am") so the widget
+    // doesn't reflow across frames.
+    min-width: 5.6em;
+    font-variant-numeric: tabular-nums;
+  }
+}
 
 // Custom attribution: an info icon in the lower-left that reveals the full
 // © text on hover/focus. Replaces Leaflet's default bottom-right control.

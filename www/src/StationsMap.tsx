@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useQuery } from '@tanstack/react-query'
 import { asyncBufferFromUrl, parquetRead } from 'hyparquet'
+import { compressors } from './parquet-compressors'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Param, codeParam, useUrlState } from 'use-prms'
@@ -144,6 +145,7 @@ export default function StationsMap({
                   'Avg Weekday Entry', 'Avg Saturday Entry', 'Avg Sunday Entry',
                   'Avg Weekday Exit', 'Avg Saturday Exit', 'Avg Sunday Exit'],
         rowFormat: 'object',
+        compressors,
         onComplete: data => raw.push(...data),
       })
       const num = (v: unknown) => Number(v) || 0
@@ -271,7 +273,7 @@ export default function StationsMap({
   const descParam = typeof window === 'undefined' ? null
     : new URLSearchParams(window.location.search).get('desc')
   const showDesc = descParam !== null
-  const [descTitle, descSubtitle] = (() => {
+  const [descTitle, descSubtitle]: [string, React.ReactNode] = (() => {
     // Compact range label: "Jan 2025 – Dec 2025"; or "Mar 2025" for single month.
     const rangeLabel = (() => {
       if (!fromYm || !toYm) return ''
@@ -282,13 +284,21 @@ export default function StationsMap({
       }
       return fromYm === toYm ? fmt(fromYm) : `${fmt(fromYm)} – ${fmt(toYm)}`
     })()
-    const defaults: [string, string] = [
-      'PATH faregate ridership, by hour',
-      rangeLabel ? `green = entries · orange = exits · ${rangeLabel} avg` : 'green = entries · orange = exits · area ∝ volume',
-    ]
-    if (!descParam) return defaults
+    const defaultTitle = 'PATH faregate ridership, by hour'
+    // Colored word tokens (`green`/`orange`) so the legend palette is
+    // self-documenting in the recorded GIF — the words match the wedge colors.
+    const defaultSubtitle: React.ReactNode = (
+      <>
+        <span style={{ color: ENTRY_COLOR }}>green</span>
+        {' = entries · '}
+        <span style={{ color: EXIT_COLOR }}>orange</span>
+        {' = exits'}
+        {rangeLabel ? ` · ${rangeLabel} avg` : ' · area ∝ volume'}
+      </>
+    )
+    if (!descParam) return [defaultTitle, defaultSubtitle]
     const [t, s] = descParam.split('|')
-    return [t || defaults[0], s ?? defaults[1]]
+    return [t || defaultTitle, s ?? defaultSubtitle]
   })()
   useEffect(() => {
     if (!recordMode) return
@@ -305,8 +315,13 @@ export default function StationsMap({
   // pie sizes stay absolute across hour scrubbing.
   const perStationHour = useMemo(() => {
     const result = new Map<string, Map<number, { e: number, x: number }>>()
-    if (!rows || !fromYm || !toYm) return result
-    const inRange = rows.filter(r => r.ym >= fromYm && r.ym <= toYm)
+    if (!rows) return result
+    // Standalone `/map` renders `<StationsMap />` with no `dateRange` prop, so
+    // `fromYm`/`toYm` stay empty. In that uncontrolled case use all rows so
+    // pies render out of the box; explicit ranges still filter as usual.
+    const inRange = (fromYm && toYm)
+      ? rows.filter(r => r.ym >= fromYm && r.ym <= toYm)
+      : rows
     // Bucket by (station, hour, ym) summing rows, then average across yms.
     const accum = new Map<string, Map<number, Map<string, { e: number, x: number }>>>()
     for (const r of inRange) {
@@ -698,11 +713,13 @@ export default function StationsMap({
         )}
       </div>
       {clockHost && createPortal(
-        <div className="map-clock-panel">
-          <div className="map-clock-label">
-            <span className="map-clock-hint">Hour</span>
-            <strong>{hourLabel}</strong>
-          </div>
+        <div className={`map-clock-panel${recordMode ? ' map-clock-panel--record' : ''}`}>
+          {!recordMode && (
+            <div className="map-clock-label">
+              <span className="map-clock-hint">Hour</span>
+              <strong>{hourLabel}</strong>
+            </div>
+          )}
           <div className="map-clock-row">
             <HourClock
               hour={hour}
@@ -714,13 +731,18 @@ export default function StationsMap({
               animMs={recordMode ? 0 : Math.max(animMs, 120)}
               playing={playing}
             />
-            <button type="button"
-              onClick={() => setPlaying(p => !p)}
-              title={playing ? 'Pause hour cycle' : 'Cycle through hours'}
-              style={playButtonStyle}>
-              {playing ? '⏸' : '▶'}
-            </button>
+            {!recordMode && (
+              <button type="button"
+                onClick={() => setPlaying(p => !p)}
+                title={playing ? 'Pause hour cycle' : 'Cycle through hours'}
+                style={playButtonStyle}>
+                {playing ? '⏸' : '▶'}
+              </button>
+            )}
           </div>
+          {recordMode && (
+            <div className="map-clock-big-label">{hourLabel}</div>
+          )}
         </div>,
         clockHost,
       )}

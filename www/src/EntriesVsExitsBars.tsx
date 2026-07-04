@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
+import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { compressors } from "./parquet-compressors"
 import { useEffect, useMemo } from "react"
 import { Data, Layout } from "plotly.js"
 import { useUrlState } from "use-prms"
@@ -93,7 +95,44 @@ export default function EntriesVsExitsBars({
     queryKey: ['entries-vs-exits'],
     refetchOnWindowFocus: false,
     refetchInterval: false,
-    queryFn: async () => (await fetch(dvcResolve('entries_vs_exits.json'))).json(),
+    queryFn: async () => {
+      // Flat parquet: one row per (ym, station) with `{dt}_days`, `{dt}_entries`,
+      // `{dt}_exits` for each of the 4 raw day-types. Rebuild the nested Payload
+      // shape client-side so downstream `agg` logic is unchanged.
+      const file = await asyncBufferFromUrl({ url: dvcResolve('entries_vs_exits.pqt') })
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({ file, rowFormat: 'object', compressors, onComplete: rows => raw.push(...rows) })
+      const months: Record<string, MonthEntry> = {}
+      const ymSet = new Set<string>()
+      for (const r of raw) {
+        const ym = r['ym'] as string
+        const name = r['station'] as string
+        ymSet.add(ym)
+        let m = months[ym]
+        if (!m) {
+          m = {
+            days: {
+              weekday: Number(r['weekday_days']),
+              saturday: Number(r['saturday_days']),
+              sunday: Number(r['sunday_days']),
+              holiday: Number(r['holiday_days']),
+            },
+            stations: [],
+          }
+          months[ym] = m
+        }
+        m.stations.push({
+          name,
+          by_day_type: {
+            weekday: { avg_entries: Number(r['weekday_entries']), avg_exits: Number(r['weekday_exits']) },
+            saturday: { avg_entries: Number(r['saturday_entries']), avg_exits: Number(r['saturday_exits']) },
+            sunday: { avg_entries: Number(r['sunday_entries']), avg_exits: Number(r['sunday_exits']) },
+            holiday: { avg_entries: Number(r['holiday_entries']), avg_exits: Number(r['holiday_exits']) },
+          },
+        })
+      }
+      return { all_yms: Array.from(ymSet).sort(), months }
+    },
   })
 
   const allYms = data?.all_yms ?? []

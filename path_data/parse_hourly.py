@@ -8,6 +8,7 @@ Ported from `parse-hourly.ipynb`."""
 import json
 import re
 from os.path import basename, dirname, exists, join, relpath
+from pathlib import Path
 
 import pandas as pd
 from click import option
@@ -329,7 +330,9 @@ def parse_hourly(n_jobs: int, last_month: int | None, overwrite: bool, year: int
 
 
 def run_combine_hourly() -> None:
-    """Concatenate all per-year hourly parquets into www/public/hourly.pqt."""
+    """Concatenate all per-year hourly parquets into www/public/hourly.pqt.
+    Projects to only the columns the SPA reads and downcasts int64 → int16/int32
+    to keep the browser-fetched file compact."""
     from glob import glob
     from path_data.paths import WWW_HOURLY_PQT
     frames = []
@@ -339,8 +342,25 @@ def run_combine_hourly() -> None:
     if not frames:
         raise RuntimeError('No hourly parquets found in data/')
     combined = pd.concat(frames, ignore_index=True)
-    combined.to_parquet(WWW_HOURLY_PQT, index=False, engine='fastparquet')
-    err(f'Wrote {relpath(WWW_HOURLY_PQT)} ({len(combined)} rows)')
+    # StationsMap reads Weekday/Saturday/Sunday averages only; the SPA has no
+    # holiday-hour breakdown, so drop those columns to shrink the transferred
+    # file. Downcast: Year fits int16 (2017-2026), Month/Hour fit int8, avg
+    # ridership per station-hour fits int32 with headroom (peak ~10k).
+    keep = [
+        'Station', 'Year', 'Month', 'Hour',
+        'Avg Weekday Entry', 'Avg Saturday Entry', 'Avg Sunday Entry',
+        'Avg Weekday Exit', 'Avg Saturday Exit', 'Avg Sunday Exit',
+    ]
+    combined = combined[keep].copy()
+    combined['Year'] = combined['Year'].astype('int16')
+    combined['Month'] = combined['Month'].astype('int8')
+    combined['Hour'] = combined['Hour'].astype('int8')
+    for col in keep[4:]:
+        combined[col] = combined[col].astype('int32')
+    # zstd (decoded on the browser side via `hyparquet-compressors`) is ~40%
+    # smaller than the default snappy on this int-heavy schema.
+    combined.to_parquet(WWW_HOURLY_PQT, index=False, engine='fastparquet', compression='zstd')
+    err(f'Wrote {relpath(WWW_HOURLY_PQT)} ({len(combined)} rows, {Path(WWW_HOURLY_PQT).stat().st_size:,} bytes)')
 
 
 @path_data.command('combine-hourly')

@@ -1,13 +1,13 @@
 """Aggregate per-month per-station entries/exits avg-per-day-of-type from the
 hourly PDF + day-type counts from the monthly PDF. Writes
-`www/public/entries_vs_exits.json` for the dashboard mirror-bars chart."""
+`www/public/entries_vs_exits.pqt` for the dashboard mirror-bars chart."""
 
-import json
 import re
 import subprocess
 from os.path import join
 from pathlib import Path
 
+import pandas as pd
 from click import option
 from pypdf import PdfReader
 from utz import err, now
@@ -76,9 +76,10 @@ def _parse_per_month_day_counts(monthly_pdf_path: str) -> dict[int, dict[str, in
     return per_month
 
 
-def _build_year(year: int) -> dict:
-    """Parse the hourly+monthly PDFs for `year` into a partial JSON payload
-    ({all_yms, months}). Raises if either PDF is missing."""
+def _build_year(year: int) -> list[dict]:
+    """Parse the hourly+monthly PDFs for `year` into a flat list of
+    (ym, station, *day-counts, *avg-entries, *avg-exits) row dicts. Raises
+    if either PDF is missing."""
     h_pdf = hourly_pdf(year)
     m_pdf = monthly_pdf(year)
     if not Path(h_pdf).exists():
@@ -90,28 +91,21 @@ def _build_year(year: int) -> dict:
     months = [f'{year}-{mo:02d}' for mo in sorted(month_days.keys())]
     err(f'{year}: {len(months)} months: {months[0]}..{months[-1]}')
 
-    out = {'all_yms': months, 'months': {}}
+    rows = []
     for month_idx, ym in zip(sorted(month_days.keys()), months):
         section_start = 4 + month_idx * SECTION_PAGES
-        stations_data = []
+        days = month_days[month_idx]
         for i, station in enumerate(STATIONS):
             page = section_start + i
             avgs = _parse_total_row(h_pdf, page)
-            stations_data.append({
-                'name': station,
-                'by_day_type': {
-                    dt: {
-                        'avg_entries': avgs[f'{dt}_entries'],
-                        'avg_exits': avgs[f'{dt}_exits'],
-                    }
-                    for dt in DAY_TYPES
-                },
+            rows.append({
+                'ym': ym,
+                'station': station,
+                **{f'{dt}_days': days[dt] for dt in DAY_TYPES},
+                **{f'{dt}_entries': avgs[f'{dt}_entries'] for dt in DAY_TYPES},
+                **{f'{dt}_exits': avgs[f'{dt}_exits'] for dt in DAY_TYPES},
             })
-        out['months'][ym] = {
-            'days': month_days[month_idx],
-            'stations': stations_data,
-        }
-    return out
+    return rows
 
 
 def _available_years() -> list[int]:
@@ -125,23 +119,30 @@ def _available_years() -> list[int]:
 
 
 def run_entries_vs_exits(years: list[int]) -> None:
-    out = {'all_yms': [], 'months': {}}
+    rows: list[dict] = []
     for y in sorted(years):
-        part = _build_year(y)
-        out['all_yms'].extend(part['all_yms'])
-        out['months'].update(part['months'])
-    out['all_yms'].sort()
+        rows.extend(_build_year(y))
+    df = pd.DataFrame(rows)
+    # Downcast numeric columns so the on-disk file is compact. Day counts fit
+    # in int8; avg entries/exits fit comfortably in int32 (peak PATH avg is
+    # ~10k/hour, but keep headroom for aggregated variants).
+    for dt in DAY_TYPES:
+        df[f'{dt}_days'] = df[f'{dt}_days'].astype('int16')
+        df[f'{dt}_entries'] = df[f'{dt}_entries'].astype('int32')
+        df[f'{dt}_exits'] = df[f'{dt}_exits'].astype('int32')
 
-    out_path = join(WWW_PUBLIC, 'entries_vs_exits.json')
-    Path(out_path).write_text(json.dumps(out, indent=2) + '\n')
-    err(f"wrote {out_path} ({Path(out_path).stat().st_size:,} bytes, {len(out['months'])} months over {len(years)} years)")
+    out_path = join(WWW_PUBLIC, 'entries_vs_exits.pqt')
+    # zstd (via `hyparquet-compressors` on the browser side) compresses this
+    # narrow-int table ~40% smaller than snappy — worth the extra dep.
+    df.to_parquet(out_path, index=False, engine='fastparquet', compression='zstd')
+    err(f"wrote {out_path} ({Path(out_path).stat().st_size:,} bytes, {len(rows)} rows over {len(years)} years)")
 
 
 @path_data.command('entries-vs-exits')
 @option('-y', '--year', 'years', type=int, multiple=True, help="Year(s) to parse. Repeatable; unset → all years with both hourly + monthly PDFs (2017+).")
 def entries_vs_exits(years: tuple[int, ...]):
     """Aggregate entries-vs-exits totals per station + day-type, write
-    `www/public/entries_vs_exits.json` for the dashboard mirror-bars chart."""
+    `www/public/entries_vs_exits.pqt` for the dashboard mirror-bars chart."""
     selected = list(years) if years else _available_years()
     if not selected:
         raise SystemExit("No years with both hourly + monthly PDFs on disk")
