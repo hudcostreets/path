@@ -338,44 +338,59 @@ html.clean {
   color: #ddd;
   border: 1px solid #444;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 8px 10px 6px;
   font-size: 0.8rem;
   backdrop-filter: blur(2px);
 }
-.map-clock-label {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4em;
-  margin-bottom: 4px;
-  .map-clock-hint {
-    color: #888;
-    font-size: 0.85em;
-  }
-  strong {
-    font-size: 0.95em;
-  }
+.map-clock-panel {
+  position: relative;
 }
 .map-clock-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4em;
 }
-// Recording mode: no play button, centered dial + a jumbo hour label under
-// the dial so the frame-by-frame hour is legible in the exported GIF/MP4.
-.map-clock-panel--record {
-  .map-clock-row { justify-content: center; }
-  .map-clock-big-label {
-    text-align: center;
-    font-size: 1.6rem;
-    font-weight: 600;
-    line-height: 1.1;
-    margin-top: 6px;
-    color: #fff;
-    // Reserve width for the widest hour label ("11pm-12am") so the widget
-    // doesn't reflow across frames.
-    min-width: 5.6em;
-    font-variant-numeric: tabular-nums;
+.map-clock-big-label {
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.1;
+  margin-top: 6px;
+  color: #fff;
+  // Reserve width for the widest hour label ("11pm-12am") so the widget
+  // doesn't reflow between hours.
+  min-width: 5.6em;
+  font-variant-numeric: tabular-nums;
+}
+.map-clock-totals {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.5em;
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  .map-clock-totals-sep {
+    color: #666;
+    font-weight: 400;
   }
+}
+.map-clock-play {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: rgba(40, 40, 55, 0.85);
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 0 0.35em;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  min-width: 1.6em;
+  cursor: pointer;
+  &:hover { background: rgba(60, 60, 80, 0.9); color: #fff; }
 }
 
 // Custom attribution: an info icon in the lower-left that reveals the full

@@ -394,6 +394,20 @@ export default function StationsMap({
     return effectiveHour === ALL_HOURS ? dailyMax : hourlyMax
   }, [perStationHour, effectiveHour])
 
+  // System-wide totals across the visible station filter at the current hour
+  // (or across all hours in the "All" state). Uses the bucket (integer-hour
+  // floor) values so the readout snaps on hour ticks — matches on-pie labels
+  // rather than drifting with sub-hour interpolation.
+  const systemTotals = useMemo(() => {
+    let e = 0, x = 0
+    for (const r of rangeAvg) {
+      if (activeSet !== null && !activeSet.has(r.station)) continue
+      e += r.bucketEntries
+      x += r.bucketExits
+    }
+    return { entries: e, exits: x }
+  }, [rangeAvg, activeSet])
+
   // Container for the clock control rendered into the map's top-right corner
   // via React portal. Set once Leaflet's L.control creates its DOM.
   const [clockHost, setClockHost] = useState<HTMLDivElement | null>(null)
@@ -715,10 +729,12 @@ export default function StationsMap({
       {clockHost && createPortal(
         <div className={`map-clock-panel${recordMode ? ' map-clock-panel--record' : ''}`}>
           {!recordMode && (
-            <div className="map-clock-label">
-              <span className="map-clock-hint">Hour</span>
-              <strong>{hourLabel}</strong>
-            </div>
+            <button type="button"
+              className="map-clock-play"
+              onClick={() => setPlaying(p => !p)}
+              title={playing ? 'Pause hour cycle' : 'Cycle through hours'}>
+              {playing ? '⏸' : '▶'}
+            </button>
           )}
           <div className="map-clock-row">
             <HourClock
@@ -731,17 +747,14 @@ export default function StationsMap({
               animMs={recordMode ? 0 : Math.max(animMs, 120)}
               playing={playing}
             />
-            {!recordMode && (
-              <button type="button"
-                onClick={() => setPlaying(p => !p)}
-                title={playing ? 'Pause hour cycle' : 'Cycle through hours'}
-                style={playButtonStyle}>
-                {playing ? '⏸' : '▶'}
-              </button>
-            )}
           </div>
-          {recordMode && (
-            <div className="map-clock-big-label">{hourLabel}</div>
+          <div className="map-clock-big-label">{hourLabel}</div>
+          {(systemTotals.entries > 0 || systemTotals.exits > 0) && (
+            <div className="map-clock-totals">
+              <span style={{ color: ENTRY_COLOR }}>{formatCompactNum(systemTotals.entries)}</span>
+              <span className="map-clock-totals-sep">·</span>
+              <span style={{ color: EXIT_COLOR }}>{formatCompactNum(systemTotals.exits)}</span>
+            </div>
           )}
         </div>,
         clockHost,
@@ -789,18 +802,6 @@ const selectStyle: React.CSSProperties = {
   borderRadius: 4,
   padding: '0.15em 0.4em',
   fontSize: '0.85rem',
-}
-
-const playButtonStyle: React.CSSProperties = {
-  background: '#222',
-  color: '#ddd',
-  border: '1px solid #444',
-  borderRadius: 4,
-  padding: '0 0.4em',
-  fontSize: '0.85rem',
-  cursor: 'pointer',
-  lineHeight: 1.4,
-  minWidth: '1.8em',
 }
 
 // 24-hour clock-face control. 12a at top, going clockwise. Click or drag the
