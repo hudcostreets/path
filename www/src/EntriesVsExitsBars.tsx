@@ -1,33 +1,12 @@
-import { useQuery } from "@tanstack/react-query"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
-import { compressors } from "./parquet-compressors"
 import { useEffect, useMemo } from "react"
 import { Data, Layout } from "plotly.js"
 import { useUrlState } from "use-prms"
-import { resolve as dvcResolve } from "virtual:dvc-data"
 
 import { niceStep } from "./nice-step"
 import { Plot, isDark } from "./plot-utils"
 import { YmInput } from "./YmInput"
 import { DAY_TYPES, DAY_TYPE_LABELS, dayTypesParam, type DayType } from "./dayTypes"
-
-// EvE's data has 4 raw day-types (the picker only exposes 3 — weekend = sat+sun).
-type RawDayType = 'weekday' | 'saturday' | 'sunday' | 'holiday'
-
-type StationMonthRow = {
-  name: string
-  by_day_type: Record<RawDayType, { avg_entries: number, avg_exits: number }>
-}
-
-type MonthEntry = {
-  days: Record<RawDayType, number>
-  stations: StationMonthRow[]
-}
-
-type Payload = {
-  all_yms: string[]
-  months: Record<string, MonthEntry>
-}
+import { useEntriesVsExits, type RawDayType } from "./entries-vs-exits-data"
 
 // Map a picker day-type to the underlying raw types it covers.
 const PICKER_TO_RAW: Record<DayType, RawDayType[]> = {
@@ -96,49 +75,7 @@ export default function EntriesVsExitsBars({
   const filterStations = activeStations.length > 0 && activeStations.length < STATION_COUNT
     ? activeStations.map(toShort)
     : null  // null = no filter, render all
-  const { data } = useQuery<Payload>({
-    queryKey: ['entries-vs-exits'],
-    refetchOnWindowFocus: false,
-    refetchInterval: false,
-    queryFn: async () => {
-      // Flat parquet: one row per (ym, station) with `{dt}_days`, `{dt}_entries`,
-      // `{dt}_exits` for each of the 4 raw day-types. Rebuild the nested Payload
-      // shape client-side so downstream `agg` logic is unchanged.
-      const file = await asyncBufferFromUrl({ url: dvcResolve('entries_vs_exits.pqt') })
-      const raw: Record<string, unknown>[] = []
-      await parquetRead({ file, rowFormat: 'object', compressors, onComplete: rows => raw.push(...rows) })
-      const months: Record<string, MonthEntry> = {}
-      const ymSet = new Set<string>()
-      for (const r of raw) {
-        const ym = r['ym'] as string
-        const name = r['station'] as string
-        ymSet.add(ym)
-        let m = months[ym]
-        if (!m) {
-          m = {
-            days: {
-              weekday: Number(r['weekday_days']),
-              saturday: Number(r['saturday_days']),
-              sunday: Number(r['sunday_days']),
-              holiday: Number(r['holiday_days']),
-            },
-            stations: [],
-          }
-          months[ym] = m
-        }
-        m.stations.push({
-          name,
-          by_day_type: {
-            weekday: { avg_entries: Number(r['weekday_entries']), avg_exits: Number(r['weekday_exits']) },
-            saturday: { avg_entries: Number(r['saturday_entries']), avg_exits: Number(r['saturday_exits']) },
-            sunday: { avg_entries: Number(r['sunday_entries']), avg_exits: Number(r['sunday_exits']) },
-            holiday: { avg_entries: Number(r['holiday_entries']), avg_exits: Number(r['holiday_exits']) },
-          },
-        })
-      }
-      return { all_yms: Array.from(ymSet).sort(), months }
-    },
-  })
+  const { data } = useEntriesVsExits()
 
   const allYms = data?.all_yms ?? []
   const [fromYm, toYm] = dateRange ?? ['', '']

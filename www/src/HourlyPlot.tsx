@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { compressors } from "./parquet-compressors"
 import { useCallback, useMemo, useState } from "react"
+import { useEntriesVsExits, dayCountsInRange } from "./entries-vs-exits-data"
 import { Data, Legend } from "plotly.js"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { codeParam, useUrlState } from "use-prms"
@@ -247,7 +248,10 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
         }
         const y = hours.map(h => {
           const entry = hourSums.get(h)
-          return entry ? Math.round(entry.sum / entry.count) : 0
+          // Convert the per-station-month avg (`sum / count`) back to a
+          // system-wide sum by multiplying by the number of visible stations —
+          // matches EvE bars' "sum across stations × avg across months" semantics.
+          return entry ? Math.round((entry.sum * chartStations.length) / entry.count) : 0
         })
         return {
           name: label, type: "bar", x: hours, y, marker: { color }, hovertemplate,
@@ -317,7 +321,10 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
         }
         const y = hours.map(h => {
           const entry = hourSums.get(h)
-          return entry ? Math.round(entry.sum / entry.count) : 0
+          // Convert the per-station-month avg (`sum / count`) back to a
+          // system-wide sum by multiplying by the number of visible stations —
+          // matches EvE bars' "sum across stations × avg across months" semantics.
+          return entry ? Math.round((entry.sum * chartStations.length) / entry.count) : 0
         })
         return {
           name: label,
@@ -352,6 +359,27 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
     onActiveStationChange(name === "Christopher St." ? "Christopher Street" : name)
   }, [onActiveStationChange, groupBy])
 
+  // Share `entries_vs_exits.pqt` with `EntriesVsExitsBars` (same react-query
+  // cache key) purely for the per-month day counts driving the subtitle.
+  const { data: evePayload } = useEntriesVsExits()
+  const dayCountBreakdown = useMemo(() => {
+    if (!dateRange) return null
+    const totals = dayCountsInRange(evePayload, dateRange.from, dateRange.to)
+    const SHORT = { weekday: 'wkdy', saturday: 'Sat', sunday: 'Sun', holiday: 'hol' } as const
+    // Only include the day-types actually selected in the picker (weekend →
+    // sat+sun); everything else would be misleading in the "N days averaged" count.
+    const activeRaw = new Set(selectedDayTypes)
+    const parts: string[] = []
+    let total = 0
+    for (const dt of ['weekday', 'saturday', 'sunday', 'holiday'] as const) {
+      if (!activeRaw.has(dt)) continue
+      const n = totals[dt]
+      if (n > 0) parts.push(`${n} ${SHORT[dt]}`)
+      total += n
+    }
+    return total > 0 ? { total, parts } : null
+  }, [evePayload, dateRange, selectedDayTypes])
+
   // Build subtitle with filter badges (station active, day types) + static text.
   const subtitle: React.ReactNode = useMemo(() => {
     const badges: React.ReactNode[] = []
@@ -379,11 +407,17 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
       )
     }
     const rangeText = dateRange
-      ? `${dateRange.from} – ${dateRange.to}, averaged`
-      : "all months averaged (2017–present)"
-    if (badges.length === 0) return rangeText
-    return <>{badges} · {rangeText}</>
-  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onActiveStationsChange, setPickerDayTypes, dateRange])
+      ? `${dateRange.from} – ${dateRange.to}`
+      : "2017–present"
+    // "N days (X wkdy + Y Sat + Z Sun) avg" — mirrors the EvE bars subtitle so
+    // the reader knows how many typical days went into each hourly average.
+    const avgText = dayCountBreakdown
+      ? `${dayCountBreakdown.total} days (${dayCountBreakdown.parts.join(' + ')}) avg`
+      : "averaged"
+    const rangeAvg = `${rangeText}, ${avgText}`
+    if (badges.length === 0) return rangeAvg
+    return <>{badges} · {rangeAvg}</>
+  }, [activeTraceName, externalActiveStation, groupBy, pickerDayTypes, onActiveStationsChange, setPickerDayTypes, dateRange, dayCountBreakdown])
 
   // Pin = page-level `activeStations.length === 1`. Map full → trace display name.
   const soloTraceName = useMemo(() => {
