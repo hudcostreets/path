@@ -41,7 +41,12 @@ const EXIT_ORANGE = '#ef6c00'
 const RATIO_YELLOW = '#fbc02d'
 
 const fmt = (n: number) => {
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e6) {
+    const m = n / 1e6
+    // Whole millions render as "18M" not "18.0M"; keep the decimal only when
+    // it carries information ("2.5M").
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`
+  }
   if (n >= 1e3) return `${(n / 1e3).toFixed(0)}k`
   return `${n}`
 }
@@ -224,10 +229,10 @@ export default function EntriesVsExitsBars({
     }
 
     const maxAbs = Math.max(...entries, ...exits, 1) * 1.1
-    // Symmetric y-axis tick set for "magnitude" reading on both sides.
-    // Aim for ~5-10 ticks per side regardless of magnitude (10-year totals
-    // hit ~100M, single-month totals hit ~5M).
-    const tickStep = niceStep(maxAbs / 6)
+    // Symmetric y-axis tick set for "magnitude" reading on both sides. Target
+    // ~4 ticks per side (~8 total) so the chart stays uncluttered whether
+    // the range hits ~5M (a single month) or ~100M (a 10yr span).
+    const tickStep = niceStep(maxAbs / 4)
     const tickvals: number[] = []
     for (let v = -Math.floor(maxAbs / tickStep) * tickStep; v <= maxAbs; v += tickStep) tickvals.push(v)
     const ticktext = tickvals.map(v => fmt(Math.abs(v)))
