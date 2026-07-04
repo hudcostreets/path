@@ -342,14 +342,16 @@ def run_combine_hourly() -> None:
     if not frames:
         raise RuntimeError('No hourly parquets found in data/')
     combined = pd.concat(frames, ignore_index=True)
-    # StationsMap reads Weekday/Saturday/Sunday averages only; the SPA has no
-    # holiday-hour breakdown, so drop those columns to shrink the transferred
-    # file. Downcast: Year fits int16 (2017-2026), Month/Hour fit int8, avg
-    # ridership per station-hour fits int32 with headroom (peak ~10k).
+    # Downcast: Year fits int16 (2017-2026), Month/Hour fit int8, avg ridership
+    # per station-hour fits int32 with headroom (peak ~10k). HourlyPlot reads
+    # all 8 day-type avg columns (Weekday/Sat/Sun/Holiday × Entry/Exit) so we
+    # keep them all — column-projected downloads (hyparquet supports it) mean
+    # unread columns don't cost transfer bytes.
     keep = [
         'Station', 'Year', 'Month', 'Hour',
         'Avg Weekday Entry', 'Avg Saturday Entry', 'Avg Sunday Entry',
         'Avg Weekday Exit', 'Avg Saturday Exit', 'Avg Sunday Exit',
+        'Avg Holiday Entries', 'Avg Holiday Exits',
     ]
     combined = combined[keep].copy()
     combined['Year'] = combined['Year'].astype('int16')

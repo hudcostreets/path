@@ -1,6 +1,7 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { compressors } from "./parquet-compressors"
 import { useCallback, useMemo, useState } from "react"
 import { Data, Legend } from "plotly.js"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
@@ -181,6 +182,7 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
       await parquetRead({
         file,
         rowFormat: 'object',
+        compressors,
         onComplete: data => raw.push(...data),
       })
       const num = (v: unknown) => Number(v) || 0
