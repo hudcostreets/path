@@ -1,0 +1,30 @@
+outs:
+- md5: d6408bd4aa1b03fd6a90a82e32c96295
+  size: 31671
+  hash: md5
+  path: entries_vs_exits.pqt
+meta:
+  computation:
+    cmd: path-data entries-vs-exits
+    git_deps:
+      /data/2017-PATH-Monthly-Ridership-Report.pdf: 64032d30ae754074347532079d2cab1022cf60fd
+      /data/2018-PATH-Monthly-Ridership-Report.pdf: 66937f7df61f8d371e20a3b4b83a8fbc55cba06c
+      /data/2019-PATH-Monthly-Ridership-Report.pdf: 88088e02843bc339ac9f5f8f50a293af1ee8596a
+      /data/2020-PATH-Monthly-Ridership-Report.pdf: d0a1664c559904c7c358b842e1731269ec5fd92c
+      /data/2021-PATH-Monthly-Ridership-Report.pdf: 7dbcefa18398000ae1421a56e9c3cbdbcd9e662a
+      /data/2022-PATH-Monthly-Ridership-Report.pdf: bc0b11303c073fd84e65c3562971ec0e024f7154
+      /data/2023-PATH-Monthly-Ridership-Report.pdf: beeefb5466562fdd10db108649638844ff56c57e
+      /data/2024-PATH-Monthly-Ridership-Report.pdf: c065e48ca7677740ee4a36f32170e56edf7877af
+      /data/2025-PATH-Monthly-Ridership-Report.pdf: 9d4ba01e2651bc63747dc8b929b8ba9ef6824953
+      /data/2026-PATH-Monthly-Ridership-Report.pdf: 4478c80fabb180b885e5b89b552ffbaaaa79f7d1
+      /data/2017-PATH-hourly-Ridership-Report.pdf: 57db7fc0a82377c6c6e86396d577a55a8f8524b5
+      /data/2018-PATH-hourly-Ridership-Report.pdf: f280b850e38b2c3ec8cee7d4e35d9c331e635a1c
+      /data/2019-PATH-hourly-Ridership-Report.pdf: d22d9894ce7fa0ce4f18ff3f0e0c1403f9e15c6f
+      /data/2020-PATH-hourly-Ridership-Report.pdf: 7cf5e09e445531f4b8710ff26a8c50d68b7d4b38
+      /data/2021-PATH-hourly-Ridership-Report.pdf: d4fbcf32a7faffef41359765c3d71dce84941ab1
+      /data/2022-PATH-hourly-Ridership-Report.pdf: aafe816cbb221b9e3a3168e8214fe58d7b2e1d1d
+      /data/2023-PATH-Hourly-Ridership-Report.pdf: 85d2533c78f22def5be7a13f9ff94d85259e56b8
+      /data/2024-PATH-Hourly-Ridership-Report.pdf: ff8f3acf86a11bdb06afe628fe2643e5c340d94a
+      /data/2025-PATH-Hourly-Ridership-Report.pdf: ba19f2398c378668ae8dd27da53c0a22577673d0
+      /data/2026-PATH-Hourly-Ridership-Report.pdf: 46fe415caf2da89cbeb230f6d3cb9175e7f9690a
+      /path_data/entries_vs_exits.py: 69c362e90ae66e3b75e2ebaf181440af62e1fe41
