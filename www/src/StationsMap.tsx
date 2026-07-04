@@ -293,7 +293,7 @@ export default function StationsMap({
         {' = entries · '}
         <span style={{ color: EXIT_COLOR }}>orange</span>
         {' = exits'}
-        {rangeLabel ? ` · ${rangeLabel} avg` : ' · area ∝ volume'}
+        {rangeLabel && ` · ${rangeLabel} avg`}
       </>
     )
     if (!descParam) return [defaultTitle, defaultSubtitle]
@@ -768,8 +768,11 @@ export default function StationsMap({
         alignItems: 'center',
         flexWrap: 'wrap',
       }}>
-        <span><span style={{ color: ENTRY_COLOR }}>green</span>/<span style={{ color: EXIT_COLOR }}>orange</span> = entries/exits · area ∝ volume</span>
-        {fromYm && toYm && (
+        <span><span style={{ color: ENTRY_COLOR }}>green</span>/<span style={{ color: EXIT_COLOR }}>orange</span> = entries/exits</span>
+        {/* When embedded on the homepage, `EntriesVsExitsBars` renders its
+            own YM picker on the shared `?ym=` URL state — skip ours to avoid
+            two identical pickers stacked on top of each other. */}
+        {!embedded && fromYm && toYm && (
           <span>
             <YmInput value={fromYm} onChange={setFromYm} allYms={allYms} />
             {' – '}
