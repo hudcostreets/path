@@ -36,8 +36,18 @@ export default function PathPlots() {
   //    else the shared default. Both keep pickers in sync.
   const [urlYmRange, setUrlYmRange] = useUrlState<YmRange | null>("ym", ymRangeParam)
   const [dataDefaultRange, setDataDefaultRange] = useState<YmRange | null>(null)
-  const setDataDefault = useCallback((r: YmRange) => {
-    setDataDefaultRange(prev => prev ?? r)
+  const setDataDefault = useCallback(([from, to]: YmRange) => {
+    // Default to the last 5 years of data (or the full range if <5yr available),
+    // not the full ~10yr span, so the chart isn't dominated by the pandemic-era
+    // dip by default. Explicit `?ym=` in the URL still wins via `urlYmRange`.
+    const [ty, tm] = to.split('-').map(Number)
+    const fromYr = ty - 5
+    const fromMo = tm + 1
+    const fiveYearFrom = fromMo > 12
+      ? `${fromYr + 1}-${String(fromMo - 12).padStart(2, '0')}`
+      : `${fromYr}-${String(fromMo).padStart(2, '0')}`
+    const clamped = fiveYearFrom > from ? fiveYearFrom : from
+    setDataDefaultRange(prev => prev ?? [clamped, to])
   }, [])
   const effectiveRange = urlYmRange ?? dataDefaultRange
   const mapDateRange = useMemo(
