@@ -78,6 +78,19 @@ function ScrollAnchor() {
   return null
 }
 
+function NotFound() {
+  return (
+    <div style={{ maxWidth: 600, margin: '3em auto', padding: '0 1em', textAlign: 'center' }}>
+      <h1 style={{ fontSize: '2.5rem', margin: '0.2em 0' }}>404</h1>
+      <p style={{ fontSize: '1.1rem', margin: '0.5em 0 1.5em', color: '#aaa' }}>
+        <code>{typeof window === 'undefined' ? '' : window.location.pathname}</code>{' '}
+        isn't a page here.
+      </p>
+      <p><a href="/">← PATH ridership</a> · <a href="/bt">Bridge & Tunnel</a> · <a href="/map">Pie map</a></p>
+    </div>
+  )
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
@@ -103,11 +116,12 @@ createRoot(document.getElementById('root')!).render(
                       <StationsMap />
                     </Suspense>
                   } />
-                  <Route path="*" element={
+                  <Route index element={
                     <MDXProvider components={components}>
                       <Body />
                     </MDXProvider>
                   } />
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
               <Omnibar />
