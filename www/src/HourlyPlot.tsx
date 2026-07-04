@@ -112,6 +112,17 @@ const HOUR_LABELS = [
   "12p", "1p", "2p", "3p", "4p", "5p", "6p", "7p", "8p", "9p", "10p", "11p",
 ]
 
+// Text-label attributes for grouped bars (BY DAY TYPE / BY DIRECTION). Compact
+// SI-suffix format (`%{y:.2s}` → "1.2k", "12k") keeps the labels short enough
+// to sit above narrow bars without overlapping the neighbour.
+const GROUPED_BAR_LABELS = {
+  textposition: "outside" as const,
+  texttemplate: "%{y:.2s}",
+  cliponaxis: false,
+  textfont: { size: 9 },
+  textangle: 0,
+}
+
 type HourlyRow = {
   year: number
   month: number
@@ -238,7 +249,10 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
           const entry = hourSums.get(h)
           return entry ? Math.round(entry.sum / entry.count) : 0
         })
-        return { name: label, type: "bar", x: hours, y, marker: { color }, hovertemplate } as Data
+        return {
+          name: label, type: "bar", x: hours, y, marker: { color }, hovertemplate,
+          ...GROUPED_BAR_LABELS,
+        } as Data
       })
     }
 
@@ -312,6 +326,7 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
           y,
           marker: { color },
           hovertemplate,
+          ...GROUPED_BAR_LABELS,
         } as Data
       })
     }
@@ -395,7 +410,10 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
   }, [externalActiveStation, groupBy])
 
   const layout = useMemo(() => ({
-    barmode: "stack" as const,
+    // Group side-by-side when there are few traces (2-3 day-types or the 2
+    // direction traces); keep stacked for BY STATION where 13 traces would
+    // overwhelm a group layout.
+    barmode: (groupBy === "station" ? "stack" : "group") as "stack" | "group",
     xaxis: {
       tickmode: "array" as const,
       tickvals: hours24,
@@ -403,7 +421,7 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
       tickangle: -45,
     },
     legend: { traceorder: "reversed" } as Partial<Legend>,
-  }), [])
+  }), [groupBy])
 
   return (
     <div className="plot-container">
