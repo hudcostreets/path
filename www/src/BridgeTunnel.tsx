@@ -1005,8 +1005,8 @@ export default function BridgeTunnel() {
     )}
     <div className="abp-footer">
       <p>
-        Data from <a href="https://www.panynj.gov/bridges-tunnels/en/traffic---volume-information---b-t.html">PANYNJ</a> ·
-        Code <a href="https://github.com/hudcostreets/path">on GitHub</a>
+        Data from <a href="https://www.panynj.gov/bridges-tunnels/en/traffic---volume-information---b-t.html" target="_blank" rel="noopener">PANYNJ</a> ·
+        Code <a href="https://github.com/hudcostreets/path" target="_blank" rel="noopener">on GitHub</a>
       </p>
     </div>
   </>
