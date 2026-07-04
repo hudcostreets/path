@@ -792,6 +792,12 @@ export default function StationsMap({
             onChange={e => setAnimMs(parseInt(e.target.value))}
             style={{ verticalAlign: 'middle', width: '10em' }} />
         </span>
+        <span>
+          24h loop:{' '}
+          <a href="/pie-map-24h.gif" target="_blank" rel="noopener">.gif</a>
+          {' · '}
+          <a href="/pie-map-24h.mp4" target="_blank" rel="noopener">.mp4</a>
+        </span>
         {!embedded && <a href="/">← PATH ridership</a>}
       </div>}
     </div>

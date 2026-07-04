@@ -1,152 +1,61 @@
 # PATH ridership stats
-Cleaned + Plotted PATH ridership data ([source][PA data])
 
-Interactive versions of the plots below:
-- [ire.runsascoded.com/#gl=hudcostreets/path-data/-/main/months.ipynb](https://ire.runsascoded.com/#gl=hudcostreets/path-data/-/main/months.ipynb)
-- [path.hudcostreets.org](https://path.hudcostreets.org/)
+Cleaned + plotted [PANYNJ][PA data] PATH faregate + hourly ridership.
+
+**Live site:** [path.hudcostreets.org](https://path.hudcostreets.org/)
 
 ![PATH faregate entries (green) and exits (orange) per station, animated through 24 hours, 2025 avg](https://path.hudcostreets.org/pie-map-24h.gif)
 
-Contents:
-<!-- toc -->
-- [Cleaned data](#data)
-    - [Jan 2012 – Apr 2025](#weekdays)
-    - [Closer look at 2020-Present](#weekdays_2020)
-    - [Weekends only](#weekends)
-    - [Weekends (2020-Present)](#weekdays_2020)
-    - [Weekdays, Grouped by Month](#weekday_month_grouped)
-    - [Weekends, Grouped by Month](#weekend_month_grouped)
-    - [Weekdays vs. Weekends](#week_end_cmp)
-    - [Weekdays vs. Weekends, compared to 2019](#week_end_cmp_pct)
-- [Usage](#usage)
-    - [Update PATH Monthly Data PDFs](#path-data)
-        - [0. Install](#install)
-        - [1. Download PATH Ridership Reports](#download-data)
-        - [2. Process each year's data, output `.pqt`s](#process-data)
-        - [3. Combine all years' data](#combine-data)
-    - [Bridge & Tunnel Data (WIP)](#bridge_tunnel)
-<!-- /toc -->
+## Data
 
-## Cleaned data <a id="data"></a>
-- [`data/all.pqt`]
-- [`data/all.xlsx`]
+- [`data/all.pqt`] — per (month, station): total + avg-per-day for weekday / weekend / holiday
+- [`data/all.xlsx`] — Excel copy of the above
 - [Google Sheet]
+- `data/YYYY-hourly.pqt` — per (station, hour, month), avg per weekday / Sat / Sun / holiday
+- `www/public/entries_vs_exits.pqt` — per (ym, station), avg entries + exits per day-type
+- `www/public/hourly.pqt` — the browser-served hourly parquet (zstd, int32-downcast)
 
-<!-- `scripts/h3.py` -->
-<h3>
-Jan 2012 – Apr 2025 <a id="weekdays"></a>
-</h3>
+Larger artifacts (parquets, PDFs, the pie-map GIF/MP4) are DVX-tracked (`.dvc` pointers in git, blobs on S3); `dvx pull` fetches the current versions.
 
-![PATH weekday ridership over time, stacked by station](img/weekdays.png)
+## Pipeline
 
-### Closer look at 2020-Present <a id="weekdays_2020"></a>
-![PATH weekday ridership over time, stacked by station, 2020 to 2022-09; 275k in Jan/Feb 2020, large drop, almost to zero, in April 2020, steadily climbing back to 150k](img/weekdays_2020:.png)
+The daily [`update-path-data.yml`][update-workflow] cron runs `path-data gha-update`:
 
-### Weekends only <a id="weekends"></a>
-![PATH weekend ridership over time, stacked by station](img/weekends.png)
+1. `path-data refresh` — download the latest [PANYNJ ridership PDFs][PA data]
+2. `dvx run` — re-parse any changed years and rebuild derived artifacts (`path-data monthly -y YYYY`, `path-data parse-hourly -y YYYY`, `path-data combine`, `path-data combine-hourly`, `path-data entries-vs-exits`)
+3. `dvx add` + `dvx push` — snapshot new outputs to S3
+4. `git commit` and, if `www/public/**/*.dvc` actually changed, `gh workflow run www.yml` to redeploy the site
 
-### Weekends (2020-Present) <a id="weekdays_2020"></a>
-![PATH Saturday ridership over time, stacked by station, September 2022 has surpassed January/February 2020](img/weekends_2020:.png)
+Local dev:
 
-### Weekdays, Grouped by Month <a id="weekday_month_grouped"></a>
-![](img/avg%20weekday_month_grouped.png)
-
-### Weekends, Grouped by Month <a id="weekend_month_grouped"></a>
-![](img/avg%20weekend_month_grouped.png)
-
-### Weekdays vs. Weekends <a id="week_end_cmp"></a>
-![](img/avg_day_types.png)
-
-### Weekdays vs. Weekends, compared to 2019 <a id="week_end_cmp_pct"></a>
-![](img/vs_2019.png)
-
-<!-- `scripts/vs_2019.py` -->
-<div>
-
-As of April 2025:
-- Weekday ridership was 71.2% of April '19 (pre-COVID)
-- Weekend ridership was 99.6% of April '19 (pre-COVID)
-</div>
-
-## Usage <a id="usage"></a>
-
-### Automated Updates <a id="automation"></a>
-
-**Quick Update (Manual):**
-```bash
-./scripts/update-all.sh
-```
-Runs all three steps (refresh → update → combine) in sequence.
-
-**GitHub Actions (Automated):**
-- Runs automatically on the 10th of each month
-- Creates a PR when new data is available
-- Can be triggered manually from the Actions tab
-
-### Update PATH Monthly Data PDFs <a id="path-data"></a>
-
-#### 0. Install <a id="install"></a>
 ```bash
 git clone https://github.com/hudcostreets/path
 cd path
 pip install -e .
+path-data --help
 ```
 
-#### 1. Download PATH Ridership Reports <a id="download-data"></a>
+Web frontend lives at [`www/`](www/) — Vite + React + Plotly + Leaflet, deployed to GitHub Pages via [`.github/workflows/www.yml`][www-workflow]. Any push touching `www/**` (including new `.dvc` pointers to fresh data) redeploys automatically.
+
+## Bridge & Tunnel
+
+Same repo also serves [/bt](https://path.hudcostreets.org/bt) — PANYNJ B&T traffic (Lincoln + Holland tunnels, GWB, Bayonne + Goethals + Outerbridge). Merge per-year `traffic-e-zpass-usage-*.pdf` into one PDF for parsing:
 
 ```bash
-path-data refresh
+gs -o merged.pdf \
+   -sDEVICE=pdfwrite \
+   -dPDFFitPage \
+   -g12984x10033 \
+   -dPDFSETTINGS=/prepress \
+   traffic-e-zpass-usage-20*
 ```
 
-- [`refresh.py`](path_data/cli/refresh.py)
-- Updates local copies of [PANYNJ PDFs][PA data], e.g.:
-  - [2025-PATH-Monthly-Ridership-Report.pdf]
-  - [2025-PATH-Hourly-Ridership-Report.pdf]
-
-##### 1b. Create [Tabula] templates
-
-This is already done, the resulting templates are saved in [`templates/`](templates).
-
-![Selecting tables from a "PATH Ridership Report"](img/tabula-screenshot.png)
-
-#### 2. Process each year's data, output `.pqt`s <a id="process-data"></a>
-```bash
-path-data update
-```
-
-- [`update.py`](path_data/cli/update.py)
-- [`monthly.ipynb`](monthly.ipynb)
-- Outputs[`data/20*.pqt`](data/)
-
-
-#### 3. Combine all years' data <a id="combine-data"></a>
-
-```bash
-path-data combine
-```
-- [`combine.py`](path_data/cli/combine.py)
-- [`months.ipynb`](months.ipynb)
-- Outputs: [`data/all.pqt`], [`data/all.xlsx`], plots (when kaleido is working)
-
-### Bridge & Tunnel Data (WIP) <a id="bridge_tunnel"></a>
-
-Merge per-year PDFs into one:
-```bash
-/opt/homebrew/bin/gs \
-  -o merged.pdf \
-  -sDEVICE=pdfwrite \
-  -dPDFFitPage \
-  -g12984x10033 \
-  -dPDFSETTINGS=/prepress \ 
-  traffic-e-zpass-usage-20*
-```
-cf. [SO](https://stackoverflow.com/a/28455147/544236).
+(cf. [SO](https://stackoverflow.com/a/28455147/544236))
 
 
 [`data/all.pqt`]: data/all.pqt
 [`data/all.xlsx`]: data/all.xlsx
-[Tabula]: https://tabula.technology/
 [PA data]: https://www.panynj.gov/path/en/about/stats.html
-[2025-PATH-Monthly-Ridership-Report.pdf]: data/2025-PATH-Monthly-Ridership-Report.pdf
-[2025-PATH-Hourly-Ridership-Report.pdf]: data/2025-PATH-Hourly-Ridership-Report.pdf
 [Google Sheet]: https://docs.google.com/spreadsheets/d/1HMrVNcRzYryUtI5mnPc5K5hrt2UT1w78MwzexXinqys/edit
+[update-workflow]: .github/workflows/update-path-data.yml
+[www-workflow]: .github/workflows/www.yml
