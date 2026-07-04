@@ -292,12 +292,16 @@ def _generate_og_image(m: pd.DataFrame, end_month: str, last_ym_label: str | Non
 
     Station-stacked weekday ridership — same shape as the homepage hero,
     but dedicated dimensions (no header/footer bleed) and a subtitle that
-    reports the data's latest-covered month."""
+    reports the data's latest-covered month. Rendered in dark mode
+    (`#1a1a2e` bg, matches the site's default `[data-theme="dark"]`) so
+    social previews don't jarringly flip to light when readers click through."""
     start = to_dt('2012') - timedelta(days=15)
     end = to_dt(end_month) - timedelta(days=15)
     title = 'PATH Ridership'
     if last_ym_label:
         title += f' — through {last_ym_label}'
+    dark_bg = '#1a1a2e'
+    grid = 'rgba(255,255,255,0.08)'
     fig = _default_plot(
         px.bar(
             m.reset_index(),
@@ -305,7 +309,14 @@ def _generate_og_image(m: pd.DataFrame, end_month: str, last_ym_label: str | Non
             title=title,
             labels={'station': 'Station', 'avg weekday': 'Avg weekday ridership', 'month': ''},
         )
-    ).update_xaxes(range=[start.isoformat(), end.isoformat()], dtick='M12').update_layout(width=1200, height=630)
+    ).update_layout(
+        # Override `_default_plot`'s hard-coded white bg + font color.
+        paper_bgcolor=dark_bg,
+        plot_bgcolor=dark_bg,
+        font=dict(color='#e4e4e4'),
+        title=dict(font=dict(color='#ffffff')),
+        legend=dict(font=dict(color='#e4e4e4')),
+    ).update_xaxes(range=[start.isoformat(), end.isoformat()], dtick='M12', gridcolor=grid, zerolinecolor=grid).update_yaxes(gridcolor=grid, zerolinecolor=grid).update_layout(width=1200, height=630)
     og_path = join(WWW_PUBLIC, 'og.png')
     try:
         fig.write_image(og_path, width=1200, height=630)
