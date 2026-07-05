@@ -170,3 +170,12 @@ execFileSync('ffmpeg', [
   mp4Path,
 ], { stdio: 'inherit' })
 console.log(`Wrote ${mp4Path}`)
+
+// Clean up ffmpeg intermediates: the per-frame PNGs and the palettegen output
+// are only needed during encoding. Keep the .gif and .mp4 next to each other
+// in OUT_DIR. Skip if KEEP_INTERMEDIATES is set (useful for debugging frame
+// content).
+if (!process.env.KEEP_INTERMEDIATES) {
+  await rm(FRAMES_DIR, { recursive: true, force: true })
+  await rm(palette, { force: true })
+}
