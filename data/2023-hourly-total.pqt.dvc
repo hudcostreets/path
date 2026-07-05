@@ -8,4 +8,4 @@ meta:
     cmd: path-data parse-hourly -y 2023
     git_deps:
       2023-PATH-Hourly-Ridership-Report.pdf: 85d2533c78f22def5be7a13f9ff94d85259e56b8
-      /path_data/parse_hourly.py: dc8c724a03cc41336f4628a5f897b4d3d5c097bb
+      /path_data/parse_hourly.py: 38eba7e0b23c8de52d6307af21a8bc4b819a823e
