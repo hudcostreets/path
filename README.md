@@ -4,7 +4,7 @@ Cleaned + plotted [PANYNJ][PA data] PATH faregate + hourly ridership.
 
 **Live site:** [path.hudcostreets.org](https://path.hudcostreets.org/)
 
-![PATH faregate entries (green) and exits (orange) per station, animated through 24 hours, 2025 avg](https://path.hudcostreets.org/pie-map-24h.gif)
+![PATH faregate entries (green) and exits (orange) per station, animated through 24 hours, 2025 avg](https://hudcostreets.s3.amazonaws.com/path/pie-map-24h.gif)
 
 ## Data
 

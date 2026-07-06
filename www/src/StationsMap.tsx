@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { Param, codeParam, useUrlState } from 'use-prms'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { STATION_COORDS } from './stations-geo'
+import { PIE_MAP_GIF_URL, PIE_MAP_MP4_URL } from './static-urls'
 import { YmInput } from './YmInput'
 
 const resolved = dvcResolve('hourly.pqt')
@@ -794,9 +795,9 @@ export default function StationsMap({
         </span>
         <span>
           24h loop:{' '}
-          <a href="/pie-map-24h.gif" target="_blank" rel="noopener">.gif</a>
+          <a href={PIE_MAP_GIF_URL} target="_blank" rel="noopener">.gif</a>
           {' · '}
-          <a href="/pie-map-24h.mp4" target="_blank" rel="noopener">.mp4</a>
+          <a href={PIE_MAP_MP4_URL} target="_blank" rel="noopener">.mp4</a>
         </span>
         {!embedded && <a href="/">← PATH ridership</a>}
       </div>}

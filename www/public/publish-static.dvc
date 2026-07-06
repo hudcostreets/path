@@ -1,0 +1,8 @@
+meta:
+  computation:
+    cmd: path-data publish-static
+    deps:
+      pie-map-24h.gif: f1538bd3fe639665f85c18433976b5c0
+      pie-map-24h.mp4: 2cc1ff576a228c9d60265a6787325fd2
+    git_deps:
+      /path_data/publish_static.py: 7f7caeccf5fcad53d42a2172c641ac0637d82da7
