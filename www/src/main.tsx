@@ -16,6 +16,7 @@ import { HccsIcon, GhIcon, ThemeCycleIcon } from './speed-dial-icons'
 import { applyTheme, ThemeProvider, useTheme } from './ThemeContext'
 import { useScrollAnchor } from './useScrollAnchor'
 
+const Airports = lazy(() => import('./Airports'))
 const BridgeTunnel = lazy(() => import('./BridgeTunnel'))
 const BannerPage = lazy(() => import('./ABPBanner').then(m => ({ default: m.BannerPage })))
 const StationsMap = lazy(() => import('./StationsMap'))
@@ -86,7 +87,7 @@ function NotFound() {
         <code>{typeof window === 'undefined' ? '' : window.location.pathname}</code>{' '}
         isn't a page here.
       </p>
-      <p><a href="/">← PATH ridership</a> · <a href="/bt">Bridge & Tunnel</a> · <a href="/map">Pie map</a></p>
+      <p><a href="/">← PATH ridership</a> · <a href="/bt">Bridge & Tunnel</a> · <a href="/map">Pie map</a> · <a href="/airports">Airports</a></p>
     </div>
   )
 }
@@ -114,6 +115,11 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/map" element={
                     <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
                       <StationsMap />
+                    </Suspense>
+                  } />
+                  <Route path="/airports" element={
+                    <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
+                      <Airports />
                     </Suspense>
                   } />
                   <Route index element={

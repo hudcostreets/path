@@ -20,6 +20,7 @@ import copy
 import json
 from datetime import datetime
 from pathlib import Path
+from shutil import copy2
 
 import pandas as pd
 import requests
@@ -27,6 +28,7 @@ from click import argument, option
 from utz import err
 
 from path_data.cli.base import path_data
+from path_data.paths import WWW_PUBLIC
 
 ENDPOINT = 'https://wabi-us-gov-virginia-api.analysis.usgovcloudapi.net/public/reports/querydata?synchronous=true'
 RESOURCE_KEY = 'e3465680-4a72-4c34-9860-d6ae446d9a95'
@@ -202,3 +204,10 @@ def atd_ground(airports: tuple[str, ...], out: str, timeframe: str):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     all_df.to_parquet(out_path, index=False, engine='fastparquet', compression='zstd')
     err(f'\nWrote {out_path}: {len(all_df)} rows, {out_path.stat().st_size:,} bytes')
+
+    # Mirror to `www/public/` so the FE (`dvcResolve('atd-ground.pqt')`) picks
+    # it up in dev + gets copied to `dist/` in prod. Same pattern as
+    # `months.py`'s `copy2(ALL_PQT, WWW_ALL_PQT)`.
+    www_path = Path(WWW_PUBLIC) / 'atd-ground.pqt'
+    copy2(out_path, www_path)
+    err(f'Mirrored to {www_path}')
