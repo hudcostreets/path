@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev-s3": "VITE_PLUGIN_DVC_DEV=s3 vite",
     "ds": "VITE_PLUGIN_DVC_DEV=s3 vite",
-    "build": "tsc -b && vite build && node scripts/prerender-routes.mjs && rm -f dist/.gitignore",
+    "build": "tsc -b && vite build && node scripts/prerender-routes.mjs && node scripts/strip-dvc-artifacts.mjs && rm -f dist/.gitignore",
     "clean": "rm -rf dist node_modules/.vite",
     "lint": "eslint .",
     "preview": "vite preview",
