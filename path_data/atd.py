@@ -211,3 +211,66 @@ def atd_ground(airports: tuple[str, ...], out: str, timeframe: str):
     www_path = Path(WWW_PUBLIC) / 'atd-ground.pqt'
     copy2(out_path, www_path)
     err(f'Mirrored to {www_path}')
+
+
+FLIGHTS_CSV_URL = 'https://pacorpredevblobstorage.blob.core.windows.net/csv-trafficdata/PANYNJ_Airport_Traffic_Data.csv'
+
+
+@path_data.command('atd-flights')
+@option('-o', '--out', default='data/atd/flights.pqt', help='Output parquet path')
+@option('-c', '--csv-cache', default='data/atd/panynj-flights.csv', help='Local cache path for raw CSV')
+@option('-F', '--no-fetch', is_flag=True, help='Skip re-download; use existing cached CSV')
+def atd_flights(out: str, csv_cache: str, no_fetch: bool):
+    """Download PANYNJ aviation CSV → pre-aggregated parquet for the FE.
+
+    Raw CSV is per (month, airport, terminal, airline, direction, market, region).
+    We aggregate across terminal + airline for a compact
+    (ym, airport, direction, market, region) rollup — small enough (~215 KB) to
+    ship in the FE bundle for on-demand plotting. Airline-level breakouts can
+    be added as a separate stage if/when needed.
+    """
+    csv_path = Path(csv_cache)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    if not no_fetch or not csv_path.exists():
+        err(f'Fetching {FLIGHTS_CSV_URL}')
+        r = requests.get(FLIGHTS_CSV_URL, stream=True, timeout=120)
+        r.raise_for_status()
+        with open(csv_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1 << 16):
+                f.write(chunk)
+        err(f'  wrote {csv_path}: {csv_path.stat().st_size:,} bytes')
+
+    err(f'Aggregating {csv_path}…')
+    df = pd.read_csv(csv_path)
+    df['ym'] = pd.to_datetime(df['Activity Period']).dt.to_period('M').dt.to_timestamp()
+    agg = df.groupby(
+        ['ym', 'Airport Code', 'Direction', 'Market', 'World Region'],
+        as_index=False,
+    ).agg({
+        'Revenue Passenger Volume': 'sum',
+        'Non-Revenue Passenger Volume': 'sum',
+        'Freight Volume': 'sum',
+        'Mail Volume': 'sum',
+        'Total Flights': 'sum',
+    })
+    agg.columns = ['ym', 'airport', 'direction', 'market', 'region',
+                   'pax_rev', 'pax_nonrev', 'freight', 'mail', 'flights']
+    agg = agg.astype({
+        'airport': 'category',
+        'direction': 'category',
+        'market': 'category',
+        'region': 'category',
+        'pax_rev': 'int64',
+        'pax_nonrev': 'int64',
+        'flights': 'int32',
+    })
+    agg = agg.sort_values(['ym', 'airport', 'direction', 'market', 'region']).reset_index(drop=True)
+
+    out_path = Path(out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    agg.to_parquet(out_path, index=False, engine='fastparquet', compression='zstd')
+    err(f'Wrote {out_path}: {len(agg):,} rows, {out_path.stat().st_size:,} bytes')
+
+    www_path = Path(WWW_PUBLIC) / 'atd-flights.pqt'
+    copy2(out_path, www_path)
+    err(f'Mirrored to {www_path}')

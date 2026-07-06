@@ -2,19 +2,18 @@ import { useQuery } from "@tanstack/react-query"
 import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useMemo } from "react"
 import { Data, Layout } from "plotly.js"
-import { Plot as PltlyPlot } from "pltly/react"
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { codeParam, useUrlState } from "use-prms"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { compressors } from "./parquet-compressors"
-import { isDark, useDark } from "./plot-utils"
+import { Plot } from "./plot-utils"
 
 const AIRPORTS = ['EWR', 'JFK', 'LGA', 'SWF'] as const
 type Airport = typeof AIRPORTS[number]
 
-// Stacking order: smallest → largest average, so the biggest sits on top of
-// the stack (visually similar to `/bt`'s vehicle-type stacking).
-const CATEGORIES = [
+// --- Ground Transport (PBI dashboard scrape) ---
+
+const GROUND_CATEGORIES = [
   'Coach Bus Pax',
   'For-Hire Vehicles',
   'Taxi Dispatched',
@@ -24,11 +23,9 @@ const CATEGORIES = [
   'Paid-EWR',
   'Unpaid-On Airport',
 ] as const
-type Category = typeof CATEGORIES[number]
+type GroundCategory = typeof GROUND_CATEGORIES[number]
 
-// Roughly matches Plotly's default qualitative palette so the chart looks at
-// home next to the other pages.
-const CATEGORY_COLORS: Record<Category, string> = {
+const GROUND_COLORS: Record<GroundCategory, string> = {
   'Coach Bus Pax':     '#636efa',
   'For-Hire Vehicles': '#EF553B',
   'Taxi Dispatched':   '#00cc96',
@@ -39,15 +36,38 @@ const CATEGORY_COLORS: Record<Category, string> = {
   'Unpaid-On Airport': '#B6E880',
 }
 
-type Row = { airport: Airport, year: number, month: number, category: Category, value: number }
+type GroundRow = { airport: Airport, year: number, month: number, category: GroundCategory, value: number }
 
-function dataUrl(): string {
-  const resolved = dvcResolve('atd-ground.pqt')
+// --- Flights / Passengers (PANYNJ bulk CSV) ---
+
+// The bulk CSV pre-aggregates to (ym, airport, direction, market, region). For
+// the v1 airport view we sum across direction — inbound + outbound = total
+// throughput, which is what PANYNJ reports as "activity".
+const MARKETS = ['Domestic', 'International'] as const
+type Market = typeof MARKETS[number]
+
+const MARKET_COLORS: Record<Market, string> = {
+  'Domestic':      '#636efa',
+  'International': '#EF553B',
+}
+
+type FlightRow = { ym: number, airport: Airport, market: Market, pax_rev: number, pax_nonrev: number, flights: number }
+
+const MODES = ['ground', 'passengers', 'flights'] as const
+type Mode = typeof MODES[number]
+
+// --- URL state + data hooks ---
+
+const airportParam = codeParam<Airport>('EWR', { EWR: 'e', JFK: 'j', LGA: 'l', SWF: 's' })
+const modeParam    = codeParam<Mode>('ground', { ground: 'g', passengers: 'p', flights: 'f' })
+
+function dvcUrl(name: string): string {
+  const resolved = dvcResolve(name)
   return resolved.startsWith('/') ? `${window.location.origin}${resolved}` : resolved
 }
 
-function useAtdData() {
-  const url = dataUrl()
+function useGroundData() {
+  const url = dvcUrl('atd-ground.pqt')
   return useQuery({
     queryKey: ['atd-ground', url],
     queryFn: async () => {
@@ -60,97 +80,169 @@ function useAtdData() {
           airport: r['airport'] as Airport,
           year: Number(r['year']),
           month: Number(r['month']),
-          category: r['category'] as Category,
+          category: r['category'] as GroundCategory,
           value: Number(r['value']),
-        } as Row))
-        .filter(r => AIRPORTS.includes(r.airport) && CATEGORIES.includes(r.category))
+        } as GroundRow))
+        .filter(r => AIRPORTS.includes(r.airport) && GROUND_CATEGORIES.includes(r.category))
     },
   })
 }
 
-const airportParam = codeParam<Airport>('EWR', { EWR: 'e', JFK: 'j', LGA: 'l', SWF: 's' })
+function useFlightData() {
+  const url = dvcUrl('atd-flights.pqt')
+  return useQuery({
+    queryKey: ['atd-flights', url],
+    queryFn: async () => {
+      const file = await asyncBufferFromUrl({ url })
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({ file, rowFormat: 'object', compressors, onComplete: data => raw.push(...data) })
+      return raw.map(r => ({
+        ym: Number(r['ym']),
+        airport: r['airport'] as Airport,
+        market: r['market'] as Market,
+        pax_rev: Number(r['pax_rev']),
+        pax_nonrev: Number(r['pax_nonrev']),
+        flights: Number(r['flights']),
+      } as FlightRow))
+    },
+  })
+}
+
+// --- Trace builders ---
+
+function ymLabel(msFromEpoch: number): string {
+  const d = new Date(msFromEpoch)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+function buildGroundTraces(rows: GroundRow[], airport: Airport, windowYears = 5): Data[] {
+  const filtered = rows.filter(r => r.airport === airport)
+  if (!filtered.length) return []
+  const maxYear = Math.max(...filtered.map(r => r.year))
+  const minYear = Math.max(2011, maxYear - (windowYears - 1))
+  const inWindow = filtered.filter(r => r.year >= minYear && r.year <= maxYear)
+  const byCat = new Map<GroundCategory, { x: string[], y: number[] }>()
+  for (const r of inWindow) {
+    if (!byCat.has(r.category)) byCat.set(r.category, { x: [], y: [] })
+    const e = byCat.get(r.category)!
+    e.x.push(`${r.year}-${String(r.month).padStart(2, '0')}`)
+    e.y.push(r.value)
+  }
+  const sortEntries = (e: { x: string[], y: number[] }) => {
+    const zipped = e.x.map((x, i) => ({ x, y: e.y[i] }))
+    zipped.sort((a, b) => a.x.localeCompare(b.x))
+    return { x: zipped.map(z => z.x), y: zipped.map(z => z.y) }
+  }
+  return GROUND_CATEGORIES
+    .filter(c => byCat.has(c))
+    .map(cat => {
+      const { x, y } = sortEntries(byCat.get(cat)!)
+      return {
+        type: 'bar' as const,
+        name: cat,
+        x, y,
+        marker: { color: GROUND_COLORS[cat] },
+        hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
+      } as Data
+    })
+}
+
+function buildFlightTraces(
+  rows: FlightRow[], airport: Airport, metric: 'pax' | 'flights', windowYears = 5,
+): Data[] {
+  const filtered = rows.filter(r => r.airport === airport)
+  if (!filtered.length) return []
+  // Sum inbound + outbound (both directions are in the parquet). Aggregate to
+  // (ym, market).
+  const bucket = new Map<string, Map<Market, number>>()
+  for (const r of filtered) {
+    const label = ymLabel(r.ym)
+    if (!bucket.has(label)) bucket.set(label, new Map())
+    const m = bucket.get(label)!
+    const value = metric === 'pax' ? r.pax_rev : r.flights
+    m.set(r.market, (m.get(r.market) ?? 0) + value)
+  }
+  const labels = [...bucket.keys()].sort()
+  const maxYm = labels[labels.length - 1]
+  const maxYear = Number(maxYm.slice(0, 4))
+  const minYear = Math.max(2000, maxYear - (windowYears - 1))
+  const inWindow = labels.filter(l => Number(l.slice(0, 4)) >= minYear)
+  return MARKETS.map(mk => ({
+    type: 'bar' as const,
+    name: mk,
+    x: inWindow,
+    y: inWindow.map(l => bucket.get(l)?.get(mk) ?? 0),
+    marker: { color: MARKET_COLORS[mk] },
+    hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
+  } as Data))
+}
+
+// --- Component ---
+
+const MODE_LABELS: Record<Mode, string> = {
+  ground: 'Ground',
+  passengers: 'Passengers',
+  flights: 'Flights',
+}
 
 export default function Airports() {
-  const dark = useDark()
   const [airport, setAirport] = useUrlState<Airport>('a', airportParam)
-  const { data: rows = [], isLoading } = useAtdData()
+  const [mode,    setMode]    = useUrlState<Mode>('m', modeParam)
 
-  const filtered = useMemo(() => rows.filter(r => r.airport === airport), [rows, airport])
+  const groundQ = useGroundData()
+  const flightQ = useFlightData()
 
-  const yearRange = useMemo(() => {
-    if (!filtered.length) return null
-    const maxYear = Math.max(...filtered.map(r => r.year))
-    const minYear = Math.max(2011, maxYear - 4)  // last ~5 years by default
-    return [minYear, maxYear] as const
-  }, [filtered])
+  const traces = useMemo<Data[]>(() => {
+    if (mode === 'ground')     return buildGroundTraces(groundQ.data ?? [], airport)
+    if (mode === 'passengers') return buildFlightTraces(flightQ.data ?? [], airport, 'pax')
+    if (mode === 'flights')    return buildFlightTraces(flightQ.data ?? [], airport, 'flights')
+    return []
+  }, [mode, airport, groundQ.data, flightQ.data])
 
-  const traces: Data[] = useMemo(() => {
-    if (!yearRange) return []
-    const [minY, maxY] = yearRange
-    const windowRows = filtered.filter(r => r.year >= minY && r.year <= maxY)
-    // Build one trace per category with per-month x/y series.
-    const byCat = new Map<Category, { x: string[], y: number[] }>()
-    for (const r of windowRows) {
-      if (!byCat.has(r.category)) byCat.set(r.category, { x: [], y: [] })
-      byCat.get(r.category)!.x.push(`${r.year}-${String(r.month).padStart(2, '0')}`)
-      byCat.get(r.category)!.y.push(r.value)
-    }
-    // Sort each series by month for consistent bar order.
-    const sortEntries = (e: { x: string[], y: number[] }) => {
-      const zipped = e.x.map((x, i) => ({ x, y: e.y[i] }))
-      zipped.sort((a, b) => a.x.localeCompare(b.x))
-      return { x: zipped.map(z => z.x), y: zipped.map(z => z.y) }
-    }
-    return CATEGORIES
-      .filter(c => byCat.has(c))
-      .map(cat => {
-        const { x, y } = sortEntries(byCat.get(cat)!)
-        return {
-          type: 'bar' as const,
-          name: cat,
-          x, y,
-          marker: { color: CATEGORY_COLORS[cat] },
-          hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
-        } as Data
-      })
-  }, [filtered, yearRange])
+  const isLoading = mode === 'ground' ? groundQ.isLoading : flightQ.isLoading
+
+  const yAxisTitle =
+    mode === 'ground'     ? 'Passengers / vehicles / cars'
+    : mode === 'passengers' ? 'Revenue passengers'
+    : 'Flights'
 
   const layout: Partial<Layout> = useMemo(() => ({
     barmode: 'stack',
-    title: {
-      text: `${airport} — Airport Traffic Dashboard (Ground Transport + AirTrain)`,
-      font: { color: isDark(dark) ? '#e4e4e4' : undefined },
-    },
     xaxis: { title: { text: 'Month' } },
-    yaxis: { title: { text: 'Passengers / vehicles / cars' }, tickformat: '.2s' },
-    legend: { orientation: 'h', y: -0.15 },
-    margin: { l: 60, r: 20, t: 60, b: 80 },
-    hovermode: 'x unified',
-  }), [airport, dark])
+    yaxis: { title: { text: yAxisTitle }, tickformat: '.2s' },
+  }), [yAxisTitle])
+
+  const subtitle =
+    mode === 'ground'     ? 'Monthly totals per category (Ground Transport + AirTrain)'
+    : mode === 'passengers' ? 'Monthly revenue passengers, Domestic + International (inbound + outbound)'
+    : 'Monthly flight ops, Domestic + International (inbound + outbound)'
 
   return (
     <div style={{ padding: '1em', maxWidth: 1100, margin: '0 auto' }}>
-      <h1 style={{ margin: '0.2em 0' }}>Airport Traffic (ATD) — Ground Transport</h1>
+      <h1 style={{ margin: '0.2em 0' }}>Airport Traffic (ATD)</h1>
       <p style={{ margin: '0.2em 0 1em', color: '#888' }}>
-        Monthly totals per category, from{' '}
+        From{' '}
         <a href="https://www.panynj.gov/airports/en/statistics-general-info.html"
            target="_blank" rel="noopener">PANYNJ ATD</a>.
-        {' '}For-Hire Vehicles data available from Jan 2023.
+        {' '}Ground: For-Hire Vehicles data available from Jan 2023.
       </p>
-      <ToggleButtonGroup
-        exclusive
-        value={airport}
-        onChange={(_, v) => v && setAirport(v)}
-        size="small"
-        sx={{ marginBottom: '1em' }}
-      >
-        {AIRPORTS.map(a => (
-          <ToggleButton key={a} value={a}>{a}</ToggleButton>
-        ))}
-      </ToggleButtonGroup>
+      <div style={{ display: 'flex', gap: '1em', alignItems: 'center', marginBottom: '1em', flexWrap: 'wrap' }}>
+        <ToggleButtonGroup exclusive value={airport} onChange={(_, v) => v && setAirport(v)} size="small">
+          {AIRPORTS.map(a => <ToggleButton key={a} value={a}>{a}</ToggleButton>)}
+        </ToggleButtonGroup>
+        <ToggleButtonGroup exclusive value={mode} onChange={(_, v) => v && setMode(v)} size="small">
+          {MODES.map(m => <ToggleButton key={m} value={m}>{MODE_LABELS[m]}</ToggleButton>)}
+        </ToggleButtonGroup>
+      </div>
       {isLoading
         ? <div className="loading">Loading…</div>
-        : <PltlyPlot data={traces} layout={layout} style={{ width: '100%', height: 500 }} />}
+        : <Plot
+            id="atd"
+            title={`${airport} — ${MODE_LABELS[mode]}`}
+            subtitle={subtitle}
+            data={traces}
+            layout={layout}
+          />}
       <p style={{ marginTop: '1em' }}>
         <a href="/">← PATH ridership</a>
       </p>
