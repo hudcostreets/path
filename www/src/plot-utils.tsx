@@ -126,12 +126,18 @@ export function Plot(
       <Loading/>
     </>
   }
-  const { data, layout: _layout, ...plotProps } = props as { data: Data[], layout?: Partial<Layout> } & Omit<PltlyPlotProps, 'style' | 'data' | 'layout'>
+  const { data, layout: _layout, soloMode: soloModeIn, ...plotProps } = props as { data: Data[], layout?: Partial<Layout>, soloMode?: 'fade' | 'hide' } & Omit<PltlyPlotProps, 'style' | 'data' | 'layout' | 'soloMode'>
+  // Legend-hover solo (pltly built-in). For stacked bars, `fade` leaves the
+  // faded segments visibly in the stack — force `hide` so hovering a legend
+  // item genuinely solos it. Caller can override.
+  const isStack = mergedLayout.barmode === 'stack'
+  const soloMode: 'fade' | 'hide' = soloModeIn ?? (isStack ? 'hide' : 'fade')
   return <>
     {h2}
     {sub}
     <PltlyPlot
       data={data}
+      soloMode={soloMode}
       {...plotProps}
       style={{ width: '100%', height: `${height}px` }}
       layout={mergedLayout}
