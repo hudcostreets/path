@@ -3,7 +3,7 @@ import { asyncBufferFromUrl, parquetRead } from "hyparquet"
 import { useMemo } from "react"
 import { Data, Layout } from "plotly.js"
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
-import { codeParam, useUrlState } from "use-prms"
+import { codeParam, codesParam, useUrlState } from "use-prms"
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { compressors } from "./parquet-compressors"
 import { Plot } from "./plot-utils"
@@ -40,26 +40,82 @@ type GroundRow = { airport: Airport, year: number, month: number, category: Grou
 
 // --- Flights / Passengers (PANYNJ bulk CSV) ---
 
-// The bulk CSV pre-aggregates to (ym, airport, direction, market, region). For
-// the v1 airport view we sum across direction — inbound + outbound = total
-// throughput, which is what PANYNJ reports as "activity".
 const MARKETS = ['Domestic', 'International'] as const
 type Market = typeof MARKETS[number]
 
-const MARKET_COLORS: Record<Market, string> = {
-  'Domestic':      '#636efa',
-  'International': '#EF553B',
+const DIRECTIONS = ['Inbound', 'Outbound'] as const
+type Direction = typeof DIRECTIONS[number]
+
+// Ordered smallest → largest by total volume so stacks look right visually.
+const REGIONS = [
+  '~ SHUTTLE (PRE 2012)',
+  'MEXICO',
+  'PUERTO RICO + U.S. TERRITORIES',
+  'TRANSPACIFIC',
+  'CANADA',
+  'CENTRAL AND SOUTH AMERICA',
+  'CARIBBEAN + BERMUDA',
+  'TRANSATLANTIC',
+  'DOMESTIC',
+  '~ INTERNATIONAL (2000 & 2001)',
+] as const
+type Region = typeof REGIONS[number]
+
+const AIRPORT_COLORS: Record<Airport, string> = {
+  EWR: '#636efa',
+  JFK: '#EF553B',
+  LGA: '#00cc96',
+  SWF: '#ab63fa',
 }
 
-type FlightRow = { ym: number, airport: Airport, market: Market, pax_rev: number, pax_nonrev: number, flights: number }
+const MARKET_COLORS: Record<Market, string> = {
+  Domestic:      '#636efa',
+  International: '#EF553B',
+}
+
+const DIRECTION_COLORS: Record<Direction, string> = {
+  Inbound:  '#636efa',
+  Outbound: '#EF553B',
+}
+
+// Plotly's default qualitative palette, mapped to regions in the order above.
+const REGION_COLORS: Record<Region, string> = {
+  '~ SHUTTLE (PRE 2012)':           '#a5a5a5',
+  'MEXICO':                         '#FECB52',
+  'PUERTO RICO + U.S. TERRITORIES': '#FF97FF',
+  'TRANSPACIFIC':                   '#B6E880',
+  'CANADA':                         '#FF6692',
+  'CENTRAL AND SOUTH AMERICA':      '#19d3f3',
+  'CARIBBEAN + BERMUDA':            '#FFA15A',
+  'TRANSATLANTIC':                  '#ab63fa',
+  'DOMESTIC':                       '#636efa',
+  '~ INTERNATIONAL (2000 & 2001)':  '#EF553B',
+}
+
+type FlightRow = {
+  ym: number,
+  airport: Airport,
+  direction: Direction,
+  market: Market,
+  region: Region,
+  pax_rev: number,
+  pax_nonrev: number,
+  flights: number,
+}
 
 const MODES = ['ground', 'passengers', 'flights'] as const
 type Mode = typeof MODES[number]
 
-// --- URL state + data hooks ---
+const STACK_BYS = ['market', 'airport', 'region', 'direction'] as const
+type StackBy = typeof STACK_BYS[number]
 
-const airportParam = codeParam<Airport>('EWR', { EWR: 'e', JFK: 'j', LGA: 'l', SWF: 's' })
-const modeParam    = codeParam<Mode>('ground', { ground: 'g', passengers: 'p', flights: 'f' })
+// --- URL state ---
+
+const airportsParam = codesParam<Airport>([...AIRPORTS], { EWR: 'e', JFK: 'j', LGA: 'l', SWF: 's' })
+const modeParam    = codeParam<Mode>('passengers', { ground: 'g', passengers: 'p', flights: 'f' })
+const stackByParam = codeParam<StackBy>('market', { market: 'm', airport: 'a', region: 'r', direction: 'd' })
+
+// --- Data hooks ---
 
 function dvcUrl(name: string): string {
   const resolved = dvcResolve(name)
@@ -99,7 +155,9 @@ function useFlightData() {
       return raw.map(r => ({
         ym: Number(r['ym']),
         airport: r['airport'] as Airport,
+        direction: r['direction'] as Direction,
         market: r['market'] as Market,
+        region: r['region'] as Region,
         pax_rev: Number(r['pax_rev']),
         pax_nonrev: Number(r['pax_nonrev']),
         flights: Number(r['flights']),
@@ -147,34 +205,63 @@ function buildGroundTraces(rows: GroundRow[], airport: Airport, windowYears = 5)
     })
 }
 
+type FlightMetric = 'pax_rev' | 'flights'
+
 function buildFlightTraces(
-  rows: FlightRow[], airport: Airport, metric: 'pax' | 'flights', windowYears = 5,
+  rows: FlightRow[],
+  airports: Airport[],
+  stackBy: StackBy,
+  metric: FlightMetric,
+  windowYears = 5,
 ): Data[] {
-  const filtered = rows.filter(r => r.airport === airport)
+  const airportSet = new Set(airports)
+  const filtered = rows.filter(r => airportSet.has(r.airport))
   if (!filtered.length) return []
-  // Sum inbound + outbound (both directions are in the parquet). Aggregate to
-  // (ym, market).
-  const bucket = new Map<string, Map<Market, number>>()
+
+  // key = (ym, groupKey) → summed value.
+  const keyOf = (r: FlightRow): string =>
+    stackBy === 'market'    ? r.market
+    : stackBy === 'airport' ? r.airport
+    : stackBy === 'region'  ? r.region
+    : r.direction
+
+  const bucket = new Map<string, Map<string, number>>()
   for (const r of filtered) {
-    const label = ymLabel(r.ym)
-    if (!bucket.has(label)) bucket.set(label, new Map())
-    const m = bucket.get(label)!
-    const value = metric === 'pax' ? r.pax_rev : r.flights
-    m.set(r.market, (m.get(r.market) ?? 0) + value)
+    const ym = ymLabel(r.ym)
+    if (!bucket.has(ym)) bucket.set(ym, new Map())
+    const inner = bucket.get(ym)!
+    const k = keyOf(r)
+    inner.set(k, (inner.get(k) ?? 0) + r[metric])
   }
-  const labels = [...bucket.keys()].sort()
-  const maxYm = labels[labels.length - 1]
-  const maxYear = Number(maxYm.slice(0, 4))
-  const minYear = Math.max(2000, maxYear - (windowYears - 1))
-  const inWindow = labels.filter(l => Number(l.slice(0, 4)) >= minYear)
-  return MARKETS.map(mk => ({
-    type: 'bar' as const,
-    name: mk,
-    x: inWindow,
-    y: inWindow.map(l => bucket.get(l)?.get(mk) ?? 0),
-    marker: { color: MARKET_COLORS[mk] },
-    hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
-  } as Data))
+
+  const xs = [...bucket.keys()].sort()
+  const maxYm = xs[xs.length - 1]
+  const minYear = Math.max(2000, Number(maxYm.slice(0, 4)) - (windowYears - 1))
+  const inWindow = xs.filter(x => Number(x.slice(0, 4)) >= minYear)
+
+  // Determine group order (stacking order) + colors per stack-by.
+  const order: string[] =
+    stackBy === 'market'    ? [...MARKETS]
+    : stackBy === 'airport' ? [...AIRPORTS].filter(a => airportSet.has(a))
+    : stackBy === 'region'  ? [...REGIONS]
+    : [...DIRECTIONS]
+
+  const colorOf: Record<string, string> =
+    stackBy === 'market'    ? MARKET_COLORS
+    : stackBy === 'airport' ? AIRPORT_COLORS
+    : stackBy === 'region'  ? REGION_COLORS
+    : DIRECTION_COLORS
+
+  return order
+    .filter(k => inWindow.some(x => (bucket.get(x)?.get(k) ?? 0) > 0))
+    .map(k => ({
+      type: 'bar' as const,
+      name: k,
+      x: inWindow,
+      y: inWindow.map(x => bucket.get(x)?.get(k) ?? 0),
+      marker: { color: colorOf[k] },
+      hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
+    } as Data))
 }
 
 // --- Component ---
@@ -185,19 +272,32 @@ const MODE_LABELS: Record<Mode, string> = {
   flights: 'Flights',
 }
 
+const STACKBY_LABELS: Record<StackBy, string> = {
+  market: 'Market',
+  airport: 'Airport',
+  region: 'Region',
+  direction: 'Direction',
+}
+
 export default function Airports() {
-  const [airport, setAirport] = useUrlState<Airport>('a', airportParam)
-  const [mode,    setMode]    = useUrlState<Mode>('m', modeParam)
+  const [airports, setAirports] = useUrlState<Airport[]>('a', airportsParam)
+  const [mode,     setMode]     = useUrlState<Mode>('m', modeParam)
+  const [stackBy,  setStackBy]  = useUrlState<StackBy>('s', stackByParam)
 
   const groundQ = useGroundData()
   const flightQ = useFlightData()
 
+  // Ground mode: single-airport view (data doesn't roll up naturally across
+  // airports). Fall back to first selected airport, or EWR.
+  const groundAirport: Airport = airports[0] ?? 'EWR'
+
   const traces = useMemo<Data[]>(() => {
-    if (mode === 'ground')     return buildGroundTraces(groundQ.data ?? [], airport)
-    if (mode === 'passengers') return buildFlightTraces(flightQ.data ?? [], airport, 'pax')
-    if (mode === 'flights')    return buildFlightTraces(flightQ.data ?? [], airport, 'flights')
-    return []
-  }, [mode, airport, groundQ.data, flightQ.data])
+    if (mode === 'ground') {
+      return buildGroundTraces(groundQ.data ?? [], groundAirport)
+    }
+    const metric: FlightMetric = mode === 'passengers' ? 'pax_rev' : 'flights'
+    return buildFlightTraces(flightQ.data ?? [], airports, stackBy, metric)
+  }, [mode, groundAirport, airports, stackBy, groundQ.data, flightQ.data])
 
   const isLoading = mode === 'ground' ? groundQ.isLoading : flightQ.isLoading
 
@@ -212,10 +312,15 @@ export default function Airports() {
     yaxis: { title: { text: yAxisTitle }, tickformat: '.2s' },
   }), [yAxisTitle])
 
-  const subtitle =
-    mode === 'ground'     ? 'Monthly totals per category (Ground Transport + AirTrain)'
-    : mode === 'passengers' ? 'Monthly revenue passengers, Domestic + International (inbound + outbound)'
-    : 'Monthly flight ops, Domestic + International (inbound + outbound)'
+  const subtitle = mode === 'ground'
+    ? 'Monthly totals per category (Ground Transport + AirTrain)'
+    : `Monthly ${mode === 'passengers' ? 'revenue passengers' : 'flights'}` +
+      ` for ${airports.length === AIRPORTS.length ? 'all airports' : airports.join(' + ')}` +
+      `, stacked by ${STACKBY_LABELS[stackBy].toLowerCase()} (inbound + outbound summed)`
+
+  const title = mode === 'ground'
+    ? `${groundAirport} — ${MODE_LABELS[mode]}`
+    : `${airports.length === AIRPORTS.length ? 'All airports' : airports.join(' + ')} — ${MODE_LABELS[mode]}`
 
   return (
     <div style={{ padding: '1em', maxWidth: 1100, margin: '0 auto' }}>
@@ -227,22 +332,36 @@ export default function Airports() {
         {' '}Ground: For-Hire Vehicles data available from Jan 2023.
       </p>
       <div style={{ display: 'flex', gap: '1em', alignItems: 'center', marginBottom: '1em', flexWrap: 'wrap' }}>
-        <ToggleButtonGroup exclusive value={airport} onChange={(_, v) => v && setAirport(v)} size="small">
-          {AIRPORTS.map(a => <ToggleButton key={a} value={a}>{a}</ToggleButton>)}
-        </ToggleButtonGroup>
-        <ToggleButtonGroup exclusive value={mode} onChange={(_, v) => v && setMode(v)} size="small">
-          {MODES.map(m => <ToggleButton key={m} value={m}>{MODE_LABELS[m]}</ToggleButton>)}
-        </ToggleButtonGroup>
+        <span style={{ display: 'flex', gap: '0.4em', alignItems: 'center' }}>
+          <span style={{ color: '#888', fontSize: '0.9em' }}>Mode</span>
+          <ToggleButtonGroup exclusive value={mode} onChange={(_, v) => v && setMode(v)} size="small">
+            {MODES.map(m => <ToggleButton key={m} value={m}>{MODE_LABELS[m]}</ToggleButton>)}
+          </ToggleButtonGroup>
+        </span>
+        <span style={{ display: 'flex', gap: '0.4em', alignItems: 'center' }}>
+          <span style={{ color: '#888', fontSize: '0.9em' }}>
+            {mode === 'ground' ? 'Airport' : 'Airports'}
+          </span>
+          {mode === 'ground'
+            ? <ToggleButtonGroup exclusive value={groundAirport} onChange={(_, v) => v && setAirports([v])} size="small">
+                {AIRPORTS.map(a => <ToggleButton key={a} value={a}>{a}</ToggleButton>)}
+              </ToggleButtonGroup>
+            : <ToggleButtonGroup value={airports} onChange={(_, v) => v.length && setAirports(v)} size="small">
+                {AIRPORTS.map(a => <ToggleButton key={a} value={a}>{a}</ToggleButton>)}
+              </ToggleButtonGroup>}
+        </span>
+        {mode !== 'ground' && (
+          <span style={{ display: 'flex', gap: '0.4em', alignItems: 'center' }}>
+            <span style={{ color: '#888', fontSize: '0.9em' }}>Stack by</span>
+            <ToggleButtonGroup exclusive value={stackBy} onChange={(_, v) => v && setStackBy(v)} size="small">
+              {STACK_BYS.map(s => <ToggleButton key={s} value={s}>{STACKBY_LABELS[s]}</ToggleButton>)}
+            </ToggleButtonGroup>
+          </span>
+        )}
       </div>
       {isLoading
         ? <div className="loading">Loading…</div>
-        : <Plot
-            id="atd"
-            title={`${airport} — ${MODE_LABELS[mode]}`}
-            subtitle={subtitle}
-            data={traces}
-            layout={layout}
-          />}
+        : <Plot id="atd" title={title} subtitle={subtitle} data={traces} layout={layout} />}
       <p style={{ marginTop: '1em' }}>
         <a href="/">← PATH ridership</a>
       </p>
