@@ -1,0 +1,5 @@
+outs:
+- md5: 6fcec3d8c8ea4d19077d5975ab4d9fba
+  size: 20026
+  hash: md5
+  path: atd-ground.pqt
