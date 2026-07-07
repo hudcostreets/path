@@ -25,6 +25,19 @@ const GROUND_CATEGORIES = [
 ] as const
 type GroundCategory = typeof GROUND_CATEGORIES[number]
 
+// Display labels replace PANYNJ's raw AirTrain terminology
+// (`Paid-EWR` / `Unpaid-On Airport`) with clearer names.
+const GROUND_DISPLAY: Record<GroundCategory, string> = {
+  'Coach Bus Pax':     'Coach Bus Pax',
+  'For-Hire Vehicles': 'For-Hire Vehicles',
+  'Taxi Dispatched':   'Taxi Dispatched',
+  'Parked Cars':       'Parked Cars',
+  'Paid-Hwrd Beach':   'AirTrain — Howard Beach',
+  'Paid-Jamaica':      'AirTrain — Jamaica',
+  'Paid-EWR':          'AirTrain — Newark',
+  'Unpaid-On Airport': 'AirTrain — free (on airport)',
+}
+
 const GROUND_COLORS: Record<GroundCategory, string> = {
   'Coach Bus Pax':     '#636efa',
   'For-Hire Vehicles': '#EF553B',
@@ -111,9 +124,9 @@ type StackBy = typeof STACK_BYS[number]
 
 // --- URL state ---
 
-const airportsParam = codesParam<Airport>([...AIRPORTS], { EWR: 'e', JFK: 'j', LGA: 'l', SWF: 's' })
-const modeParam    = codeParam<Mode>('passengers', { ground: 'g', passengers: 'p', flights: 'f' })
-const stackByParam = codeParam<StackBy>('market', { market: 'm', airport: 'a', region: 'r', direction: 'd' })
+const airportsParam = codesParam<Airport>(['EWR'], { EWR: 'e', JFK: 'j', LGA: 'l', SWF: 's' })
+const modeParam    = codeParam<Mode>('ground', { ground: 'g', passengers: 'p', flights: 'f' })
+const stackByParam = codeParam<StackBy>('airport', { market: 'm', airport: 'a', region: 'r', direction: 'd' })
 
 // --- Data hooks ---
 
@@ -168,9 +181,11 @@ function useFlightData() {
 
 // --- Trace builders ---
 
-function ymLabel(msFromEpoch: number): string {
+// ISO date string ("YYYY-MM-01") so Plotly treats the x-axis as a date type
+// (enabling `%b '%y` tickformat) instead of falling back to category.
+function ymIso(msFromEpoch: number): string {
   const d = new Date(msFromEpoch)
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
 }
 
 function buildGroundTraces(rows: GroundRow[], airport: Airport, windowYears = 5): Data[] {
@@ -183,7 +198,7 @@ function buildGroundTraces(rows: GroundRow[], airport: Airport, windowYears = 5)
   for (const r of inWindow) {
     if (!byCat.has(r.category)) byCat.set(r.category, { x: [], y: [] })
     const e = byCat.get(r.category)!
-    e.x.push(`${r.year}-${String(r.month).padStart(2, '0')}`)
+    e.x.push(`${r.year}-${String(r.month).padStart(2, '0')}-01`)
     e.y.push(r.value)
   }
   const sortEntries = (e: { x: string[], y: number[] }) => {
@@ -197,10 +212,10 @@ function buildGroundTraces(rows: GroundRow[], airport: Airport, windowYears = 5)
       const { x, y } = sortEntries(byCat.get(cat)!)
       return {
         type: 'bar' as const,
-        name: cat,
+        name: GROUND_DISPLAY[cat],
         x, y,
         marker: { color: GROUND_COLORS[cat] },
-        hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
+        hovertemplate: '%{fullData.name}: %{y:,}<extra></extra>',
       } as Data
     })
 }
@@ -227,7 +242,7 @@ function buildFlightTraces(
 
   const bucket = new Map<string, Map<string, number>>()
   for (const r of filtered) {
-    const ym = ymLabel(r.ym)
+    const ym = ymIso(r.ym)
     if (!bucket.has(ym)) bucket.set(ym, new Map())
     const inner = bucket.get(ym)!
     const k = keyOf(r)
@@ -260,7 +275,7 @@ function buildFlightTraces(
       x: inWindow,
       y: inWindow.map(x => bucket.get(x)?.get(k) ?? 0),
       marker: { color: colorOf[k] },
-      hovertemplate: '%{x}<br>%{fullData.name}: %{y:,}<extra></extra>',
+      hovertemplate: '%{fullData.name}: %{y:,}<extra></extra>',
     } as Data))
 }
 
@@ -308,7 +323,9 @@ export default function Airports() {
 
   const layout: Partial<Layout> = useMemo(() => ({
     barmode: 'stack',
-    xaxis: { title: { text: 'Month' } },
+    // Date-typed x-axis so `%b '%y` (e.g. `Jun '24`) works in both ticks and
+    // the unified hoverbox. Trace x-values are ISO `YYYY-MM-01` strings.
+    xaxis: { type: 'date', tickformat: "%b '%y", hoverformat: "%b '%y" },
     yaxis: { title: { text: yAxisTitle }, tickformat: '.2s' },
   }), [yAxisTitle])
 
