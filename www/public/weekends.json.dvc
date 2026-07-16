@@ -1,6 +1,6 @@
 outs:
-- md5: eeebb6b6fa496785ec306828e2013c87
-  size: 84033
+- md5: 4b1adcfaca2c999e38502b8e24ccb03c
+  size: 84423
   hash: md5
   path: weekends.json
 meta:
@@ -21,6 +21,6 @@ meta:
       data/2023.pqt: c5c3d4a1de834ee3b3c8df7a550c253e
       data/2024.pqt: 145d6167c407fcb5a15871518297008d
       data/2025.pqt: 95f69d8e56ecccba58fdef58981af4a8
-      data/2026.pqt: 222e2ff4ad77e4958107fbd8bbcbc924
+      data/2026.pqt: 25aa5d6b247beb61137d7a02b7159cb7
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089

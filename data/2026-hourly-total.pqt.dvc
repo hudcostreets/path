@@ -7,5 +7,5 @@ meta:
   computation:
     cmd: path-data parse-hourly -y 2026
     git_deps:
-      2026-PATH-Hourly-Ridership-Report.pdf: 46fe415caf2da89cbeb230f6d3cb9175e7f9690a
+      2026-PATH-Hourly-Ridership-Report.pdf: d15182b17ddabf8f9b09cf2f171a5af99f1d3951
       /path_data/parse_hourly.py: 38eba7e0b23c8de52d6307af21a8bc4b819a823e
