@@ -1,5 +1,5 @@
 outs:
-- md5: 9de6050a0367ceb4b5bbb4ff2ddc423a
+- md5: e13f9133925728a163c98a3a5a13cccf
   size: 107062
   hash: md5
   path: all.pqt
@@ -7,20 +7,20 @@ meta:
   computation:
     cmd: path-data months
     deps:
-      2012.pqt: f228991a3d9c8ef1e1249c95940775b1
-      2013.pqt: f0eaf693badb22d34af688518bee37c1
-      2014.pqt: 69c5ec477ca546b2fd1774fa26fefcc6
-      2015.pqt: 68551e8dedd40f04559aca3b8c81a403
-      2016.pqt: b3f8ca4896ac500309165108c66502e2
-      2017.pqt: ae97102ae4cf2960a9e5c82a3b1f82fc
-      2018.pqt: 18d6fff4e1a7cffc89636228bbdec28f
-      2019.pqt: 062d8f54f3651d492016ea5b026be462
-      2020.pqt: 764689f43296fe6d79754cf051c3439a
-      2021.pqt: b0133f69d2cac6ac3144c5fb6534dede
-      2022.pqt: ee4f86036f72cd910bd090d2e849fc3b
-      2023.pqt: c5c3d4a1de834ee3b3c8df7a550c253e
-      2024.pqt: 145d6167c407fcb5a15871518297008d
-      2025.pqt: 95f69d8e56ecccba58fdef58981af4a8
+      2012.pqt: 3ad21c25b93622300bab6c123930b3c0
+      2013.pqt: aaaad7d00599e17640da62fd152874f3
+      2014.pqt: 66311e8af87454aa2577690ff6f720a1
+      2015.pqt: 9173691fa58ebbd742bb3688ce5e46a9
+      2016.pqt: ee41d430fa4a16d4fc142819456c8ce4
+      2017.pqt: 4f85e11a7584d4c4085feaf86b240085
+      2018.pqt: 38afc1ec6e83274e7677187b33b4d308
+      2019.pqt: d4413d108d2c11ed2ba37128b30de998
+      2020.pqt: 4b782d1e9e43af02a2941cfe4a30e6ea
+      2021.pqt: 693ae082f45f647385855c361133623a
+      2022.pqt: 6606392d1bf0a110c2e6a5ca6c3f042a
+      2023.pqt: 03d41e3851f551a9d8f3a3731ae7ffeb
+      2024.pqt: 1c7a7556eef34fa27b2b80e47c53da9a
+      2025.pqt: 14a3aedc727551bb80414a9a83d149c3
       2026.pqt: 25aa5d6b247beb61137d7a02b7159cb7
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089
