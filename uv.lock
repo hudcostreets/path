@@ -1145,6 +1145,15 @@ s3 = [
 ]
 
 [[package]]
+name = "emoji"
+version = "2.15.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/78/0d2db9382c92a163d7095fc08efff7800880f830a152cfced40161e7638d/emoji-2.15.0.tar.gz", hash = "sha256:eae4ab7d86456a70a00a985125a03263a5eac54cd55e51d7e184b1ed3b6757e4", size = 615483, upload-time = "2025-09-21T12:13:02.755Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/5e/4b5aaaabddfacfe36ba7768817bd1f71a7a810a43705e531f3ae4c690767/emoji-2.15.0-py3-none-any.whl", hash = "sha256:205296793d66a89d88af4688fa57fd6496732eb48917a87175a023c8138995eb", size = 608433, upload-time = "2025-09-21T12:13:01.197Z" },
+]
+
+[[package]]
 name = "entrypoints"
 version = "0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2747,7 +2756,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "requests", specifier = ">=2.33.0" },
     { name = "tabula-py" },
-    { name = "thrds", git = "https://github.com/runsascoded/thrds?rev=3cb9a0f" },
+    { name = "thrds", specifier = ">=0.5.0" },
     { name = "tornado", marker = "extra == 'eda'", specifier = ">=6.5.7" },
     { name = "urllib3", specifier = ">=2.7.0" },
     { name = "utz" },
@@ -2770,7 +2779,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -3875,8 +3884,16 @@ wheels = [
 
 [[package]]
 name = "thrds"
-version = "0.3.0"
-source = { git = "https://github.com/runsascoded/thrds?rev=3cb9a0f#3cb9a0f90eab32b80770d9c91ee09ef1a4fcc8a7" }
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "emoji" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/2c/f8e177206aff2e4e6f1b1628d4903a458786febf6b5f0dbeffdb00ac4105/thrds-0.5.0.tar.gz", hash = "sha256:fbaa078b721ebe62c456f8d103998e93f4dae37e02281f73b26a8509039d93b0", size = 195831, upload-time = "2026-08-12T02:11:27.416Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9b/e5/92b6f0b62fe145bfc194f12e23d65d956313f373227a5caa69516951b4a4/thrds-0.5.0-py3-none-any.whl", hash = "sha256:9fff5fea566ec60373f3854e84571e76663e18096e691e68addd290954f66f8c", size = 67747, upload-time = "2026-08-12T02:11:26.239Z" },
+]
 
 [[package]]
 name = "tinycss2"
