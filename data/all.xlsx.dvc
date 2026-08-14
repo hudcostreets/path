@@ -1,6 +1,6 @@
 outs:
-- md5: 09a77b245cb8b0fdac2ea599e246a491
-  size: 203142
+- md5: 99ac4fef261329733867edb42ebfa65a
+  size: 204262
   hash: md5
   path: all.xlsx
 meta:
@@ -21,6 +21,6 @@ meta:
       2023.pqt: 03d41e3851f551a9d8f3a3731ae7ffeb
       2024.pqt: 1c7a7556eef34fa27b2b80e47c53da9a
       2025.pqt: 14a3aedc727551bb80414a9a83d149c3
-      2026.pqt: 25aa5d6b247beb61137d7a02b7159cb7
+      2026.pqt: 60b5c0b974c3bea3bde18717d7e6d4d3
     git_deps:
       path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089
