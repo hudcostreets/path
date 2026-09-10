@@ -1,7 +1,8 @@
 import React from "react"
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useQuery } from "@tanstack/react-query"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { parquetRead } from "hyparquet"
+import { bufferFromUrl } from "./parquet-buffer"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Data, Layout, Legend } from "plotly.js"
 import { Plot as PltlyPlot } from "pltly/react"
@@ -146,7 +147,7 @@ function useAllTrafficData() {
   return useQuery({
     queryKey: ['bt-traffic-all', url],
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url })
+      const file = await bufferFromUrl(url)
       const raw: Record<string, unknown>[] = []
       await parquetRead({ file, rowFormat: 'object', onComplete: data => raw.push(...data) })
       return raw
@@ -170,7 +171,7 @@ function useEZPassData() {
   return useQuery({
     queryKey: ['bt-ezpass', url],
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url })
+      const file = await bufferFromUrl(url)
       const raw: Record<string, unknown>[] = []
       await parquetRead({ file, rowFormat: 'object', onComplete: data => raw.push(...data) })
       return raw

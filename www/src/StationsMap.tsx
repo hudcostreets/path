@@ -1,7 +1,8 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useQuery } from '@tanstack/react-query'
-import { asyncBufferFromUrl, parquetRead } from 'hyparquet'
+import { parquetRead } from 'hyparquet'
+import { bufferFromUrl } from './parquet-buffer'
 import { compressors } from './parquet-compressors'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -138,7 +139,7 @@ export default function StationsMap({
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async (): Promise<StationRow[]> => {
-      const file = await asyncBufferFromUrl({ url: hourlyUrl })
+      const file = await bufferFromUrl(hourlyUrl)
       const raw: Record<string, unknown>[] = []
       await parquetRead({
         file,

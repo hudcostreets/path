@@ -1,6 +1,7 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
 import { useQuery } from "@tanstack/react-query"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { parquetRead } from "hyparquet"
+import { bufferFromUrl } from "./parquet-buffer"
 import { compressors } from "./parquet-compressors"
 import { useCallback, useMemo, useState } from "react"
 import { useEntriesVsExits, dayCountsInRange } from "./entries-vs-exits-data"
@@ -189,7 +190,7 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url: hourlyUrl })
+      const file = await bufferFromUrl(hourlyUrl)
       const raw: Record<string, unknown>[] = []
       await parquetRead({
         file,

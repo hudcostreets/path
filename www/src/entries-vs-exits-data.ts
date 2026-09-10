@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { parquetRead } from "hyparquet"
+import { bufferFromUrl } from "./parquet-buffer"
 import { resolve as dvcResolve } from "virtual:dvc-data"
 import { compressors } from "./parquet-compressors"
 
@@ -32,7 +33,7 @@ export function useEntriesVsExits() {
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url: dvcResolve('entries_vs_exits.pqt') })
+      const file = await bufferFromUrl(dvcResolve('entries_vs_exits.pqt'))
       const raw: Record<string, unknown>[] = []
       await parquetRead({ file, rowFormat: 'object', compressors, onComplete: rows => raw.push(...rows) })
       const months: Record<string, MonthEntry> = {}

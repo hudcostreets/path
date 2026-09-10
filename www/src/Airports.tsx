@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { parquetRead } from "hyparquet"
+import { bufferFromUrl } from "./parquet-buffer"
 import { useMemo } from "react"
 import { Data, Layout } from "plotly.js"
 import { ToggleButton, ToggleButtonGroup } from "@mui/material"
@@ -140,7 +141,7 @@ function useGroundData() {
   return useQuery({
     queryKey: ['atd-ground', url],
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url })
+      const file = await bufferFromUrl(url)
       const raw: Record<string, unknown>[] = []
       await parquetRead({ file, rowFormat: 'object', compressors, onComplete: data => raw.push(...data) })
       return raw
@@ -162,7 +163,7 @@ function useFlightData() {
   return useQuery({
     queryKey: ['atd-flights', url],
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url })
+      const file = await bufferFromUrl(url)
       const raw: Record<string, unknown>[] = []
       await parquetRead({ file, rowFormat: 'object', compressors, onComplete: data => raw.push(...data) })
       return raw.map(r => ({

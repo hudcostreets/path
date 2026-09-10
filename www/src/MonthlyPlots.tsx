@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { parquetRead } from "hyparquet"
+import { bufferFromUrl } from "./parquet-buffer"
 import { useEffect, useMemo, useState } from "react"
 import { Data, Legend } from "plotly.js"
 import { INFERNO, getColorAt } from "pltly"
@@ -48,7 +49,7 @@ export default function MonthlyPlots({ stations, dayTypes, metric = "avg", subti
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url })
+      const file = await bufferFromUrl(url)
       const raw: Record<string, unknown>[] = []
       await parquetRead({
         file,

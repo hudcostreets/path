@@ -3,7 +3,8 @@ import ReactJsonView from '@microlink/react-json-view'
 import { round } from "@rdub/base/math"
 import { useQuery } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { asyncBufferFromUrl, parquetRead } from "hyparquet"
+import { parquetRead } from "hyparquet"
+import { bufferFromUrl } from "./parquet-buffer"
 import { Data, Layout, Legend } from "plotly.js"
 import { useActions } from "use-kbd"
 import { Param, useUrlState, codeParam } from "use-prms"
@@ -1015,7 +1016,7 @@ export default function RidesPlot({ activeStations, onActiveStationsChange, acti
     refetchOnWindowFocus: false,
     refetchInterval: false,
     queryFn: async () => {
-      const file = await asyncBufferFromUrl({ url })
+      const file = await bufferFromUrl(url)
       const raw: Record<string, unknown>[] = []
       await parquetRead({
         file,
