@@ -1,65 +1,63 @@
-# Move prod site domain → `pa.hccs.dev` (+ free `path.hccs.dev` for a redirect, move data to `data.pa.hccs.dev`)
+# Move prod site → Cloudflare Pages (`pa.hccs.dev`); data → `data.pa.hccs.dev`
 
-Follow-on to the S3→R2→HCCS data migration (`4928858` + `adc022f`, playbook `specs/s3-to-r2-hccs-playbook.md`). That moved the *data* to R2 on `path.hccs.dev`. This moves the *site*.
+Follow-on to the S3→R2→HCCS data migration (`4928858` + `adc022f`, playbook `specs/s3-to-r2-hccs-playbook.md`). That moved the *data* to R2 on `path.hccs.dev`. This moves the *site* off GitHub Pages onto **Cloudflare Pages**, and gives the site + data cleaner names under the Port Authority umbrella (`pa` = PATH + B&T).
 
 ## Goal / target end state
 
-- **Canonical site:** `pa.hccs.dev` (GH Pages). "pa" = Port Authority — the umbrella for both PATH ridership and B&T (Bridge & Tunnel) data this project hosts, so a better name than `path`.
+- **Site:** Cloudflare Pages project **`pa`** (HCCS account `2363642879f18d37d52dca114059937e`), canonical custom domain **`pa.hccs.dev`**. Replaces GitHub Pages.
 - **Data blobs:** `data.pa.hccs.dev` (R2 custom domain on bucket `path`), freeing `path.hccs.dev`.
-- **`path.hccs.dev`:** no longer serves R2; **301 → `pa.hccs.dev`** (alias for the project).
-- **`path.hudcostreets.org`** (current prod): **301 → `pa.hccs.dev`**.
+- **Legacy `path.hccs.dev` + `path.hudcostreets.org`:** attached to the same CFP project (CFP serves many domains per project) and/or 301 → `pa.hccs.dev`.
+
+## Why CFP, not GHP
+
+GitHub Pages allows **one** custom domain per repo, so switching domains is atomic and breaks the old URL until a registrar redirect lands. Cloudflare Pages serves **multiple** custom domains per project (crashes serves both `crashes.hccs.dev` and `crashes.hudcostreets.org` from one project) with native redirects — no cutover gap — and keeps the site in the HCCS CF account beside the data and the sibling projects (crashes, ctbk).
 
 ## Current state (verified 2026-09-22)
 
-- Site: `path.hudcostreets.org`, GH Pages, repo `hudcostreets/path`, `gh-pages` branch `CNAME` = `path.hudcostreets.org` (HTTP 200). Deploy: `.github/workflows/www.yml` → `JamesIves/github-pages-deploy-action@v4` (wipes `gh-pages` each run).
-- `path.hccs.dev` → R2 custom domain on bucket `path` (CF-proxied). Root `/` 404s (no index object — normal R2 behavior); real blobs serve, e.g. `path.hccs.dev/.dvc/cache/files/md5/ca/181795721daf78beb622eb9dd5befe` (hourly.pqt) = **200**.
-- `pa.hccs.dev` → CNAME to `hudcostreets.github.io` (DNS-only) from the zone move; **not yet claimed** by any repo (bare `https://pa.hccs.dev/` = TLS error / no cert). Free to take.
-- `hccs.dev` zone is on **Cloudflare** (HCCS account `2363642879f18d37d52dca114059937e`); DNS via token `CF_HCCS_DEV_DNS_EDIT_TOKEN` (Zone:Read + DNS:Edit).
-- `hudcostreets.org` zone is on **Google Cloud DNS** (`ns-cloud-*.googledomains.com`), NOT Cloudflare — its redirect happens at that registrar, not via a CF rule.
-- FE data-base is set in two files: `www/vite.config.ts` (`dvc({ ..., baseUrl: 'https://path.hccs.dev/.dvc/cache' })`) and `www/src/static-urls.ts` (`R2_STATIC_BASE = 'https://path.hccs.dev'`, used by the pie-map GIF/MP4 URLs).
+- Site: `path.hudcostreets.org`, GH Pages, repo `hudcostreets/path`, deployed via `JamesIves/github-pages-deploy-action` in `.github/workflows/www.yml`. Stays live (untouched) throughout — CFP is stood up independently, so there is **no downtime**.
+- `data.pa.hccs.dev` → R2 custom domain on bucket `path`, **Active**. Verified GET 200 (etag = md5), CORS `*` + expose-headers, Range → 206.
+- `path.hccs.dev` → still R2 custom domain on bucket `path` (current prod reads blobs here). Root `/` 404s (no index object — normal). Free it only after nothing reads it.
+- `pa.hccs.dev` → CNAME to `hudcostreets.github.io` (DNS-only) from the zone move; not yet claimed. Attaching it to the CFP project repoints this record to the project.
+- `hccs.dev` zone on **Cloudflare** (HCCS); `hudcostreets.org` zone on **Google Cloud DNS** (`ns-cloud-*.googledomains.com`), not CF.
+- FE data-base set in `www/vite.config.ts` (`dvc` `baseUrl`) + `www/src/static-urls.ts` (`R2_STATIC_BASE`); site canonical/og in `www/index.html` + `www/scripts/prerender-routes.mjs` (`ORIGIN`).
 
-## Token-scope caveat
+## Deploy idiom (mirrors crashes `www/deploy.sh`)
 
-`CF_HCCS_DEV_DNS_EDIT_TOKEN` is Zone:Read + DNS:Edit only. It **cannot** attach/detach an R2 custom domain (needs R2 admin) nor create a **Redirect Rule** (needs Ruleset edit). Those steps are **CF dashboard (Chrome, HCCSx / ryanw@hudcostreets.org)** unless the token is scope-bumped. Plain DNS records (the redirect placeholder) the token can do.
+`npx wrangler pages deploy dist --project-name pa --branch main --commit-dirty=true`, with env `CLOUDFLARE_API_TOKEN=$CF_HCCS_INFRA_TOKEN` + `CLOUDFLARE_ACCOUNT_ID=2363642879f18d37d52dca114059937e`. In `www.yml` this replaces the GH-Pages action (build + e2e steps unchanged; `404.html` copy kept for SPA fallback).
 
-## Ordering — add-new-before-remove-old (no prod downtime)
+**Token:** reuse `CF_HCCS_INFRA_TOKEN` — the HCCS Pages token crashes already uses (in `crashes/.envrc` + a GH secret on the crashes repo). Set it as a GH secret on `hudcostreets/path`; add to `path/.envrc` for local deploys.
 
-Prod (`path.hudcostreets.org`) reads blobs from `path.hccs.dev`, so don't detach that until the FE is repointed and deployed.
+## Phases (zero-downtime — GHP stays live until we repoint DNS)
 
-### Phase 1 — new data host (both live)
-1. **CF/R2 dashboard:** attach `data.pa.hccs.dev` to bucket `path` (auto-creates the CNAME, provisions cert). Re-apply the bucket CORS policy (`AllowedOrigins:["*"]`, `GET,HEAD`, `Range`; expose `Accept-Ranges,Content-Range,Content-Length,Content-Encoding,ETag`) — it's bucket-scoped so it carries over, but verify.
-2. Verify `data.pa.hccs.dev/.dvc/cache/files/md5/ca/181795721daf78beb622eb9dd5befe` = 200 + CORS headers (range 206).
+### Phase 1 — data host [DONE]
+`data.pa.hccs.dev` attached to bucket `path` (HCCS dash). FE repointed to it (commit). `path.hccs.dev` untouched.
 
-### Phase 2 — repoint FE + site domain, deploy
-3. `www/vite.config.ts`: `baseUrl` → `https://data.pa.hccs.dev/.dvc/cache`.
-4. `www/src/static-urls.ts`: `R2_STATIC_BASE` → `https://data.pa.hccs.dev`.
-5. Add **`www/public/CNAME`** = `pa.hccs.dev` (rides every build; the deploy action wipes `gh-pages` otherwise). This flips the GH Pages custom domain path.hudcostreets.org → pa.hccs.dev on next deploy (GH allows only one).
-6. Update user-visible refs: README "Live site" link, any `path.hudcostreets.org` in FE, `og:image` / meta absolute URLs → `https://pa.hccs.dev`.
-7. Commit + push → CI deploys. Confirm `pa.hccs.dev` DNS-only (grey) in CF. Wait for GH Let's Encrypt cert, then **enable "Enforce HTTPS"** (repo Settings → Pages — Chrome/you).
-8. **CIC** `https://pa.hccs.dev`: charts render, network panel shows blobs from `data.pa.hccs.dev` (GET 200, no 503), zero stale `path.hccs.dev`. Grep the built bundle for `path.hccs.dev` → none.
+### Phase 2 — stand up CFP `pa`
+1. Create CFP project `pa` (HCCS account), production branch `main`.
+2. First deploy of the built `dist/` (local `wrangler pages deploy`, or let CI do it once wired).
+3. Attach `pa.hccs.dev` as a custom domain on the project (CFP repoints the `hccs.dev` CNAME + provisions cert). Verify `pa.hccs.dev` serves the SPA + reads blobs from `data.pa.hccs.dev` (network panel: GET 200, no 503).
 
-### Phase 3 — free & redirect `path.hccs.dev`
-9. **CF/R2 dashboard:** detach `path.hccs.dev` from bucket `path`.
-10. **CF dashboard:** create a proxied placeholder DNS for `path` (CF redirect-only pattern: `AAAA path 100::`, proxied) + a **Redirect Rule** (Dynamic Redirect): `http.host eq "path.hccs.dev"` → `concat("https://pa.hccs.dev", http.request.uri.path)`, 301, preserve query string. Verify `path.hccs.dev/anything` 301s to `pa.hccs.dev/anything`.
+### Phase 3 — CI → CFP
+4. `www.yml`: swap GH-Pages action for the wrangler deploy step (done in repo). Remove `www/public/CNAME` (GHP-only).
+5. Add `CF_HCCS_INFRA_TOKEN` GH secret to `hudcostreets/path`.
+6. Push → CI builds + `wrangler pages deploy`. Watch green (`ghws`).
 
-### Phase 4 — redirect the old prod domain
-11. **Google/Squarespace registrar** (owner of `hudcostreets.org`): add domain forwarding `path.hudcostreets.org` → `https://pa.hccs.dev` (301, path/query preserved if supported). Once GH Pages custom domain flipped to pa.hccs.dev (step 5), path.hudcostreets.org would 404 at GH otherwise. — Chrome/you.
+### Phase 4 — legacy domains + retire GHP
+7. `path.hccs.dev`: detach from the R2 bucket (only after prod no longer reads it — i.e. once `path.hudcostreets.org` also serves the new build), then either attach to the CFP project or 301 → `pa.hccs.dev` (CF redirect rule; `hccs.dev` is on CF).
+8. `path.hudcostreets.org`: repoint its Google-DNS CNAME `hudcostreets.github.io` → `pa.pages.dev` and attach to the CFP project (served, crashes-style), **or** 301 at the Google/Squarespace registrar. Either way it stays up.
+9. Retire GHP: remove the repo's Pages custom domain; the stale `gh-pages` branch can be left or deleted.
+
+## Token-scope note
+
+`CF_HCCS_DEV_DNS_EDIT_TOKEN` (Zone:Read + DNS:Edit) can't create/deploy a Pages project — that needs `CF_HCCS_INFRA_TOKEN` (Pages:Edit). CFP custom-domain attach + the Phase-4 redirect rule are CF dashboard/API with that token, or the dashboard (HCCSx).
 
 ## Verification checklist
 
-- `https://pa.hccs.dev` → site 200, HTTPS enforced, charts render from `data.pa.hccs.dev`.
-- `https://data.pa.hccs.dev/.dvc/cache/files/md5/ca/181795721daf78beb622eb9dd5befe` → 200, `access-control-allow-origin: *`, range → 206.
-- `https://path.hccs.dev/` and a sub-path → 301 to `pa.hccs.dev`.
-- `https://path.hudcostreets.org/` → 301 to `pa.hccs.dev`.
-- CI green; built bundle has zero `path.hccs.dev` / `path.hudcostreets.org` refs.
+- `https://pa.hccs.dev` → CFP-served SPA, 200; charts render from `data.pa.hccs.dev` (GET 200, no 503); `/bt` + `/map` prerendered og tags = `pa.hccs.dev`.
+- CI: `www.yml` deploys to CFP project `pa`, green.
+- Built `dist/`: `data.pa.hccs.dev` (blobs) + `pa.hccs.dev` (og), zero `path.hccs.dev` / `path.hudcostreets.org`.
+- Legacy `path.hccs.dev` / `path.hudcostreets.org` → served by CFP or 301 to `pa.hccs.dev`; neither 404s.
 
 ## Rollback
 
-Data on bucket `path` is untouched (only the custom-domain hostname changes). To roll back: re-attach `path.hccs.dev` to the bucket, revert the two FE constants + `www/public/CNAME`, redeploy. R2 objects never move.
-
-## Handoff summary (what needs Chrome / non-code)
-
-- **CF dashboard (HCCSx):** attach `data.pa.hccs.dev`; later detach `path.hccs.dev` + add its Redirect Rule + placeholder DNS.
-- **GH repo Settings → Pages:** enable Enforce HTTPS after cert.
-- **Google/Squarespace registrar:** forward `path.hudcostreets.org` → `pa.hccs.dev`.
-- Everything else (FE constants, `CNAME`, README/meta) is code in this repo.
+Site: GHP stays live until Phase 4, so rollback pre-cutover = revert `www.yml` + redeploy gh-pages. Data: bucket `path` objects never move; re-attach `path.hccs.dev` and revert the two FE constants to roll the data host back.

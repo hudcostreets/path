@@ -7,7 +7,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const ORIGIN = 'https://path.hudcostreets.org'
+export const ORIGIN = 'https://pa.hccs.dev'
 
 export const ROUTES = [
   {

@@ -12,8 +12,8 @@ const FIXTURE = `<!doctype html>
     <meta name="description" content="Interactive visualizations of PATH train ridership data, parsed from monthly reports published by the Port Authority of NY & NJ." />
     <meta property="og:title" content="PATH Ridership Data" />
     <meta property="og:description" content="Interactive visualizations of PATH train ridership data, parsed from monthly reports published by the Port Authority of NY & NJ." />
-    <meta property="og:image" content="https://path.hudcostreets.org/og.png" />
-    <meta property="og:url" content="https://path.hudcostreets.org/" />
+    <meta property="og:image" content="https://pa.hccs.dev/og.png" />
+    <meta property="og:url" content="https://pa.hccs.dev/" />
     <meta property="og:type" content="website" />
   </head>
   <body></body>

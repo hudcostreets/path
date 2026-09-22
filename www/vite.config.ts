@@ -24,11 +24,11 @@ export default defineConfig({
     mdx({
       providerImportSource: "@mdx-js/react",
     }),
-    // Prod blob reads come from R2 (bucket `path`, custom domain path.hccs.dev). `baseUrl`
+    // Prod blob reads come from R2 (bucket `path`, custom domain data.pa.hccs.dev). `baseUrl`
     // overrides the default S3-URL derivation from `.dvc/config` (whose remote
     // url `s3://path/.dvc/cache` would otherwise resolve to an AWS host). Cache
     // blobs live at `<base>/.dvc/cache/files/md5/...`.
-    dvc({ root: 'public', baseUrl: 'https://path.hccs.dev/.dvc/cache' }),
+    dvc({ root: 'public', baseUrl: 'https://data.pa.hccs.dev/.dvc/cache' }),
     pdsPlugin(),
   ],
   resolve: {

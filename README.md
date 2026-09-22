@@ -2,9 +2,9 @@
 
 Cleaned + plotted [PANYNJ][PA data] PATH faregate + hourly ridership.
 
-**Live site:** [path.hudcostreets.org](https://path.hudcostreets.org/)
+**Live site:** [pa.hccs.dev](https://pa.hccs.dev/)
 
-![PATH faregate entries (green) and exits (orange) per station, animated through 24 hours, 2025 avg](https://hudcostreets.s3.amazonaws.com/path/pie-map-24h.gif)
+![PATH faregate entries (green) and exits (orange) per station, animated through 24 hours, 2025 avg](https://data.pa.hccs.dev/pie-map-24h.gif)
 
 ## Data
 
@@ -39,7 +39,7 @@ Web frontend lives at [`www/`](www/) — Vite + React + Plotly + Leaflet, deploy
 
 ## Bridge & Tunnel
 
-Same repo also serves [/bt](https://path.hudcostreets.org/bt) — PANYNJ B&T traffic (Lincoln + Holland tunnels, GWB, Bayonne + Goethals + Outerbridge). Merge per-year `traffic-e-zpass-usage-*.pdf` into one PDF for parsing:
+Same repo also serves [/bt](https://pa.hccs.dev/bt) — PANYNJ B&T traffic (Lincoln + Holland tunnels, GWB, Bayonne + Goethals + Outerbridge). Merge per-year `traffic-e-zpass-usage-*.pdf` into one PDF for parsing:
 
 ```bash
 gs -o merged.pdf \
