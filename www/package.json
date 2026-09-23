@@ -33,7 +33,7 @@
     "leaflet": "^1.9.4",
     "plotly.js": "https://github.com/runsascoded/plotly.js#cf90c76e0398a19b429a573fac5fabcec44d0606",
     "plotly.js-dist-min": "^3.4.0",
-    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/0edf371f940ae549a6511d74b98b96d96048cdd8/pltly-0edf371f940ae549a6511d74b98b96d96048cdd8.tar.gz",
+    "pltly": "https://gitlab.com/runsascoded/js/pltly/-/archive/6a9ea2e8bbe96c1937c3cfe45d4336e3384e6bc4/pltly-6a9ea2e8bbe96c1937c3cfe45d4336e3384e6bc4.tar.gz",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.1",
@@ -60,7 +60,6 @@
   },
   "pnpm": {
     "overrides": {
-      "vite": "^5.4.21",
       "@babel/runtime": ">=7.26.10",
       "basic-ftp": ">=5.2.2",
       "flatted": ">=3.4.2",
@@ -71,7 +70,8 @@
       "picomatch": ">=4.0.4",
       "postcss": ">=8.5.10",
       "protocol-buffers-schema": ">=3.6.1",
-      "rollup": ">=4.22.4"
+      "rollup": ">=4.22.4",
+      "vite": "^5.4.21"
     }
   }
 }
