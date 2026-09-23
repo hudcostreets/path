@@ -83,8 +83,8 @@ importers:
         specifier: ^0.12.0
         version: 0.12.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       use-prms:
-        specifier: https://github.com/runsascoded/use-prms#2cc362372ae5cfb056b16df127870ae1db615fb8
-        version: https://codeload.github.com/runsascoded/use-prms/tar.gz/2cc362372ae5cfb056b16df127870ae1db615fb8(react@18.3.1)
+        specifier: ^0.5.0
+        version: 0.5.0(react@18.3.1)
     devDependencies:
       '@playwright/test':
         specifier: ^1.58.2
@@ -4690,11 +4690,13 @@ packages:
       react: '>=18'
       react-dom: '>=18'
 
-  use-prms@https://codeload.github.com/runsascoded/use-prms/tar.gz/2cc362372ae5cfb056b16df127870ae1db615fb8:
-    resolution: {tarball: https://codeload.github.com/runsascoded/use-prms/tar.gz/2cc362372ae5cfb056b16df127870ae1db615fb8}
-    version: 0.4.1-dist.ea5fe32
+  use-prms@0.5.0:
+    resolution: {integrity: sha512-oWgETG/6KxEzJToR0MltHgIkJBLVBcibjjvx7qdMg63SqUVgNAy6iYBjODjcXwC7OYtw9UyyrnFfqC6JumQdKQ==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -10246,8 +10248,8 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  use-prms@https://codeload.github.com/runsascoded/use-prms/tar.gz/2cc362372ae5cfb056b16df127870ae1db615fb8(react@18.3.1):
-    dependencies:
+  use-prms@0.5.0(react@18.3.1):
+    optionalDependencies:
       react: 18.3.1
 
   util-deprecate@1.0.2: {}
