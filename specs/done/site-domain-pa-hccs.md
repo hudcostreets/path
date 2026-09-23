@@ -1,5 +1,16 @@
 # Move prod site → Cloudflare Pages (`pa.hccs.dev`); data → `data.pa.hccs.dev`
 
+## Outcome (completed 2026-09-23)
+
+All phases done; site fully live on CFP with zero downtime.
+
+- **Site:** CFP project `pa` serves both `pa.hccs.dev` (canonical) and `path.hudcostreets.org` — both `active` custom domains, both verified `server: cloudflare`, 200, bundle references `data.pa.hccs.dev` (×1), zero stale bare `path.hccs.dev`.
+- **`path.hudcostreets.org`:** Google-DNS CNAME repointed `hudcostreets.github.io` → **`pa-3pz.pages.dev`** (the project's `pages.dev` subdomain) and attached to the CFP project (served, crashes-style — *not* a registrar 301). CFP validation initially sat `pending` ~a day on a stale internal DNS cache of the old GitHub CNAME; a `PATCH …/domains/{name}` re-nudge + propagation cleared it.
+- **`path.hccs.dev`:** **left attached** to R2 bucket `path` as a harmless same-bucket alias of `data.pa.hccs.dev`. *Not* redirected — it was only ever a **data** host, never a site host, so a 301 → `pa.hccs.dev` (a static CFP site that doesn't serve `.dvc/…` blob paths) would 404 the data fetches of recently-cached copies of the old build. Freeing the name wasn't needed by anything.
+- **GHP retired:** full deactivation is blocked by org policy (`DELETE …/pages` → HTTP 422 "not allowed"), so instead cleared the Pages custom-domain claim (`PUT …/pages` `cname=` → 204); `cname` is now `null` and Pages reverted to `hudcostreets.github.io/path/`, releasing GitHub's cert/claim on `path.hudcostreets.org`. The `gh-pages` branch is left in place (inert; CI deploys to CFP).
+
+---
+
 Follow-on to the S3→R2→HCCS data migration (`4928858` + `adc022f`, playbook `specs/s3-to-r2-hccs-playbook.md`). That moved the *data* to R2 on `path.hccs.dev`. This moves the *site* off GitHub Pages onto **Cloudflare Pages**, and gives the site + data cleaner names under the Port Authority umbrella (`pa` = PATH + B&T).
 
 ## Goal / target end state
@@ -42,10 +53,10 @@ GitHub Pages allows **one** custom domain per repo, so switching domains is atom
 5. Add `CF_HCCS_INFRA_TOKEN` GH secret to `hudcostreets/path`.
 6. Push → CI builds + `wrangler pages deploy`. Watch green (`ghws`).
 
-### Phase 4 — legacy domains + retire GHP
-7. `path.hccs.dev`: detach from the R2 bucket (only after prod no longer reads it — i.e. once `path.hudcostreets.org` also serves the new build), then either attach to the CFP project or 301 → `pa.hccs.dev` (CF redirect rule; `hccs.dev` is on CF).
-8. `path.hudcostreets.org`: repoint its Google-DNS CNAME `hudcostreets.github.io` → `pa.pages.dev` and attach to the CFP project (served, crashes-style), **or** 301 at the Google/Squarespace registrar. Either way it stays up.
-9. Retire GHP: remove the repo's Pages custom domain; the stale `gh-pages` branch can be left or deleted.
+### Phase 4 — legacy domains + retire GHP [DONE — see Outcome]
+7. `path.hccs.dev`: **left attached** to the R2 bucket (harmless same-bucket alias of `data.pa.hccs.dev`; not redirected — a data host, not a site host, so a 301 → `pa.hccs.dev` would 404 cached old-build blob fetches).
+8. `path.hudcostreets.org`: Google-DNS CNAME repointed `hudcostreets.github.io` → `pa-3pz.pages.dev` and attached to the CFP project (served, crashes-style). Stays up.
+9. Retire GHP: repo Pages custom-domain claim cleared (`cname` → `null`); full deactivation blocked by org policy, so Pages is left inert at `hudcostreets.github.io/path/`. `gh-pages` branch left in place.
 
 ## Token-scope note
 
