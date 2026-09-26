@@ -169,6 +169,10 @@
     background: rgba(255, 255, 255, 0.18);
   }
 }
+// No hover (touch) or narrow viewport can't reveal the "only" link on hover, so show it permanently.
+@media (hover: none), (max-width: 600px) {
+  .solo-link { opacity: 1; }
+}
 .group-section {
   &:not(:last-child) {
     border-bottom: 1px solid #555;
