@@ -1,6 +1,21 @@
 name: Deploy www
 on:
   workflow_dispatch:
+    # Set by `path-data gha-update` when it dispatches a deploy for new data;
+    # this workflow then announces it in Slack once the deploy finishes.
+    inputs:
+      notify:
+        description: "New-data summary to announce in Slack after deploying (empty: no post)"
+        required: false
+        default: ''
+      site_path:
+        description: "Site path to link in the Slack post"
+        required: false
+        default: '/'
+      data_run_url:
+        description: "URL of the data-update run that published the new data"
+        required: false
+        default: ''
   push:
     branches: [ main ]
     paths:
@@ -52,3 +67,15 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_HCCS_INFRA_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 2363642879f18d37d52dca114059937e  # HCCS
         run: npx wrangler pages deploy dist --project-name pa --branch main --commit-dirty=true
+      - name: Announce new data in Slack
+        # `job.status` is `success`/`failure` here; skip cancelled runs + plain pushes (no `notify`)
+        if: ${{ !cancelled() && inputs.notify }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+          NOTIFY: ${{ inputs.notify }}
+          SITE_PATH: ${{ inputs.site_path }}
+          DATA_RUN_URL: ${{ inputs.data_run_url }}
+          DEPLOY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STATUS: ${{ job.status }}
+        run: path-data deploy-notify -s "$STATUS" -p "$SITE_PATH" -d "$DATA_RUN_URL" -r "$DEPLOY_RUN_URL" "$NOTIFY"

@@ -394,7 +394,7 @@ def _summarize_new_data(updated_pdfs: list[str], prev_ym=None, curr_ym=None) -> 
             lm = _pdf_last_modified(dvc) or '—'
             lines.append(f'| `{basename(p)}` | `{lm}` |')
         lines.append('')
-    lines.append('Deployed to https://path.hudcostreets.org')
+    lines.append('Deploying to https://pa.hccs.dev (via `www.yml`)')
     return '\n'.join(lines)
 
 
@@ -624,15 +624,6 @@ def gha_update():
         run('git', 'commit', '-m', 'Update PATH ridership data')
         run('git', 'push')
 
-        # GITHUB_TOKEN pushes don't trigger other workflows (GH loop-prevention),
-        # so www.yml won't auto-deploy the new data. Kick it off explicitly.
-        if environ.get('GITHUB_RUN_ID'):
-            try:
-                run('gh', 'workflow', 'run', 'www.yml')
-                err('=== dispatched www.yml ===')
-            except CalledProcessError as e:
-                err(f"Failed to dispatch www.yml: {e}")
-
         _append_summary(_summarize_new_data(updated_pdfs, prev_ym, curr_ym) + f'\n\n{md_link}\n')
         curr_label = _ym_label(curr_ym)
         prev_label = _ym_label(prev_ym)
@@ -663,6 +654,8 @@ def gha_update():
         new_path = label_flipped_path and path_outs_changed
         new_bt = label_flipped_bt and bt_outs_changed
 
+        summary = None
+        site_path = '/'
         if new_path or new_bt:
             # At least one source has genuinely new upstream data
             parts = []
@@ -673,15 +666,38 @@ def gha_update():
                     parts.append(f"B&T through {curr_bt} (was {prev_bt})")
                 else:
                     parts.append(f"B&T through {curr_bt}")
-            headline = ":white_check_mark: *New data:* " + ", ".join(parts) + " — published and deployed"
+            summary = ", ".join(parts)
             # Link to /bt when only BT changed; otherwise the headline page.
             site_path = '/bt' if new_bt and not new_path else '/'
-            site_url = 'https://path.hudcostreets.org' + site_path
-            _slack(
-                f"{headline}\n{slack_link} · <{site_url}|View site>",
-                emoji=':white_check_mark:',
-            )
-        else:
+
+        # GITHUB_TOKEN pushes don't trigger other workflows (GH loop-prevention),
+        # so www.yml won't auto-deploy the new data. Kick it off explicitly.
+        # www.yml posts the "published and deployed" message itself once the
+        # deploy finishes (`path-data deploy-notify`); posting it here, right
+        # after dispatching, claimed "deployed" minutes before the site
+        # updated (and would have even if the deploy failed).
+        if environ.get('GITHUB_RUN_ID'):
+            dispatch = ['gh', 'workflow', 'run', 'www.yml']
+            if summary and not environ.get('PATH_DATA_SKIP_SLACK'):
+                dispatch += [
+                    '-f', f'notify={summary}',
+                    '-f', f'site_path={site_path}',
+                    '-f', f'data_run_url={_run_url() or ""}',
+                ]
+            try:
+                run(*dispatch)
+                err('=== dispatched www.yml ===')
+            except CalledProcessError as e:
+                err(f"Failed to dispatch www.yml: {e}")
+                if summary:
+                    _slack(
+                        f":rotating_light: *New data published, but the deploy couldn't be dispatched:* {summary}\n{slack_link}",
+                        emoji=':rotating_light:',
+                    )
+        elif summary:
+            err(f"Not in GHA; skipping www.yml dispatch + deploy notification: {summary}")
+
+        if not summary:
             # Artifacts regenerated but no new upstream data — thread
             _post_no_new_data(slack_link)
     except CalledProcessError as e:
