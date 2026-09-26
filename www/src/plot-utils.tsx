@@ -110,7 +110,7 @@ export function Plot(
       autosize: true,
       margin,
       hovermode: "x unified" as const,
-      hoverlabel: dark ? { bgcolor: "#2a2a3e", font: { color: "#e4e4e4" } } : undefined,
+      hoverlabel: dark ? { bgcolor: "#2a2a3e", bordercolor: "#8a8ab8", font: { color: "#e4e4e4" } } : undefined,
       xaxis: { fixedrange: true, ...xaxisIn },
       yaxis: { fixedrange: true, ...yaxisIn },
       legend: narrow
