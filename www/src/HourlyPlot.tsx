@@ -10,14 +10,14 @@ import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { codeParam, useUrlState } from "use-prms"
 import { Plot, hovertemplate } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
-import type { StationGroup } from "./RidesPlot"
+import type { StationGroup } from "./stations"
 import {
   DAY_TYPES as PICKER_DAY_TYPES,
   DAY_TYPE_COLORS as PICKER_DAY_TYPE_COLORS,
   DAY_TYPE_LABELS as PICKER_DAY_TYPE_LABELS,
   type DayType as PickerDayType,
 } from "./dayTypes"
-import { STATIONS as CANONICAL_STATIONS } from "./stations"
+import { STATIONS as CANONICAL_STATIONS, fromShortName, stationPath, toShortName } from "./stations"
 
 const height = 450
 
@@ -83,6 +83,8 @@ const PICKER_TO_RAW: Record<PickerDayType, DayType[]> = {
 }
 
 const groupByParam = codeParam<GroupBy>("station", { station: "s", daytype: "d", direction: "r" })
+// Single-station mode (per-station pages) has no BY STATION view.
+const stationGroupByParam = codeParam<GroupBy>("daytype", { station: "s", daytype: "d", direction: "r" })
 const directionParam = codeParam<Direction>("entry", { entry: "n", exit: "x" })
 
 const DIRECTION_COLORS: Record<Direction, string> = {
@@ -147,7 +149,16 @@ function colKey(dayType: DayType, direction: Direction): keyof HourlyRow {
   return `avg_${dayType}_${direction}` as keyof HourlyRow
 }
 
-export default function HourlyPlot({ activeStations, onActiveStationsChange, activeDayTypes, onActiveDayTypesChange, onActiveStationChange, externalActiveStation, dateRange }: {
+/** Last 12 months present in the hourly data, as a "YYYY-MM" range. */
+function lastYearRange(rows: { year: number, month: number }[]): { from: string, to: string } | undefined {
+  if (rows.length === 0) return undefined
+  let max = 0
+  for (const r of rows) max = Math.max(max, r.year * 12 + r.month - 1)
+  const fmt = (n: number) => `${Math.floor(n / 12)}-${String(n % 12 + 1).padStart(2, '0')}`
+  return { from: fmt(max - 11), to: fmt(max) }
+}
+
+export default function HourlyPlot({ activeStations, onActiveStationsChange, activeDayTypes, onActiveDayTypesChange, onActiveStationChange, externalActiveStation, dateRange: dateRangeIn, station }: {
   /** Page-level station filter; pin = single-element subset. */
   activeStations: string[]
   onActiveStationsChange: (stations: string[]) => void
@@ -156,20 +167,27 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
   onActiveStationChange?: (station: string | null) => void
   /** Cross-plot active signal (from another plot's local hover/pin). */
   externalActiveStation?: string | null
-  /** "YYYY-MM" range filter from sibling plot (e.g. plot4 / map). */
+  /** "YYYY-MM" range filter from sibling plot (e.g. plot4 / map). In
+   *  single-station mode, defaults to the last 12 months of data. */
   dateRange?: { from: string, to: string }
+  /** Single-station mode (canonical name): fixes the station filter, and
+   *  hides the station picker + BY STATION view. */
+  station?: string
 }) {
-  const [groupBy, setGroupBy] = useUrlState<GroupBy>("hg", groupByParam)
+  const [groupByRaw, setGroupBy] = useUrlState<GroupBy>("hg", station ? stationGroupByParam : groupByParam)
+  const groupBy: GroupBy = station && groupByRaw === "station" ? "daytype" : groupByRaw
   const [direction, setDirection] = useUrlState<Direction>("hd", directionParam)
   const [legendMode, setLegendMode] = useUrlState<LegendMode>("hl", legendModeParam)
   // Aliases mapping page-level state into the names the rest of the file uses.
   // Empty `activeStations` → "all" for chart aggregation; "Christopher Street"
   // arrives in canonical form and gets shortened to "Christopher St." inline.
   const selectedStations = useMemo(
-    () => activeStations.length > 0
+    () => station
+      ? [toShortName(station)!]
+      : activeStations.length > 0
       ? activeStations.map(s => s === "Christopher Street" ? "Christopher St." : s)
       : [...STATIONS] as string[],
-    [activeStations],
+    [activeStations, station],
   )
   const setSelectedStations = onActiveStationsChange
   const pickerDayTypes = activeDayTypes
@@ -215,6 +233,11 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
       }))
     },
   })
+
+  const dateRange = useMemo(
+    () => dateRangeIn ?? (station && allRows ? lastYearRange(allRows) : undefined),
+    [dateRangeIn, station, allRows],
+  )
 
   const plotData = useMemo(() => {
     if (!allRows) return null
@@ -455,6 +478,9 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
       ticktext: HOUR_LABELS,
       tickangle: -45,
     },
+    // SI ticks ("4.5k", not "4500") so single-station magnitudes fit the
+    // narrow-viewport left margin.
+    yaxis: { tickformat: "~s" },
     legend: { traceorder: "reversed" } as Partial<Legend>,
   }), [groupBy])
 
@@ -481,22 +507,25 @@ export default function HourlyPlot({ activeStations, onActiveStationsChange, act
           </ToggleButtonGroup>
         )}
         <ToggleButtonGroup size="small" exclusive value={groupBy} onChange={(_, v) => v && setGroupBy(v)}>
-          <ToggleButton value="station">By Station</ToggleButton>
+          {!station && <ToggleButton value="station">By Station</ToggleButton>}
           <ToggleButton value="daytype">By Day Type</ToggleButton>
           <ToggleButton value="direction">By Direction</ToggleButton>
         </ToggleButtonGroup>
-        <ToggleButtonGroup size="small" exclusive value={legendMode} onChange={(_, v) => v && setLegendMode(v)}>
-          <ToggleButton value="solo">Solo</ToggleButton>
-          <ToggleButton value="highlight">Highlight</ToggleButton>
-        </ToggleButtonGroup>
-        <StationDropdown
-          stations={[...STATIONS]}
-          colors={STATION_COLORS}
-          selected={selectedStations}
-          onChange={stations => setSelectedStations(stations.map(s => s === "Christopher St." ? "Christopher Street" : s))}
-          lineGroups={LINE_GROUPS}
-          regionGroups={REGION_GROUPS}
-        />
+        {!station && <>
+          <ToggleButtonGroup size="small" exclusive value={legendMode} onChange={(_, v) => v && setLegendMode(v)}>
+            <ToggleButton value="solo">Solo</ToggleButton>
+            <ToggleButton value="highlight">Highlight</ToggleButton>
+          </ToggleButtonGroup>
+          <StationDropdown
+            stations={[...STATIONS]}
+            colors={STATION_COLORS}
+            selected={selectedStations}
+            onChange={stations => setSelectedStations(stations.map(s => s === "Christopher St." ? "Christopher Street" : s))}
+            lineGroups={LINE_GROUPS}
+            regionGroups={REGION_GROUPS}
+            stationHref={s => stationPath(fromShortName(s))}
+          />
+        </>}
         <StationDropdown
           label="Day Types"
           stations={[...PICKER_DAY_TYPES]}

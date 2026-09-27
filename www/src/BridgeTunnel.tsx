@@ -12,7 +12,7 @@ import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { Plot, blendAvgColor, hovertemplate, hovertemplatePct, isDark, rollingAvg, useDark } from "./plot-utils"
 import { StationDropdown } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
-import type { StationGroup } from "./RidesPlot"
+import type { StationGroup } from "./stations"
 import BTFlowMap from "./BTFlowMap"
 
 // --- Constants ---

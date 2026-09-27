@@ -1,0 +1,122 @@
+.station-page {
+  padding-bottom: 2em;
+  h1 {
+    font-size: 2.4rem;
+    margin: 0.2em 0 0.1em;
+  }
+}
+
+.station-breadcrumb {
+  font-size: 0.85rem;
+  margin-top: 1em;
+  color: #999;
+}
+
+.station-header {
+  border-left: 5px solid var(--c, #888);
+  padding-left: 0.8em;
+  margin-bottom: 1em;
+}
+.station-area {
+  color: #999;
+  font-size: 1rem;
+}
+.station-lines {
+  list-style: none;
+  padding: 0;
+  margin: 0.6em 0 0;
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0.25em 0;
+    font-size: 0.9rem;
+  }
+}
+.line-chip {
+  display: inline-block;
+  min-width: 5.5em;
+  text-align: center;
+  padding: 0.05em 0.6em;
+  border-radius: 999px;
+  background: var(--line);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+.line-neighbors {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  .terminal {
+    color: #888;
+    font-style: italic;
+  }
+}
+.sep {
+  color: #888;
+  margin: 0 0.1em;
+}
+
+.station-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6em;
+  margin: 0.8em 0;
+  @media (max-width: 700px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.station-stats-loading {
+  grid-column: 1 / -1;
+  height: 4.5em;
+}
+.station-stat {
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 0.5em 0.7em;
+  .station-stat-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .station-stat-label {
+    font-size: 0.8rem;
+    color: #999;
+  }
+}
+
+.station-controls {
+  .station-controls-note {
+    font-size: 0.8rem;
+    color: #888;
+  }
+}
+
+.station-data {
+  margin-top: 1.5em;
+  font-size: 0.9rem;
+  button {
+    padding: 0.3em 0.8em;
+    font-size: 0.9rem;
+  }
+}
+
+.station-back {
+  font-size: 0.9rem;
+  text-align: center;
+  .sep {
+    margin: 0 0.5em;
+  }
+}
+
+:root[data-theme="light"] {
+  .station-stat {
+    border-color: #ccc;
+  }
+  .station-area, .station-stat .station-stat-label, .station-breadcrumb {
+    color: #666;
+  }
+}

@@ -1,6 +1,6 @@
 import { Headings } from "@rdub/base/heading"
 import { useEffect, useMemo, useState } from "react"
-import { Annotations, Data, Layout } from "plotly.js"
+import { Annotations, Data, Layout, Margin } from "plotly.js"
 
 import { Plot as PltlyPlot, type PlotProps as PltlyPlotProps } from 'pltly/react'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
@@ -73,6 +73,9 @@ type PlotOwnProps = {
    *  a plot that lives under a shared `<h2>` section heading. */
   level?: 2 | 3
   subtitle?: React.ReactNode
+  /** Extra left margin (px) on top of the default, for wide y-tick labels
+   *  (e.g. "140%"). */
+  extraMarginLeft?: number
 }
 
 /** Track `window.innerWidth < threshold` as reactive React state. Subscribes
@@ -92,13 +95,16 @@ function useNarrow(threshold = 600): boolean {
 }
 
 export function Plot(
-  { id, title, level = 2, subtitle, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
+  { id, title, level = 2, subtitle, extraMarginLeft = 0, ...props }: PlotOwnProps & Partial<Omit<PltlyPlotProps, 'style'>> & { layout?: Partial<Layout> }
 ) {
   const H = level === 3 ? H3 : H2
   const h2 = title ? <H id={id}>{title}</H> : null
   const sub = <div className="plot-subtitle" style={subtitle ? undefined : { visibility: 'hidden' }}>{subtitle || '\u00A0'}</div>
   const narrow = useNarrow()
-  const margin = useMemo(() => ({ l: narrow ? 30 : 40, r: narrow ? 20 : 0, t: 0, b: narrow ? 50 : 40 }), [narrow])
+  const margin = useMemo<Partial<Margin>>(
+    () => ({ l: (narrow ? 30 : 40) + extraMarginLeft, r: narrow ? 20 : 0, t: 0, b: narrow ? 50 : 40 }),
+    [narrow, extraMarginLeft],
+  )
   const userLayout = (props as { layout?: Partial<Layout> }).layout
   const dark = useDark()
   // Memoize the computed layout so its identity depends only on `userLayout`.

@@ -11,7 +11,7 @@ import { Param, useUrlState, codeParam } from "use-prms"
 import { repelLabels } from "pltly/plotly"
 import type { RepelLineObstacle, RepelPoint, RepelRectObstacle } from "pltly/plotly"
 import { Plot, blendAvgColor, clean, hovertemplate, hovertemplatePct, isDark, rollingAvg, url, useDark } from "./plot-utils"
-import { StationDropdown } from "./StationDropdown"
+import { StationDropdown, StationPageLink } from "./StationDropdown"
 import { InfoTip } from "./Tooltip"
 import {
   DAY_TYPES,
@@ -21,74 +21,35 @@ import {
   dayTypesParam,
   type DayType,
 } from "./dayTypes"
-
-
-const STATIONS = [
-  "Christopher Street",
-  "9th Street",
-  "14th Street",
-  "23rd Street",
-  "33rd Street",
-  "WTC",
-  "Newark",
-  "Harrison",
-  "Journal Square",
-  "Grove Street",
-  "Exchange Place",
-  "Newport",
-  "Hoboken",
-] as const
-
-const STATION_COLORS: Record<string, string> = {
-  "Christopher Street": "#636efa",
-  "9th Street": "#EF553B",
-  "14th Street": "#00cc96",
-  "23rd Street": "#ab63fa",
-  "33rd Street": "#FFA15A",
-  "WTC": "#19d3f3",
-  "Newark": "#FF6692",
-  "Harrison": "#B6E880",
-  "Journal Square": "#FF97FF",
-  "Grove Street": "#FECB52",
-  "Exchange Place": "#636efa",
-  "Newport": "#EF553B",
-  "Hoboken": "#00cc96",
-}
-
-// Station groups by state
-const NY_STATIONS = ["Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street", "WTC"] as const
-const NJ_STATIONS = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken"] as const
-
-// Station groups by line (canonical PATH map colors)
-const NWK_WTC = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "WTC"] as const
-const JSQ_33 = ["Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
-const HOB_33 = ["Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
-const HOB_WTC = ["Hoboken", "Newport", "Exchange Place", "WTC"] as const
-
-export type StationGroup = { label: string, color: string, stations: readonly string[] }
-
-const LINE_GROUPS: StationGroup[] = [
-  { label: "NWK–WTC", color: "#D93A30", stations: NWK_WTC },
-  { label: "JSQ–33", color: "#F0A81C", stations: JSQ_33 },
-  { label: "HOB–33", color: "#0082C6", stations: HOB_33 },
-  { label: "HOB–WTC", color: "#00A84F", stations: HOB_WTC },
-]
-
-const REGION_GROUPS: StationGroup[] = [
-  { label: "New York", color: "#aaa", stations: NY_STATIONS },
-  { label: "New Jersey", color: "#aaa", stations: NJ_STATIONS },
-]
+import {
+  CODE_TO_STATION,
+  HOB_33,
+  HOB_WTC,
+  JSQ_33,
+  LINE_GROUPS,
+  NJ_STATIONS,
+  NWK_WTC,
+  NY_STATIONS,
+  REGION_GROUPS,
+  STATIONS,
+  STATION_ABBREVS,
+  STATION_CODES,
+  STATION_COLORS,
+  STATION_FROM_DISPLAY,
+  displayName,
+  stationPath,
+} from "./stations"
 
 export type Metric = "avg" | "total" | "pct2019"
 type GroupBy = "daytype" | "station"
-type TimeRange = "all" | "recent"
+export type TimeRange = "all" | "recent"
 const metricParam = codeParam<Metric>("avg", { avg: "a", total: "t", pct2019: "p" })
 const groupByParam = codeParam<GroupBy>("station", { daytype: "d", station: "s" })
 const timeRangeParam = codeParam<TimeRange>("all", { all: "a", recent: "p" })
 
-type Exclusion = { station: string, month: string }
+export type Exclusion = { station: string, month: string }
 
-const DEFAULT_EXCLUSIONS: Exclusion[] = [
+export const DEFAULT_EXCLUSIONS: Exclusion[] = [
   { station: "Christopher Street", month: "2016-08" },
   { station: "Christopher Street", month: "2016-10" },
   { station: "Christopher Street", month: "2018-08" },
@@ -152,77 +113,7 @@ const exclusionsParam: Param<Exclusion[]> = {
   },
 }
 
-const STATION_DISPLAY: Record<string, string> = {
-  "Christopher Street": "Christopher St",
-}
-
-function displayName(station: string): string {
-  return STATION_DISPLAY[station] ?? station
-}
-
-const STATION_FROM_DISPLAY: Record<string, string> = {
-  ...Object.fromEntries((STATIONS as readonly string[]).map(s => [s, s])),
-  ...Object.fromEntries(Object.entries(STATION_DISPLAY).map(([k, v]) => [v, k])),
-}
-
-const STATION_ABBREVS: Record<string, string> = {
-  "Christopher Street": "CHR",
-  "9th Street": "9TH",
-  "14th Street": "14TH",
-  "23rd Street": "23RD",
-  "33rd Street": "33RD",
-  "WTC": "WTC",
-  "Newark": "NWK",
-  "Harrison": "HAR",
-  "Journal Square": "JSQ",
-  "Grove Street": "GRO",
-  "Exchange Place": "EXP",
-  "Newport": "NPT",
-  "Hoboken": "HOB",
-}
-
-const STATION_CODES: Record<string, string> = {
-  "Christopher Street": "c",
-  "9th Street": "9",
-  "14th Street": "1",
-  "23rd Street": "2",
-  "33rd Street": "3",
-  "WTC": "w",
-  "Newark": "n",
-  "Harrison": "h",
-  "Journal Square": "j",
-  "Grove Street": "g",
-  "Exchange Place": "x",
-  "Newport": "p",
-  "Hoboken": "o",
-}
-const CODE_TO_STATION: Record<string, string> = Object.fromEntries(
-  Object.entries(STATION_CODES).map(([k, v]) => [v, k])
-)
-
-// Custom param with `-` complement mode: `-abc` means "all except a, b, c"
-// Max URL length: 7 chars (for 7 of 13 stations) vs 12 without complement
-const stationsParam: Param<string[]> = {
-  encode(stations: string[]): string | undefined {
-    if (stations.length >= STATIONS.length) return undefined
-    if (stations.length === 0) return ''
-    const included = stations.map(s => STATION_CODES[s] ?? '').join('')
-    const excluded = STATIONS.filter(s => !stations.includes(s)).map(s => STATION_CODES[s]).join('')
-    if (excluded.length + 1 < included.length) return `-${excluded}`
-    return included
-  },
-  decode(encoded: string | undefined): string[] {
-    if (encoded === undefined) return [...STATIONS]
-    if (encoded === '') return []
-    if (encoded.startsWith('-')) {
-      const excludedCodes = new Set(encoded.slice(1).split(''))
-      return STATIONS.filter(s => !excludedCodes.has(STATION_CODES[s]))
-    }
-    return encoded.split('').map(c => CODE_TO_STATION[c]).filter(Boolean)
-  },
-}
-
-type StationData = {
+export type StationData = {
   months: Date[]
   avg_weekday: number[]
   avg_weekend: number[]
@@ -233,9 +124,9 @@ type StationData = {
 }
 
 // Per-station baselines: baselines[col][calMonth] = average value over baseline years
-type StationBaseline = Record<MetricDayTypeCol, number[]>
+export type StationBaseline = Record<MetricDayTypeCol, number[]>
 
-type ProcessedData = {
+export type ProcessedData = {
   stations: Map<string, StationData>
   aggregate: StationData
   firstPostBaselineIdx: number
@@ -347,7 +238,7 @@ function processData(rows: RawRow[]): ProcessedData {
 }
 
 /** Compute padded date-string ranges from the last month in the data */
-function dataRanges(months: Date[]): { allTimeRange: [string, string], recentRange: [string, string] } {
+export function dataRanges(months: Date[]): { allTimeRange: [string, string], recentRange: [string, string] } {
   const last = months[months.length - 1]
   const endDate = new Date(last.getFullYear(), last.getMonth() + 1, 17)
   const end = endDate.toISOString().slice(0, 10)
@@ -359,7 +250,7 @@ function dataRanges(months: Date[]): { allTimeRange: [string, string], recentRan
 
 const BASELINE_COLS: MetricDayTypeCol[] = ["avg_weekday", "avg_weekend", "avg_holiday", "total_weekday", "total_weekend", "total_holiday"]
 
-function computeBaselines(
+export function computeBaselines(
   stations: Map<string, StationData>,
   nYears: number,
   exclusions: Exclusion[],
@@ -397,13 +288,13 @@ export function stationSubtitle(stations: string[]): string {
   return stations.map(s => STATION_ABBREVS[s] ?? s).join(", ")
 }
 
-type MetricDayTypeCol = `${"avg" | "total"}_${DayType}`
+export type MetricDayTypeCol = `${"avg" | "total"}_${DayType}`
 
-function colName(metric: "avg" | "total", dayType: string): MetricDayTypeCol {
+export function colName(metric: "avg" | "total", dayType: string): MetricDayTypeCol {
   return `${metric}_${dayType}` as MetricDayTypeCol
 }
 
-function sumAcrossDayTypes(
+export function sumAcrossDayTypes(
   sd: StationData,
   metric: "avg" | "total",
   dayTypes: string[],
@@ -671,7 +562,7 @@ function buildByStation(
   }
 }
 
-function buildByDayType(
+export function buildByDayType(
   processed: ProcessedData,
   baselines: Map<string, StationBaseline>,
   metric: Metric,
@@ -875,6 +766,40 @@ function buildByDayType(
   }
 }
 
+/** Monthly per-station ridership (`all.pqt`), processed into per-station
+ *  series + a system aggregate. Shared react-query cache key, so the homepage
+ *  and per-station pages only fetch/parse once per session. */
+export function useRidesData() {
+  return useQuery({
+    queryKey: ['rides', url],
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
+    queryFn: async () => {
+      const file = await bufferFromUrl(url)
+      const raw: Record<string, unknown>[] = []
+      await parquetRead({
+        file,
+        columns: ['month', 'station', 'avg weekday', 'avg weekend', 'avg holiday', 'total weekday', 'total weekend', 'total holiday'],
+        rowFormat: 'object',
+        onComplete: data => raw.push(...data),
+      })
+      const rows: RawRow[] = raw
+        .map(r => ({
+          month: r['month'] as string,
+          station: r['station'] as string,
+          avg_weekday: (r['avg weekday'] as number) || 0,
+          avg_weekend: (r['avg weekend'] as number) || 0,
+          avg_holiday: (r['avg holiday'] as number) || 0,
+          total_weekday: (r['total weekday'] as number) || 0,
+          total_weekend: (r['total weekend'] as number) || 0,
+          total_holiday: (r['total holiday'] as number) || 0,
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month) || a.station.localeCompare(b.station))
+      return processData(rows)
+    },
+  })
+}
+
 export default function RidesPlot({ activeStations, onActiveStationsChange, activeDayTypes, onActiveDayTypesChange, onMetricChange, activeYear, onActiveStationChange, externalActiveStation }: {
   /** Page-level station filter. Empty/full = all stations; non-empty subset
    *  narrows the chart. Single-element subset is the "pin" state. */
@@ -1011,34 +936,7 @@ export default function RidesPlot({ activeStations, onActiveStationsChange, acti
     },
   })
 
-  const { data: processed, isError, error } = useQuery({
-    queryKey: ['rides', url],
-    refetchOnWindowFocus: false,
-    refetchInterval: false,
-    queryFn: async () => {
-      const file = await bufferFromUrl(url)
-      const raw: Record<string, unknown>[] = []
-      await parquetRead({
-        file,
-        columns: ['month', 'station', 'avg weekday', 'avg weekend', 'avg holiday', 'total weekday', 'total weekend', 'total holiday'],
-        rowFormat: 'object',
-        onComplete: data => raw.push(...data),
-      })
-      const rows: RawRow[] = raw
-        .map(r => ({
-          month: r['month'] as string,
-          station: r['station'] as string,
-          avg_weekday: (r['avg weekday'] as number) || 0,
-          avg_weekend: (r['avg weekend'] as number) || 0,
-          avg_holiday: (r['avg holiday'] as number) || 0,
-          total_weekday: (r['total weekday'] as number) || 0,
-          total_weekend: (r['total weekend'] as number) || 0,
-          total_holiday: (r['total holiday'] as number) || 0,
-        }))
-        .sort((a, b) => a.month.localeCompare(b.month) || a.station.localeCompare(b.station))
-      return processData(rows)
-    },
-  })
+  const { data: processed, isError, error } = useRidesData()
 
   // Legend hover/pin → brush plot2 to the matching dimension.
   const [activeTraceName, setActiveTraceName] = useState<string | null>(null)
@@ -1089,9 +987,15 @@ export default function RidesPlot({ activeStations, onActiveStationsChange, acti
         </span>
       )
     }
+    // Pinned (single-station filter) → link to that station's page. Only on
+    // pin, not hover, so the link doesn't vanish as the cursor moves to it.
+    const pinnedPath = activeStations.length === 1 ? stationPath(activeStations[0]) : undefined
+    if (pinnedPath) {
+      badges.push(<StationPageLink key="station-page" to={pinnedPath} station={activeStations[0]} />)
+    }
     if (badges.length === 0) return ""
     return <>{badges}</>
-  }, [brushedStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes])
+  }, [brushedStations, activeStations, selectedDayTypes, setSelectedStations, setSelectedDayTypes])
 
   const baselines = useMemo(
     () => processed ? computeBaselines(processed.stations, baselineYears, exclusions) : new Map<string, StationBaseline>(),
@@ -1209,6 +1113,7 @@ export default function RidesPlot({ activeStations, onActiveStationsChange, acti
             onChange={setSelectedStations}
             lineGroups={LINE_GROUPS}
             regionGroups={REGION_GROUPS}
+            stationHref={stationPath}
           />
         </div>
         {metric === "pct2019" && (
