@@ -237,6 +237,11 @@ html.clean {
   .abp-header, .abp-footer, .kbd-speed-dial, h1 {
     display: none !important;
   }
+  // Its negative top margin tucks it under the `h1`; with that hidden, it
+  // would poke above the viewport (clipped text atop `og-bt.png`).
+  .bt-subtitle {
+    margin-top: 0 !important;
+  }
 }
 
 // use-kbd's dark `--kbd-bg` default (#1f2937) is too close to this page's

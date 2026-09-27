@@ -4,6 +4,7 @@ import { createRequire } from 'module'
 import { pdsPlugin } from 'pnpm-dep-source/vite'
 import { defineConfig } from 'vite'
 import dvc from 'vite-plugin-dvc'
+import { routeMetaPlugin } from './vite-route-meta'
 
 const require = createRequire(import.meta.url)
 const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') ?? []
@@ -30,6 +31,7 @@ export default defineConfig({
     // blobs live at `<base>/.dvc/cache/files/md5/...`.
     dvc({ root: 'public', baseUrl: 'https://data.pa.hccs.dev/.dvc/cache' }),
     pdsPlugin(),
+    routeMetaPlugin(),
   ],
   resolve: {
     alias: {
