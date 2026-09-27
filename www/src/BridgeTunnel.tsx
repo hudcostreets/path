@@ -973,7 +973,7 @@ export default function BridgeTunnel() {
 
   return <>
     <h1>PANYNJ Bridge &amp; Tunnel Traffic</h1>
-    <p style={{ color: "#888", marginTop: "-0.5em" }}>
+    <p className="bt-subtitle" style={{ color: "#888", marginTop: "-0.5em" }}>
       Eastbound (tolled direction) vehicle counts, {dataRange ?? "2011–present"}.{" "}
       <a href="/">← PATH ridership</a>
     </p>
