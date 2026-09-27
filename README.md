@@ -15,16 +15,17 @@ Cleaned + plotted [PANYNJ][PA data] PATH faregate + hourly ridership.
 - `www/public/entries_vs_exits.pqt` — per (ym, station), avg entries + exits per day-type
 - `www/public/hourly.pqt` — the browser-served hourly parquet (zstd, int32-downcast)
 
-Larger artifacts (parquets, PDFs, the pie-map GIF/MP4) are DVX-tracked (`.dvc` pointers in git, blobs on S3); `dvx pull` fetches the current versions.
+Larger artifacts (parquets, PDFs, the pie-map GIF/MP4) are DVX-tracked (`.dvc` pointers in git, blobs on R2); `dvx pull` fetches the current versions.
 
 ## Pipeline
 
-The daily [`update-path-data.yml`][update-workflow] cron runs `path-data gha-update`:
+The daily [`daily.yml`][daily-workflow] cron (10:00 UTC):
 
-1. `path-data refresh` — download the latest [PANYNJ ridership PDFs][PA data]
-2. `dvx run` — re-parse any changed years and rebuild derived artifacts (`path-data monthly -y YYYY`, `path-data parse-hourly -y YYYY`, `path-data combine`, `path-data combine-hourly`, `path-data entries-vs-exits`)
-3. `dvx add` + `dvx push` — snapshot new outputs to S3
-4. `git commit` and, if `www/public/**/*.dvc` actually changed, `gh workflow run www.yml` to redeploy the site
+1. `path-data refresh` — download the latest [PANYNJ ridership PDFs][PA data] (commits any that changed)
+2. `dvx run --commit --push each` — re-parse changed years and rebuild derived artifacts (`path-data monthly -y YYYY`, `path-data parse-hourly -y YYYY`, `path-data combine`, `path-data combine-hourly`, `path-data entries-vs-exits`, B&T), committing and pushing each stage as it completes
+3. `www/deploy.dvc` → `path-data deploy` — rebuild and deploy the site, iff a `www/public` artifact changed
+4. `www/announce.dvc` → `path-data announce` — post "new data" to Slack, only after a successful deploy
+5. `path-data daily-report` — "no new data" Slack thread reply, or a failure alert
 
 Local dev:
 
@@ -35,7 +36,7 @@ pip install -e .
 path-data --help
 ```
 
-Web frontend lives at [`www/`](www/) — Vite + React + Plotly + Leaflet, deployed to GitHub Pages via [`.github/workflows/www.yml`][www-workflow]. Any push touching `www/**` (including new `.dvc` pointers to fresh data) redeploys automatically.
+Web frontend lives at [`www/`](www/) — Vite + React + Plotly + Leaflet, deployed to Cloudflare Pages ([pa.hccs.dev]) via [`.github/workflows/www.yml`][www-workflow] (`path-data deploy`) on any push touching `www/**`.
 
 ## Bridge & Tunnel
 
@@ -57,5 +58,6 @@ gs -o merged.pdf \
 [`data/all.xlsx`]: data/all.xlsx
 [PA data]: https://www.panynj.gov/path/en/about/stats.html
 [Google Sheet]: https://docs.google.com/spreadsheets/d/1HMrVNcRzYryUtI5mnPc5K5hrt2UT1w78MwzexXinqys/edit
-[update-workflow]: .github/workflows/update-path-data.yml
+[daily-workflow]: .github/workflows/daily.yml
+[pa.hccs.dev]: https://pa.hccs.dev
 [www-workflow]: .github/workflows/www.yml

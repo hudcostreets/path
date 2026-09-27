@@ -1,7 +1,7 @@
 from json import dumps, loads
 from urllib.request import Request, urlopen
 
-from click import Choice, argument, option
+from click import argument, option
 from thrds import SlackClient, Thread
 from utz import err
 
@@ -118,34 +118,3 @@ def deploy_message(
         emoji = ':rotating_light:'
     return text + '\n' + ' · '.join(link for link in links if link), emoji
 
-
-@path_data.command('deploy-notify')
-@option('-c', '--channel', envvar='SLACK_CHANNEL_ID', required=True, help='Slack channel ID')
-@option('-d', '--data-run-url', help='URL of the data-update GHA run that published the new data')
-@option('-p', '--site-path', default='/', help='Site path to link, e.g. `/bt`')
-@option('-r', '--deploy-run-url', help='URL of the deploy GHA run')
-@option('-s', '--status', type=Choice(['success', 'failure']), required=True, help='Deploy outcome')
-@option('-t', '--token', envvar='SLACK_BOT_TOKEN', required=True, help='Slack bot token')
-@argument('summary')
-def deploy_notify(
-    channel: str,
-    data_run_url: str | None,
-    site_path: str,
-    deploy_run_url: str | None,
-    status: str,
-    token: str,
-    summary: str,
-):
-    """Announce new data after its `www.yml` deploy finishes (success or failure).
-
-    `SUMMARY` is e.g. "B&T through Jul '26 (was Jun '26)". Posted from the deploy
-    workflow so "deployed" is only claimed once it's true."""
-    text, emoji = deploy_message(status, summary, data_run_url, deploy_run_url, site_path)
-    result = post_message(
-        text=text,
-        channel=channel,
-        token=token,
-        username=BOT_USERNAME,
-        icon_emoji=emoji,
-    )
-    err(f"Posted to #{channel}: ts={result.get('ts')}")

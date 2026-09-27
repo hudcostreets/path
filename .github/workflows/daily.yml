@@ -1,10 +1,12 @@
 name: "Daily (DVX): refresh PATH data, deploy, announce"
-# DVX-orchestrated successor to `update-path-data.yml` (`path-data gha-update`);
-# see `specs/port-pipelines-to-dvx.md`. Dispatch-only until proven: the cron
-# still runs `update-path-data.yml`. `dry_run` (the default) refreshes the PDFs
-# and prints each stage's plan, without committing, pushing, deploying, or
-# posting to Slack.
+# Daily PATH/B&T data refresh, DVX-orchestrated (`specs/done/port-pipelines-to-dvx.md`):
+# refresh PDFs → `dvx run` the pipeline (each stage committed + pushed) →
+# `www/deploy.dvc` → `www/announce.dvc` → `path-data daily-report`. Dispatch
+# with `dry_run` (the default for manual runs) to print each stage's plan,
+# without committing, pushing, deploying, or posting to Slack.
 on:
+  schedule:
+    - cron: '0 10 * * *'  # scheduled runs have empty `inputs`, i.e. a real (non-dry) run
   workflow_dispatch:
     inputs:
       dry_run:

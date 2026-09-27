@@ -17,7 +17,7 @@ from click import UsageError, option
 from utz import err
 
 from path_data.cli.base import path_data
-from path_data.cli.gha_update import _append_summary, _run_url
+from path_data.cli.report import _append_summary, _run_url
 from path_data.cli.slack import BOT_USERNAME, deploy_message, post_message
 from path_data.paths import WWW, WWW_ALL_PQT, WWW_PUBLIC
 

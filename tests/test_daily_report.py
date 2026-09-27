@@ -4,7 +4,7 @@ from subprocess import run
 import pytest
 from click.testing import CliRunner
 
-from path_data.cli import gha_update as gu
+from path_data.cli import report as rp
 from path_data.cli.base import path_data
 
 GIT_ENV = {
@@ -29,10 +29,10 @@ def repo(tmp_path, monkeypatch):
     for var in ['GITHUB_RUN_ID', 'GITHUB_REPOSITORY', 'GITHUB_STEP_SUMMARY', 'PATH_DATA_SKIP_SLACK']:
         monkeypatch.delenv(var, raising=False)
     posts = []
-    monkeypatch.setattr(gu, '_slack', lambda text, emoji=None, thread_ts=None, blocks=None: posts.append((text, thread_ts)) or f'ts{len(posts)}')
-    monkeypatch.setattr(gu, '_post_no_new_data', lambda slack_link: posts.append(('no-new-data', slack_link)))
-    monkeypatch.setattr(gu, '_latest_summary', lambda: "PATH Aug '26, B&T Jul '26")
-    monkeypatch.setattr(gu, '_unpushed_commits', list)
+    monkeypatch.setattr(rp, '_slack', lambda text, emoji=None, thread_ts=None, blocks=None: posts.append((text, thread_ts)) or f'ts{len(posts)}')
+    monkeypatch.setattr(rp, '_post_no_new_data', lambda slack_link: posts.append(('no-new-data', slack_link)))
+    monkeypatch.setattr(rp, '_latest_summary', lambda: "PATH Aug '26, B&T Jul '26")
+    monkeypatch.setattr(rp, '_unpushed_commits', list)
     return tmp_path, git('rev-parse', 'HEAD', cwd=tmp_path), posts
 
 
@@ -63,7 +63,7 @@ def test_new_data(repo):
 def test_unpushed(repo, monkeypatch):
     """`dvx run --push each` only warns on a failed `git push`; surface it."""
     _, base, posts = repo
-    monkeypatch.setattr(gu, '_unpushed_commits', lambda: ['abc1234 Announce new data'])
+    monkeypatch.setattr(rp, '_unpushed_commits', lambda: ['abc1234 Announce new data'])
     result = report('-b', base, '-s', 'success')
     assert result.exit_code == 1
     assert posts == [

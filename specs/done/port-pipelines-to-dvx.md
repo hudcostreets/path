@@ -13,11 +13,11 @@ Replace the ad-hoc mix of GHA-orchestrated steps, Python CLI wrappers, and DVX p
 | Phase | Status |
 |---|---|
 | 0. DAG hygiene (prerequisite, found while porting) | ✅ done |
-| 1. Side-effect stages (`www/deploy.dvc`, `www/announce.dvc`) | ✅ done (not yet scheduled) |
+| 1. Side-effect stages (`www/deploy.dvc`, `www/announce.dvc`) | ✅ done |
 | 2. External fetches via DVX | ✅ audited (daily pipeline: yes; ATD: manual, deferred) |
-| 3a. DVX workflow (`daily.yml`), dispatch-only | ✅ done, **untested in GHA** |
+| 3a. DVX workflow (`daily.yml`) | ✅ done; proven by dispatch (dry run 36316450310, real run 36342352067) |
 | 4. Daily Slack on no-change days | ✅ done (in `daily.yml`'s `daily-report` step) |
-| 3b. Cutover: schedule `daily.yml`, retire `gha-update` + `www.yml`'s notify path | ⏳ todo, after 3a is proven by dispatch |
+| 3b. Cutover: schedule `daily.yml`, retire `gha-update` + `www.yml`'s notify path | ✅ done (2026-09-27) |
 
 ## Phase 0: DAG hygiene ✅
 
@@ -50,7 +50,7 @@ This phase also changes the currently-scheduled `gha-update` flow: previously-al
 
 ## Phase 3a: DVX workflow ✅ (dispatch-only, untested in GHA)
 
-`.github/workflows/daily.yml`, `workflow_dispatch` only (the cron still runs `update-path-data.yml`); both share `concurrency: path-data`. Steps:
+`.github/workflows/daily.yml` (cron `0 10 * * *` since 3b, plus `workflow_dispatch`; `concurrency: path-data`). Steps:
 
 1. `path-data refresh -cc` (commit + push new PDFs)
 2. `dvx pull` (non-fatal; hydrates outputs so fresh stages are hash-verified, not recomputed)
@@ -62,7 +62,7 @@ This phase also changes the currently-scheduled `gha-update` flow: previously-al
 
 `$DVX` = `dvx run -v --commit --push each` (`-n` when the `dry_run` input is set, which is the default: refresh + plans, no commits / pushes / deploys / posts). Each completed stage is committed + pushed immediately, so a mid-pipeline failure keeps the finished stages and the next run resumes from the stale ones (e.g. a failed deploy is retried the next day, then announced).
 
-Transition safety: while both flows exist, `gha-update` also writes `www/announced.json` when it commits new data, so `daily.yml` never re-announces an update the old flow announced. After an old-flow update, `daily.yml` will redeploy once (harmless).
+Transition safety (until 3b): `gha-update` also wrote `www/announced.json` when it committed new data, so `daily.yml` couldn't re-announce an update the old flow announced.
 
 ## Phase 4: daily Slack on no-change days ✅
 
@@ -71,7 +71,7 @@ Spec option 1, moved into a final step: `path-data daily-report -s ${{ job.statu
 - success, and `www/announced.json` unchanged since the run started ⇒ reply to the "no new data" thread (the existing `_post_no_new_data`); also fails loudly if any commit is unpushed (`--push each` only warns when a `git push` fails, and an unpushed `announced.json` would re-announce).
 - failure (any step) ⇒ ":rotating_light: PATH pipeline failed", with the failing stage's output (from the `✗ <target>` line in the tee'd `dvx` output → DVX's `tmp/dvx-run-<stem>.log`), or the notebook cell error, as a thread reply.
 
-## Phase 3b: cutover ⏳
+## Phase 3b: cutover ✅
 
 Prove 3a first:
 
@@ -83,6 +83,20 @@ Prove 3a first:
    - `www.yml`: replace its build/e2e/wrangler steps with `path-data deploy` (one definition of "deploy"); drop the `notify`/`site_path`/`data_run_url` inputs, the "Announce new data in Slack" step, and `path-data deploy-notify`.
 
 The first real new-data day after that exercises refresh → parse → per-stage commits/pushes → deploy → announce end to end.
+
+Outcome (2026-09-27):
+
+1. Dry run [36316450310]: all 75 data stages `skip (up-to-date)`; `www/deploy` "would run" only because `deploy.dvc` predated the merged re-capture of `og-bt.png` (fixed in `074d880`, which also bumps `announce.dvc`'s `git_dep` on it).
+2. Real run [36342352067]: 75/75 stages skipped, deploy + announce up-to-date, no commits, one "no new data" reply (the day's thread shows "Polled 2x": the old cron's + this one's).
+3. Cutover commit:
+   - `daily.yml`: `schedule: - cron: '0 10 * * *'`.
+   - Deleted `update-path-data.yml`, `gha-update`, `deploy-notify`, and helpers only they used; the rest of `path_data/cli/gha_update.py` (`daily-report`, `backfill-slack`, Slack/summary helpers) is now `path_data/cli/report.py`.
+   - `www.yml`: toolchain setup + Playwright browsers + `path-data deploy` (for site-code pushes; data deploys are `www/deploy.dvc`). No inputs / Slack step.
+
+Also observed: the old flow committed + redeployed daily even with no new data, because `refresh` bumps the PDFs' `fetched:` dates. `daily.yml` still commits those bumps (`refresh -cc`), but `www/deploy.dvc` doesn't depend on them, so no redeploy; and a `GITHUB_TOKEN` push doesn't trigger `www.yml`.
+
+[36316450310]: https://github.com/hudcostreets/path/actions/runs/36316450310
+[36342352067]: https://github.com/hudcostreets/path/actions/runs/36342352067
 
 ## Decisions (formerly open questions)
 

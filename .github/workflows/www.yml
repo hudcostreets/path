@@ -1,21 +1,7 @@
 name: Deploy www
+# Site-code deploys (data-update deploys run as `www/deploy.dvc` in `daily.yml`).
 on:
   workflow_dispatch:
-    # Set by `path-data gha-update` when it dispatches a deploy for new data;
-    # this workflow then announces it in Slack once the deploy finishes.
-    inputs:
-      notify:
-        description: "New-data summary to announce in Slack after deploying (empty: no post)"
-        required: false
-        default: ''
-      site_path:
-        description: "Site path to link in the Slack post"
-        required: false
-        default: '/'
-      data_run_url:
-        description: "URL of the data-update run that published the new data"
-        required: false
-        default: ''
   push:
     branches: [ main ]
     paths:
@@ -30,6 +16,8 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto  # R2 (S3-compatible) uses region `auto`
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_HCCS_INFRA_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 2363642879f18d37d52dca114059937e  # HCCS
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -37,10 +25,6 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
       - run: pip install -e .
-      # Pull www/public/* DVX artifacts from S3 so the built SPA has data files
-      # at the content-addressed URLs that `vite-plugin-dvc` resolves to.
-      - name: Pull www/public DVX artifacts
-        run: dvx pull --glob 'www/public/*.dvc'
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -49,33 +33,9 @@ jobs:
           node-version: 22
           cache: 'pnpm'
           cache-dependency-path: www/pnpm-lock.yaml
-      - working-directory: www
-        run: pnpm install
-      - working-directory: www
-        run: pnpm run build
-      - name: Copy index.html to 404.html for SPA routing
-        run: cp www/dist/index.html www/dist/404.html
-      - name: Install Playwright browsers
+      - name: Install Playwright browsers (deploy's e2e tests)
         working-directory: www
-        run: npx playwright install --with-deps chromium
-      - name: Run e2e tests
-        working-directory: www
-        run: npx playwright test
-      - name: Deploy to Cloudflare Pages
-        working-directory: www
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_HCCS_INFRA_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: 2363642879f18d37d52dca114059937e  # HCCS
-        run: npx wrangler pages deploy dist --project-name pa --branch main --commit-dirty=true
-      - name: Announce new data in Slack
-        # `job.status` is `success`/`failure` here; skip cancelled runs + plain pushes (no `notify`)
-        if: ${{ !cancelled() && inputs.notify }}
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
-          NOTIFY: ${{ inputs.notify }}
-          SITE_PATH: ${{ inputs.site_path }}
-          DATA_RUN_URL: ${{ inputs.data_run_url }}
-          DEPLOY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          STATUS: ${{ job.status }}
-        run: path-data deploy-notify -s "$STATUS" -p "$SITE_PATH" -d "$DATA_RUN_URL" -r "$DEPLOY_RUN_URL" "$NOTIFY"
+        run: pnpm install && npx playwright install --with-deps chromium
+      # `dvx pull`/`push` of `www/public` artifacts, build, e2e, `wrangler pages deploy`
+      - name: Deploy
+        run: path-data deploy
