@@ -39,7 +39,8 @@ With `bt.html`, the canonical, trailing-slash-free URL (matching `og:url` and th
 | `/bt` | PANYNJ Bridge & Tunnel Traffic | `og-bt.png` (`scripts/capture-og.ts`, 1200×630) |
 | `/map` | PATH Ridership – Hourly Pie-Map | `og-map.jpg` (`scripts/capture-og.ts`, 1200×630) |
 | `/airports` | PANYNJ Airport Traffic | `og.png` (fallback) |
-| `/station/<slug>` ×13 | `<Station> PATH Station Ridership` | `og.png` (fallback) |
+| `/station` | `PATH Stations` | `og.png` (fallback) |
+| `/station/<slug>` ×13 | `<Station title> PATH Station Ridership` (long-form, e.g. "World Trade Center") | `og.png` (fallback) |
 | anything else (`/banner`, …) | homepage's | `og.png` |
 
 `<title>`s are `<page title> – Hudson County Complete Streets`; descriptions are human-written for top-level routes and templated (`stationMeta()`) for stations. Twitter/X reads `og:*` (plus the existing `twitter:card=summary_large_image`), so no separate `twitter:*` tags.
@@ -58,10 +59,8 @@ With `bt.html`, the canonical, trailing-slash-free URL (matching `og:url` and th
 
 ### Phase 3: per-station — plumbing done, images remaining
 
-- Done: `stationSlug()` (lowercase-kebab of `STATIONS` names: `grove-street`, `wtc`, `33rd-street`, …) and `stationMeta()` generate a `ROUTE_METAS` entry per station, so `dist/station/<slug>.html` is emitted with station-specific title/description/`og:url`, and `useRouteMeta` sets them client-side.
+- Done: `stationMeta()` generates a `ROUTE_METAS` entry per `STATION_INFO` entry (`stations.ts`, from `per-station-pages.md`: the single source of slugs like `grove-street`, `wtc`, and long-form titles), so `dist/station/<slug>.html` is emitted with station-specific title/description/`og:url`, and `useRouteMeta` sets them client-side (station pages don't set `document.title` themselves). The `/station` index has its own entry too.
 - Remaining:
-  - If `per-station-pages.md` defines its own slug function, make `route-meta.ts` import it (or vice versa) so there's one definition; the e2e test pins today's slugs.
-  - The station page shouldn't also set `document.title` itself (`useRouteMeta` owns it); tweak `stationMeta()`'s copy to match the page once its contents settle.
   - Per-station images: add the station route to `scripts/capture-og.ts` (13 × `og-station-<slug>.png`, or a single DVX stage), then point `stationMeta().ogImage` at them and add them to `strip-dvc-artifacts.mjs`'s `KEEP`.
 
 ### Phase 4: social copy — done

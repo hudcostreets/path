@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyRouteMeta, routeHtmlPath } from '../vite-route-meta'
-import { HOME, ROUTE_METAS, routeMeta, stationSlug } from './route-meta'
-import { STATIONS } from './stations'
+import { HOME, ROUTE_METAS, routeMeta } from './route-meta'
+import { STATION_INFO } from './stations'
 
 const FIXTURE = `<head>
     <title>X</title>
@@ -51,7 +51,8 @@ describe('ROUTE_METAS', () => {
       '/bt',
       '/map',
       '/airports',
-      ...STATIONS.map(s => `/station/${stationSlug(s)}`),
+      '/station',
+      ...STATION_INFO.map(i => `/station/${i.slug}`),
     ])
   })
   it('non-home routes are emitted as `<route>.html`', () => {
@@ -59,11 +60,12 @@ describe('ROUTE_METAS', () => {
       'bt.html',
       'map.html',
       'airports.html',
-      ...STATIONS.map(s => `station/${stationSlug(s)}.html`),
+      'station.html',
+      ...STATION_INFO.map(i => `station/${i.slug}.html`),
     ])
   })
   it('station slugs are lowercase-kebab', () => {
-    expect(STATIONS.map(stationSlug)).toEqual([
+    expect(STATION_INFO.map(i => i.slug)).toEqual([
       'christopher-street',
       '9th-street',
       '14th-street',

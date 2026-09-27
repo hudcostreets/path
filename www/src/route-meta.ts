@@ -8,7 +8,7 @@
  *    client-side navigation.
  *
  *  Pure data (no React / DOM imports): it's also loaded by `vite.config.ts`. */
-import { STATIONS } from "./stations"
+import { STATION_INFO, type StationInfo } from "./stations"
 
 export const ORIGIN = 'https://pa.hccs.dev'
 const SITE_SUFFIX = ' – Hudson County Complete Streets'
@@ -31,20 +31,15 @@ export const HOME: RouteMeta = {
   ogImage: `${ORIGIN}/og.png`,
 }
 
-/** Lowercase-kebab slug for `/station/<slug>` (e.g. "Grove Street" →
- *  `grove-street`, "WTC" → `wtc`). */
-export function stationSlug(station: string): string {
-  return station.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-}
-
-/** Templated metadata for a per-station page. No per-station image yet, so
- *  these fall back to the homepage's all-stations plot. */
-export function stationMeta(station: string): RouteMeta {
+/** Templated metadata for a per-station page (slug + long-form title from
+ *  `STATION_INFO`). No per-station image yet, so these fall back to the
+ *  homepage's all-stations plot. */
+export function stationMeta({ slug, title }: StationInfo): RouteMeta {
   return {
-    path: `/station/${stationSlug(station)}`,
-    title: `${station} – PATH Ridership${SITE_SUFFIX}`,
-    description: `PATH ridership at ${station}: monthly weekday/weekend averages and recovery vs. pre-COVID, from PANYNJ monthly reports.`,
-    ogTitle: `${station} PATH Station Ridership`,
+    path: `/station/${slug}`,
+    title: `${title} – PATH Ridership${SITE_SUFFIX}`,
+    description: `PATH ridership at ${title}: monthly weekday/weekend averages and recovery vs. pre-COVID, from PANYNJ monthly reports.`,
+    ogTitle: `${title} PATH Station Ridership`,
     ogImage: HOME.ogImage,
   }
 }
@@ -78,7 +73,14 @@ export const ROUTE_METAS: RouteMeta[] = [
     ogTitle: 'PANYNJ Airport Traffic',
     ogImage: HOME.ogImage,
   },
-  ...STATIONS.map(stationMeta),
+  {
+    path: '/station',
+    title: `PATH Stations – PATH Ridership${SITE_SUFFIX}`,
+    description: 'Per-station PATH ridership: history, recovery vs. pre-COVID, rank among the 13 stations, and hourly profiles.',
+    ogTitle: 'PATH Stations',
+    ogImage: HOME.ogImage,
+  },
+  ...STATION_INFO.map(stationMeta),
 ]
 
 const BY_PATH = new Map(ROUTE_METAS.map(m => [m.path, m]))

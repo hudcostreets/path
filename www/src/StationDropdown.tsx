@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react"
-import type { StationGroup } from "./RidesPlot"
+import { Link } from "react-router-dom"
+import { displayName as stationDisplayName, type StationGroup } from "./stations"
+import { Tooltip } from "./Tooltip"
+
+/** "Grove Street page →" link, shown next to a pinned station's filter badge. */
+export function StationPageLink({ to, station }: { to: string, station: string }) {
+  return (
+    <Link className="station-page-link" to={to} data-pltly-keep-pin>
+      <span className="station-page-link-name">{stationDisplayName(station)} </span>page →
+    </Link>
+  )
+}
 
 function GroupCheckbox({
   group,
@@ -56,12 +67,15 @@ function StationRow({
   checked,
   onToggle,
   onSolo,
+  href,
 }: {
   station: string
   color: string
   checked: boolean
   onToggle: () => void
   onSolo: () => void
+  /** Per-station page; renders a "↗" link at the end of the row. */
+  href?: string
 }) {
   const solo = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -80,6 +94,11 @@ function StationRow({
         {station}
       </label>
       <span className="solo-link" onClick={solo}>only</span>
+      {href && (
+        <Tooltip content={`${station} station page`} placement="right">
+          <Link className="station-row-link" to={href} aria-label={`${station} station page`}>↗</Link>
+        </Tooltip>
+      )}
     </div>
   )
 }
@@ -96,6 +115,7 @@ export function StationDropdown({
   lineGroupsLabel = "Lines",
   regionGroupsLabel = "Regions",
   nameMap,
+  stationHref,
 }: {
   stations: string[]
   colors: Record<string, string>
@@ -108,6 +128,8 @@ export function StationDropdown({
   lineGroupsLabel?: string
   regionGroupsLabel?: string
   nameMap?: Record<string, string>
+  /** Map a station to its per-station page path (adds a link per row). */
+  stationHref?: (station: string) => string | undefined
 }) {
   const displayName = (s: string) => nameMap?.[s] ?? s
   const [isOpen, setIsOpen] = useState(false)
@@ -201,6 +223,7 @@ export function StationDropdown({
               checked={selected.includes(station)}
               onToggle={() => toggleStation(station)}
               onSolo={() => onChange([station])}
+              href={stationHref?.(station)}
             />
           ))}
         </div>

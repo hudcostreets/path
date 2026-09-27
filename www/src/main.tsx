@@ -13,6 +13,7 @@ import './index.scss'
 import './plot.scss'
 import Body from './Body.mdx'
 import { HccsIcon, GhIcon, ThemeCycleIcon } from './speed-dial-icons'
+import { StationNavActions } from './StationIndex'
 import { applyTheme, ThemeProvider, useTheme } from './ThemeContext'
 import { useRouteMeta } from './useRouteMeta'
 import { useScrollAnchor } from './useScrollAnchor'
@@ -21,6 +22,8 @@ const Airports = lazy(() => import('./Airports'))
 const BridgeTunnel = lazy(() => import('./BridgeTunnel'))
 const BannerPage = lazy(() => import('./ABPBanner').then(m => ({ default: m.BannerPage })))
 const StationsMap = lazy(() => import('./StationsMap'))
+const StationPage = lazy(() => import('./StationPage'))
+const StationsIndexPage = lazy(() => import('./StationPage').then(m => ({ default: m.StationsIndexPage })))
 
 const components = {
   a: A,
@@ -94,7 +97,7 @@ function NotFound() {
         <code>{typeof window === 'undefined' ? '' : window.location.pathname}</code>{' '}
         isn't a page here.
       </p>
-      <p><a href="/">← PATH ridership</a> · <a href="/bt">Bridge & Tunnel</a> · <a href="/map">Pie map</a> · <a href="/airports">Airports</a></p>
+      <p><a href="/">← PATH ridership</a> · <a href="/bt">Bridge & Tunnel</a> · <a href="/map">Pie map</a> · <a href="/airports">Airports</a> · <a href="/station">Stations</a></p>
     </div>
   )
 }
@@ -109,6 +112,7 @@ createRoot(document.getElementById('root')!).render(
               <BrowserRouter>
                 <ScrollAnchor />
                 <RouteMeta />
+                <StationNavActions />
                 <Routes>
                   <Route path="/banner" element={
                     <Suspense fallback={null}>
@@ -128,6 +132,16 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/airports" element={
                     <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
                       <Airports />
+                    </Suspense>
+                  } />
+                  <Route path="/station" element={
+                    <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
+                      <StationsIndexPage />
+                    </Suspense>
+                  } />
+                  <Route path="/station/:slug" element={
+                    <Suspense fallback={<div className="loading" style={{ height: 450 }}>Loading...</div>}>
+                      <StationPage />
                     </Suspense>
                   } />
                   <Route index element={

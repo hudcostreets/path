@@ -1,6 +1,6 @@
 {
   "js_bundle_kb": 2000,
-  "css_bundle_kb": 60,
+  "css_bundle_kb": 64,
   "path_load_ms": 10000,
   "bt_load_ms": 15000,
   "transfer_kb": 5000,
