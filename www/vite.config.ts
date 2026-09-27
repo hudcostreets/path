@@ -36,6 +36,9 @@ export default defineConfig({
       'plotly.js/basic': plotlyBasicPath,
     },
   },
+  optimizeDeps: {
+    include: ['plotly.js/basic'],
+  },
   build: {
     commonjsOptions: {
       include: [/plotly\.js/, /node_modules/],
