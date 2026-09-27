@@ -1,0 +1,95 @@
+name: "Daily (DVX): refresh PATH data, deploy, announce"
+# DVX-orchestrated successor to `update-path-data.yml` (`path-data gha-update`);
+# see `specs/port-pipelines-to-dvx.md`. Dispatch-only until proven: the cron
+# still runs `update-path-data.yml`. `dry_run` (the default) refreshes the PDFs
+# and prints each stage's plan, without committing, pushing, deploying, or
+# posting to Slack.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        type: boolean
+        description: "Plan only (no commits, pushes, deploys, or Slack posts)"
+        default: true
+      force:
+        type: boolean
+        description: "Force re-running every stage (incl. deploy; announce still only posts new months)"
+        default: false
+concurrency:
+  group: path-data
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash  # `-eo pipefail`, so `… | tee` fails with its LHS
+env:
+  GIT_AUTHOR_NAME: "GitHub Actions"
+  GIT_AUTHOR_EMAIL: "path-ridership-data@hudcostreets.org"
+  GIT_COMMITTER_NAME: "GitHub Actions"
+  GIT_COMMITTER_EMAIL: "path-ridership-data@hudcostreets.org"
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto  # R2 (S3-compatible) uses region `auto`
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CF_HCCS_INFRA_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: 2363642879f18d37d52dca114059937e  # HCCS
+  SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+  SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # `dvx run --commit --push each`, `path-data refresh -cc`
+    env:
+      # Each stage that runs is committed + pushed (with its cache blobs) as it
+      # completes, so a failure mid-pipeline keeps the finished stages, and the
+      # next run resumes from the stale ones.
+      DVX: dvx run -v ${{ inputs.dry_run && '-n' || '--commit --push each' }} ${{ inputs.force && '--force' || '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      - name: Install poppler-utils (`pdftotext`)
+        run: sudo apt-get install -y poppler-utils
+      - run: pip install -e .
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: www/pnpm-lock.yaml
+      - name: Record starting commit
+        id: start
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mkdir -p tmp
+      - name: Refresh upstream PDFs
+        run: path-data refresh ${{ !inputs.dry_run && '-cc' || '' }}
+      # Hydrate outputs so `dvx run` can hash-verify fresh stages instead of
+      # recomputing them; whatever this misses, `dvx run` recomputes.
+      - name: Pull DVX artifacts
+        run: dvx pull || echo "::warning::\`dvx pull\` failed (partially?); \`dvx run\` will recompute what's missing"
+      - name: Run pipeline
+        run: $DVX data/*.dvc data/bt/*.dvc www/public/*.dvc 2>&1 | tee tmp/daily-pipeline.log
+      - name: Install Playwright (deploy's e2e tests)
+        if: ${{ !inputs.dry_run }}
+        working-directory: www
+        run: pnpm install && npx playwright install --with-deps chromium
+      # Runs iff a `www/public` artifact changed since the last successful deploy
+      - name: Deploy
+        run: $DVX www/deploy.dvc 2>&1 | tee tmp/daily-deploy.log
+      # Runs iff the deploy above (or a previous run's) succeeded since the last
+      # announcement; posts only if the deployed data has new months.
+      - name: Announce new data
+        run: $DVX www/announce.dvc 2>&1 | tee tmp/daily-announce.log
+      # Success: "no new data" thread reply, unless the announce stage posted.
+      # Failure (of any step above): alert, with the failing stage's output.
+      - name: Report
+        if: ${{ !cancelled() }}
+        run: |
+          path-data daily-report ${{ inputs.dry_run && '-n' || '' }} \
+            -b ${{ steps.start.outputs.sha }} \
+            -s ${{ job.status }} \
+            -l tmp/daily-pipeline.log -l tmp/daily-deploy.log -l tmp/daily-announce.log

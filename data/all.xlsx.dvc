@@ -23,4 +23,4 @@ meta:
       2025.pqt: 914f89321c7043d6750fe8cfb710245c
       2026.pqt: d960331af67f6dc967acf0e2f01bfc93
     git_deps:
-      path_data/months.py: a05ba9151d07a273b5013c1fd8abc3d76abfd089
+      /path_data/months.py: 5f7eef549725c9ccc10719320a6b474ea9abb2dd

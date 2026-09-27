@@ -1,0 +1,20 @@
+meta:
+  computation:
+    cmd: path-data deploy
+    deps:
+      public/all.pqt: 123ac68e20d690b6c80827d1facd3878
+      public/atd-flights.pqt: b0fb3168910d4eff27aa778279650d21
+      public/atd-ground.pqt: 6fcec3d8c8ea4d19077d5975ab4d9fba
+      public/avg_weekday_month_grouped.json: f043c1808757cd8f8b9514f829fb5d11
+      public/avg_weekend_month_grouped.json: 4ac62f7c7d8636b9619c4c9ee4adf399
+      public/bt-ezpass.pqt: 75c1a696208a8b1468e8fb22e920b889
+      public/bt-traffic.pqt: bc082851c253dde44db442f09df825f7
+      public/entries_vs_exits.pqt: eaa96a0d7a02493eec43ba86d22e64b4
+      public/hourly.pqt: c9686b5f02ff1c76f5ac6fc2d8ff615d
+      public/og-bt.png: a3ed2c91cdec8672b4dead25730945e1
+      public/og-map.jpg: fb70b12efe80063df539c976f38e2b82
+      public/og.png: 3f71e70592bc35ba3fde74db92a035ab
+      public/pie-map-24h.gif: f1538bd3fe639665f85c18433976b5c0
+      public/pie-map-24h.mp4: 2cc1ff576a228c9d60265a6787325fd2
+      public/weekdays.json: d4cacc5a8cb61a9bf638752ef54450ef
+      public/weekends.json: 05734578ebbf527bdac687975c77ecf7

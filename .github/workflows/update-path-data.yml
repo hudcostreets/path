@@ -10,6 +10,11 @@ on:
         description: "Skip posting to Slack (for testing)"
         default: false
 
+# Shared with `daily.yml` (its DVX-orchestrated successor), so they never race
+concurrency:
+  group: path-data
+  cancel-in-progress: false
+
 env:
   GIT_AUTHOR_NAME: "GitHub Actions"
   GIT_AUTHOR_EMAIL: "path-ridership-data@hudcostreets.org"

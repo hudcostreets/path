@@ -6,6 +6,6 @@ outs:
 meta:
   computation:
     cmd: path-data parse-hourly -y 2022
-    deps:
-      2022-PATH-Hourly-Ridership-Report.pdf: b7a4fc90c727af2f4ffbff4ff9a5b338
-      path_data/parse_hourly.py: 9fc08256c3149e06396e7f34f4c21361
+    git_deps:
+      2022-PATH-hourly-Ridership-Report.pdf: aafe816cbb221b9e3a3168e8214fe58d7b2e1d1d
+      /path_data/parse_hourly.py: 38eba7e0b23c8de52d6307af21a8bc4b819a823e
