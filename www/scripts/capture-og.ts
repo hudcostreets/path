@@ -2,7 +2,7 @@
 /**
  * Capture 1200×630 `og:image` PNGs by screenshotting live routes at
  * `?clean` (chrome hidden). Writes to `www/public/og-<slug>.png`; each
- * output is DVX-tracked and referenced from `scripts/prerender-routes.mjs`.
+ * output is DVX-tracked and referenced from `src/route-meta.ts`.
  *
  * Playwright-based (vs. plotly-Python for `og.png`) because the target
  * routes render maps + Leaflet tiles + station pies — nontrivial to

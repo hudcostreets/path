@@ -30,7 +30,7 @@ GitHub Pages allows **one** custom domain per repo, so switching domains is atom
 - `path.hccs.dev` → still R2 custom domain on bucket `path` (current prod reads blobs here). Root `/` 404s (no index object — normal). Free it only after nothing reads it.
 - `pa.hccs.dev` → CNAME to `hudcostreets.github.io` (DNS-only) from the zone move; not yet claimed. Attaching it to the CFP project repoints this record to the project.
 - `hccs.dev` zone on **Cloudflare** (HCCS); `hudcostreets.org` zone on **Google Cloud DNS** (`ns-cloud-*.googledomains.com`), not CF.
-- FE data-base set in `www/vite.config.ts` (`dvc` `baseUrl`) + `www/src/static-urls.ts` (`R2_STATIC_BASE`); site canonical/og in `www/index.html` + `www/scripts/prerender-routes.mjs` (`ORIGIN`).
+- FE data-base set in `www/vite.config.ts` (`dvc` `baseUrl`) + `www/src/static-urls.ts` (`R2_STATIC_BASE`); site canonical/og in `www/index.html` + `www/src/route-meta.ts` (`ORIGIN`).
 
 ## Deploy idiom (mirrors crashes `www/deploy.sh`)
 

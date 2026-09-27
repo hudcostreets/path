@@ -14,6 +14,7 @@ import './plot.scss'
 import Body from './Body.mdx'
 import { HccsIcon, GhIcon, ThemeCycleIcon } from './speed-dial-icons'
 import { applyTheme, ThemeProvider, useTheme } from './ThemeContext'
+import { useRouteMeta } from './useRouteMeta'
 import { useScrollAnchor } from './useScrollAnchor'
 
 const Airports = lazy(() => import('./Airports'))
@@ -79,6 +80,12 @@ function ScrollAnchor() {
   return null
 }
 
+/** Effect-only wrapper: syncs `<title>` / meta tags to the current route. */
+function RouteMeta() {
+  useRouteMeta()
+  return null
+}
+
 function NotFound() {
   return (
     <div style={{ maxWidth: 600, margin: '3em auto', padding: '0 1em', textAlign: 'center' }}>
@@ -101,6 +108,7 @@ createRoot(document.getElementById('root')!).render(
             <HotkeysProvider>
               <BrowserRouter>
                 <ScrollAnchor />
+                <RouteMeta />
                 <Routes>
                   <Route path="/banner" element={
                     <Suspense fallback={null}>
