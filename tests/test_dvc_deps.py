@@ -16,6 +16,10 @@ ROOT = Path(__file__).parent.parent
 
 # Upstream artifacts that are produced by hand, not by a DVX stage
 MANUAL_ARTIFACTS = {
+    'www/public/atd-flights.pqt',
+    'www/public/atd-ground.pqt',
+    'www/public/og-bt.png',
+    'www/public/og-map.jpg',
     'www/public/pie-map-24h.gif',
     'www/public/pie-map-24h.mp4',
 }
