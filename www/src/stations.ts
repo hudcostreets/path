@@ -76,7 +76,7 @@ export const NJ_STATIONS = ["Newark", "Harrison", "Journal Square", "Grove Stree
 // includes its nights/weekends "via HOB" stops). See `LINE_ROUTES` for the
 // ordered weekday stop sequences.
 export const NWK_WTC = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "WTC"] as const
-export const JSQ_33 = ["Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
+export const JSQ_33 = ["Journal Square", "Grove Street", "Newport", "Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
 export const HOB_33 = ["Hoboken", "Christopher Street", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
 export const HOB_WTC = ["Hoboken", "Newport", "Exchange Place", "WTC"] as const
 

@@ -50,7 +50,7 @@ const NY_STATIONS = ["Christopher St.", "9th Street", "14th Street", "23rd Stree
 const NJ_STATIONS = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken"] as const
 
 const NWK_WTC = ["Newark", "Harrison", "Journal Square", "Grove Street", "Exchange Place", "WTC"] as const
-const JSQ_33 = ["Journal Square", "Grove Street", "Exchange Place", "Newport", "Hoboken", "Christopher St.", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
+const JSQ_33 = ["Journal Square", "Grove Street", "Newport", "Hoboken", "Christopher St.", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
 const HOB_33 = ["Hoboken", "Christopher St.", "9th Street", "14th Street", "23rd Street", "33rd Street"] as const
 const HOB_WTC = ["Hoboken", "Newport", "Exchange Place", "WTC"] as const
 
