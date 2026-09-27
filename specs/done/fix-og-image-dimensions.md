@@ -20,3 +20,7 @@ Upload the corrected image as the repo's social preview (Settings → Social pre
 
 ### Set homepage URL on GitHub
 Set the repo's homepage URL so the `ryan-williams` build can find and prefer the site's OG image in the future.
+
+## Outcome (2026-09-27)
+
+`www/public/og.png` is 1200×630 (Plotly-rendered by the `path-data months` stage); per-route OG images are covered by `custom-og-images.md`. Not done (GitHub settings, manual): social-preview upload; the repo homepage URL is still `https://path.hudcostreets.org` (serves the same CFP site; `pa.hccs.dev` is canonical).

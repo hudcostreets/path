@@ -66,3 +66,7 @@ Extract everything available from PANYNJ's "PATH Ridership Report (By Hour)" PDF
 
 - Spec `specs/done/automate-pipeline.md` (fully landed; hourly PDFs are already imported)
 - `path_data/cli/refresh.py` already covers hourly PDFs end-to-end
+
+## Outcome (2026-09-27)
+
+Landed: `www/public/hourly.pqt` (DVX-tracked, from the per-year hourly stages) feeds `HourlyPlot` on the homepage and the per-station pages.

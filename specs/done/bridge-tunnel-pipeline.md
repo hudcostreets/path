@@ -115,3 +115,7 @@ Add to existing workflow:
 2. **Navigation**: How to structure the site with both PATH and B&T data? Tabs? Separate pages? Single scrolling page with sections?
 3. **E-ZPass data**: Worth visualizing? It's an interesting supplementary metric (>90% adoption at most crossings now).
 4. **Historical data**: 2008–2010 PDFs don't exist at the expected URL. Are they available elsewhere, or is 2011 the floor?
+
+## Outcome (2026-09-27)
+
+Phases 4–5 landed: the `/bt` page (traffic / vs-2019 / E-ZPass modes, crossing dropdown), and B&T refresh + deploy in the daily data workflow (`gha-update`; `daily.yml` per `port-pipelines-to-dvx.md`).

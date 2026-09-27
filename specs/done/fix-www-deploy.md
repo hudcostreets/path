@@ -69,3 +69,7 @@ After these changes, push a small `www/` change (e.g., a no-op comment) to verif
 
 - `specs/port-pipelines-to-dvx.md` — long-term, this whole deploy would become a DVX stage (`www/deploy.dvc`) following the `crashes/daily.yml` pattern
 - `specs/custom-og-images.md` — per-route OG needs working build first
+
+## Outcome (2026-09-27)
+
+Resolved: `www.yml` deploys green again (now to Cloudflare Pages; e.g. runs 36270331955, 36316414233), with the e2e suite and performance budgets passing.
