@@ -3,3 +3,9 @@ outs:
   size: 96068
   hash: md5
   path: 2024-hourly.pqt
+meta:
+  computation:
+    cmd: path-data parse-hourly -y 2024
+    git_deps:
+      2024-PATH-Hourly-Ridership-Report.pdf: ff8f3acf86a11bdb06afe628fe2643e5c340d94a
+      /path_data/parse_hourly.py: 38eba7e0b23c8de52d6307af21a8bc4b819a823e

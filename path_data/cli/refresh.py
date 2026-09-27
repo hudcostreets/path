@@ -1,16 +1,63 @@
+import re
 from glob import glob
-from os.path import basename, exists, getsize
+from os.path import basename, dirname, exists, getsize, join, normpath
 
 import yaml
 from click import option
-from utz import err, check, run
+from utz import check, err, run
 
-from path_data.cli.base import path_data, commit_opt
+from path_data.cli.base import commit_opt, path_data
 from path_data.paths import hourly_pdf, monthly_pdf
-from path_data.utils import last_month, git_has_staged_changes, pdf_pages, verify_no_staged_changes
+from path_data.utils import (
+    git_has_staged_changes,
+    last_month,
+    pdf_pages,
+    verify_no_staged_changes,
+)
 
 BASE_URL = 'https://www.panynj.gov/content/dam/path/about/statistics'
 BT_BASE_URL = 'https://www.panynj.gov/content/dam/bridges-tunnels/pdfs'
+
+# Repo-root-relative paths of per-year pipeline inputs
+MONTHLY_PQT_RE = re.compile(r'data/\d{4}\.pqt')
+HOURLY_PQT_RE = re.compile(r'data/\d{4}-hourly\.pqt')
+MONTHLY_PDF_RE = re.compile(r'data/\d{4}-PATH-Monthly-Ridership-Report\.pdf')
+HOURLY_PDF_RE = re.compile(r'data/\d{4}-PATH-[Hh]ourly-Ridership-Report\.pdf')
+BT_PDF_RE = re.compile(r'data/traffic-e-zpass-usage-\d{4}\.pdf')
+
+
+def resolve_dep(dvc_path: str, key: str) -> str:
+    """Repo-root-relative path of a `.dvc` dep key, as `dvx run` resolves it:
+    `/`-prefixed keys are repo-root-relative, others `.dvc`-dir-relative."""
+    if key.startswith('/'):
+        return key[1:]
+    dvc_dir = dirname(dvc_path)
+    return normpath(join(dvc_dir, key)) if dvc_dir else key
+
+
+def spell_dep(dvc_path: str, path: str) -> str:
+    """Inverse of `resolve_dep`, in DVX's own spelling: `.dvc`-dir-relative for
+    paths under the `.dvc`'s dir, `/`-prefixed repo-root-relative otherwise."""
+    dvc_dir = dirname(dvc_path)
+    if not dvc_dir:
+        return path
+    if path.startswith(f'{dvc_dir}/'):
+        return path[len(dvc_dir) + 1:]
+    return f'/{path}'
+
+
+def add_dep(dvc_path: str, deps: dict | None, pattern: re.Pattern, new_dep: str) -> bool:
+    """If `deps` has an entry matching `pattern` (a per-year family, e.g. all
+    monthly parquets), add `new_dep` (repo-root-relative) to it, with a null
+    value (`dvx run` records the real hash on its next run). Returns whether
+    `deps` changed."""
+    if not deps:
+        return False
+    resolved = {resolve_dep(dvc_path, k) for k in deps}
+    if new_dep in resolved or not any(pattern.fullmatch(p) for p in resolved):
+        return False
+    deps[spell_dep(dvc_path, new_dep)] = None
+    return True
 
 
 def update_pdf(name: str, base_url: str = BASE_URL, data_dir: str = 'data') -> bool:
@@ -78,50 +125,26 @@ def ensure_year_pipeline(year: int):
                 yaml.dump(stub, f, default_flow_style=False, sort_keys=False)
             files_created.append(dvc_path)
 
-    # Add new year to deps in all .dvc files that depend on per-year parquets.
-    # Monthly .dvc files get `data/{year}.pqt`; hourly gets `data/{year}-hourly.pqt`.
-    dvc_files = ['data/all.pqt.dvc'] + sorted(glob('www/public/*.dvc'))
+    # Add the new year to every stage that depends on the per-year parquets
+    # (`{year}.pqt` / `{year}-hourly.pqt`) or parses the per-year PDFs directly
+    # (e.g. `entries_vs_exits`).
+    dvc_files = ['data/all.pqt.dvc', 'data/all.xlsx.dvc'] + sorted(glob('www/public/*.dvc'))
     for dvc_path in dvc_files:
         with open(dvc_path) as f:
             dvc_data = yaml.safe_load(f)
-        comp = dvc_data.get('meta', {}).get('computation', {})
-        deps = comp.get('deps', {})
-        git_deps = comp.get('git_deps', {})
+        comp = (dvc_data.get('meta') or {}).get('computation') or {}
         added = False
-        if deps:
-            # Detect whether this .dvc depends on monthly or hourly parquets
-            has_monthly = any(k.endswith('.pqt') and '-hourly' not in k for k in deps)
-            has_hourly = any('-hourly.pqt' in k for k in deps)
-            if has_monthly:
-                dep_key = f'data/{year}.pqt'
-                if dep_key not in deps:
-                    err(f'\tadding {dep_key} to {dvc_path} deps')
-                    deps[dep_key] = None
-                    added = True
-            if has_hourly and year >= 2017:
-                dep_key = f'data/{year}-hourly.pqt'
-                if dep_key not in deps:
-                    err(f'\tadding {dep_key} to {dvc_path} deps')
-                    deps[dep_key] = None
-                    added = True
-        # Stages that parse PDFs directly (e.g. entries_vs_exits) carry the
-        # per-year PDFs in `git_deps`. Extend any such set so a new year's PDFs
-        # invalidate the cache.
-        if git_deps:
-            has_monthly_pdf = any('-PATH-Monthly-Ridership-Report.pdf' in k for k in git_deps)
-            has_hourly_pdf = any('-PATH-hourly-Ridership-Report.pdf' in k.lower() for k in git_deps)
-            if has_monthly_pdf:
-                dep_key = f'/data/{year}-PATH-Monthly-Ridership-Report.pdf'
-                if dep_key not in git_deps:
-                    err(f'\tadding {dep_key} to {dvc_path} git_deps')
-                    git_deps[dep_key] = None
-                    added = True
-            if has_hourly_pdf and year >= 2017:
-                dep_key = f'/data/{year}-PATH-Hourly-Ridership-Report.pdf'
-                if dep_key not in git_deps:
-                    err(f'\tadding {dep_key} to {dvc_path} git_deps')
-                    git_deps[dep_key] = None
-                    added = True
+        for kind, pattern, new_dep in [
+            ('deps', MONTHLY_PQT_RE, f'data/{year}.pqt'),
+            ('deps', HOURLY_PQT_RE, f'data/{year}-hourly.pqt'),
+            ('git_deps', MONTHLY_PDF_RE, f'data/{year}-PATH-Monthly-Ridership-Report.pdf'),
+            ('git_deps', HOURLY_PDF_RE, f'data/{year}-PATH-Hourly-Ridership-Report.pdf'),
+        ]:
+            if pattern in (HOURLY_PQT_RE, HOURLY_PDF_RE) and year < 2017:
+                continue
+            if add_dep(dvc_path, comp.get(kind), pattern, new_dep):
+                err(f'\tadding {new_dep} to {dvc_path} {kind}')
+                added = True
         if added:
             with open(dvc_path, 'w') as f:
                 yaml.dump(dvc_data, f, default_flow_style=False, sort_keys=False)
@@ -146,11 +169,10 @@ def ensure_bt_year(year: int):
             continue
         with open(dvc_path) as f:
             dvc_data = yaml.safe_load(f)
-        git_deps = dvc_data.get('meta', {}).get('computation', {}).get('git_deps')
-        if git_deps is None or pdf_dep in git_deps:
+        git_deps = ((dvc_data.get('meta') or {}).get('computation') or {}).get('git_deps')
+        if not add_dep(dvc_path, git_deps, BT_PDF_RE, pdf_dep):
             continue
         err(f'\tadding {pdf_dep} to {dvc_path} git_deps')
-        git_deps[pdf_dep] = None
         with open(dvc_path, 'w') as f:
             yaml.dump(dvc_data, f, default_flow_style=False, sort_keys=False)
         files_changed.append(dvc_path)

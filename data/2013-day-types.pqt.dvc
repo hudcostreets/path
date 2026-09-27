@@ -8,4 +8,4 @@ meta:
     cmd: path-data monthly -y 2013
     git_deps:
       2013-PATH-Monthly-Ridership-Report.pdf: c57868281939c42bfe2d15f3e7e1e29abf055226
-      monthly.ipynb: 9762d56544fd608da8a7ca271f80463f4582a2f3
+      /path_data/monthly.py: eed41a67bf8a39b5de796a8d832c149b0ba87f84

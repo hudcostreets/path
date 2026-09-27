@@ -6,6 +6,6 @@ outs:
 meta:
   computation:
     cmd: path-data parse-hourly -y 2020
-    deps:
-      2020-PATH-Hourly-Ridership-Report.pdf: 7c349ec0ee3de2760f47ea05fbf6f206
-      path_data/parse_hourly.py: 9fc08256c3149e06396e7f34f4c21361
+    git_deps:
+      2020-PATH-hourly-Ridership-Report.pdf: 7cf5e09e445531f4b8710ff26a8c50d68b7d4b38
+      /path_data/parse_hourly.py: 38eba7e0b23c8de52d6307af21a8bc4b819a823e

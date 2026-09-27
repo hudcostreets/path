@@ -3,3 +3,8 @@ outs:
   size: 36643
   hash: md5
   path: bt-traffic.pqt
+meta:
+  computation:
+    cmd: cp ../../data/bt/traffic.pqt bt-traffic.pqt
+    deps:
+      /data/bt/traffic.pqt: bc082851c253dde44db442f09df825f7
