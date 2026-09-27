@@ -6,13 +6,14 @@ from datetime import datetime, timezone
 from glob import glob
 from os import environ, listdir
 from os.path import basename, exists, getmtime, isdir
+from pathlib import Path
 from subprocess import CalledProcessError
 from sys import exit
 from textwrap import dedent
 from traceback import format_exc
 
 import yaml
-from click import option
+from click import Choice, option
 from utz import err, lines, run
 
 from path_data.cli.base import path_data
@@ -621,6 +622,13 @@ def gha_update():
             run('git', 'add', 'data/', 'www/public/', 'img/')
         run('dvx', 'push')
 
+        # Record the data months this update publishes in `www/announced.json`
+        # (`www/announce.dvc`'s state), so the DVX daily workflow (see
+        # `specs/port-pipelines-to-dvx.md`) doesn't re-announce them.
+        from path_data.cli.announce import ANNOUNCED_JSON, current_latest, save_announced
+        save_announced(current_latest(), ANNOUNCED_JSON)
+        run('git', 'add', ANNOUNCED_JSON)
+
         run('git', 'commit', '-m', 'Update PATH ridership data')
         run('git', 'push')
 
@@ -784,6 +792,90 @@ def gha_update():
                 thread_ts=ts,
                 blocks=_diagnostic_blocks(f"```\n{tb_tail}\n```"),
             )
+        exit(1)
+
+
+def _failing_stage_output(dvx_output: str) -> str | None:
+    """Output of the first stage `dvx run` reports as failed (`✗ <path>: …`),
+    from the per-stage log DVX writes (`tmp/dvx-run-<stem>.log`)."""
+    for target in _parse_failing_targets(dvx_output):
+        log = f'tmp/dvx-run-{Path(target).stem}.log'
+        if not exists(log):
+            continue
+        with open(log) as f:
+            out = f.read()
+        if len(out) > 5000:
+            out = out[:1500] + f'\n\n…[{len(out) - 5000} chars omitted]…\n\n' + out[-3500:]
+        return f"`{target}` output (`{log}`):\n\n```\n{out}\n```"
+    return None
+
+
+def _unpushed_commits() -> list[str]:
+    run('git', 'fetch', '--quiet')
+    return lines('git', 'log', '--format=%h %s', '@{u}..HEAD', log=False)
+
+
+@path_data.command('daily-report')
+@option('-b', '--base', required=True, help='Commit the run started from; `www/announced.json` changing since means new data was announced')
+@option('-l', '--log', 'logs', multiple=True, help='Captured `dvx run` output; on failure, parsed for the failing stage')
+@option('-n', '--dry-run', is_flag=True, help="Log Slack posts instead of sending them")
+@option('-s', '--status', type=Choice(['success', 'failure']), required=True, help='Status of the pipeline steps (`job.status`)')
+def daily_report(base: str, logs: tuple[str, ...], dry_run: bool, status: str):
+    """Final step of the DVX daily workflow: Slack + step-summary report.
+
+    On success: if no new data was announced (`www/announce.dvc` posts that),
+    add a reply to the "no new data" Slack thread. On failure: post an alert,
+    with the failing stage's output (or notebook error) as a thread reply."""
+    if dry_run:
+        environ['PATH_DATA_SKIP_SLACK'] = '1'
+    url = _run_url()
+    slack_link = _run_link_slack(url)
+    md_link = _run_link_md(url)
+    problem = None
+    if status == 'success':
+        unpushed = _unpushed_commits()
+        if unpushed:
+            # `dvx run --push each` only warns when a `git push` fails
+            problem = f"{len(unpushed)} commit(s) not pushed:\n```\n" + '\n'.join(unpushed) + "\n```"
+        else:
+            announced = subprocess.run(
+                ['git', 'diff', '--quiet', base, 'HEAD', '--', 'www/announced.json'],
+                check=False,
+            ).returncode != 0
+            if announced:
+                err("New data was announced by `www/announce.dvc`")
+            else:
+                summary = _latest_summary()
+                _append_summary(dedent(f"""\
+                    ## No new data
+
+                    Latest: **{summary}**.
+
+                    {md_link}
+                    """))
+                _post_no_new_data(slack_link)
+            return
+    else:
+        dvx_output = ''
+        for log in logs:
+            if exists(log):
+                with open(log) as f:
+                    dvx_output += f.read()
+        problem = _latest_out_notebook_error() or _failing_stage_output(dvx_output)
+    _append_summary(f"## :rotating_light: Pipeline error\n\n{problem or 'See the run log.'}\n\n{md_link}\n")
+    ts = _slack(
+        f":rotating_light: *PATH pipeline failed*\n{slack_link}",
+        emoji=':rotating_light:',
+    )
+    if ts and problem:
+        truncated = problem[:2800]
+        _slack(
+            truncated,
+            emoji=':rotating_light:',
+            thread_ts=ts,
+            blocks=_diagnostic_blocks(truncated),
+        )
+    if status == 'success':
         exit(1)
 
 
