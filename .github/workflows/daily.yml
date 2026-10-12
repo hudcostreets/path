@@ -47,13 +47,21 @@ jobs:
       DVX: dvx run -v ${{ inputs.dry_run && '-n' || '--commit --push each' }} ${{ inputs.force && '--force' || '' }}
     steps:
       - uses: actions/checkout@v6
+      - name: Record starting commit
+        id: start
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mkdir -p tmp
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
-      - name: Install poppler-utils (`pdftotext`)
-        run: sudo apt-get install -y poppler-utils
       - run: pip install -e .
+        id: python-deps
+      - name: Install poppler-utils (`pdftotext`)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -62,11 +70,6 @@ jobs:
           node-version: 22
           cache: 'pnpm'
           cache-dependency-path: www/pnpm-lock.yaml
-      - name: Record starting commit
-        id: start
-        run: |
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          mkdir -p tmp
       - name: Refresh upstream PDFs
         run: path-data refresh ${{ !inputs.dry_run && '-cc' || '' }}
       # Hydrate outputs so `dvx run` can hash-verify fresh stages instead of
@@ -87,9 +90,10 @@ jobs:
       - name: Announce new data
         run: $DVX www/announce.dvc 2>&1 | tee tmp/daily-announce.log
       # Success: "no new data" thread reply, unless the announce stage posted.
-      # Failure (of any step above): alert, with the failing stage's output.
+      # Failure after Python dependencies are installed: alert, with the failing
+      # stage's output when available.
       - name: Report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.python-deps.outcome == 'success' }}
         run: |
           path-data daily-report ${{ inputs.dry_run && '-n' || '' }} \
             -b ${{ steps.start.outputs.sha }} \
