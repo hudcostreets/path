@@ -1,11 +1,11 @@
 outs:
-- md5: d960331af67f6dc967acf0e2f01bfc93
-  size: 10090
+- md5: 12e6b53868da4dbd24ccca18722a2f79
+  size: 10920
   hash: md5
   path: 2026.pqt
 meta:
   computation:
     cmd: path-data monthly -y 2026
     git_deps:
-      2026-PATH-Monthly-Ridership-Report.pdf: 9161d39ae4fbecaf6ee044f3ddd14a4b6d1af69f
+      2026-PATH-Monthly-Ridership-Report.pdf: 865ce2b06835f2f3fbe415a70704683d1100059d
       /path_data/monthly.py: eed41a67bf8a39b5de796a8d832c149b0ba87f84
