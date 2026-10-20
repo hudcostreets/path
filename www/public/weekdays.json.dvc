@@ -1,6 +1,6 @@
 outs:
-- md5: d4cacc5a8cb61a9bf638752ef54450ef
-  size: 85872
+- md5: c388a8bc2df53e86e620d0910adab8f1
+  size: 86267
   hash: md5
   path: weekdays.json
 meta:
@@ -21,6 +21,6 @@ meta:
       /data/2023.pqt: 31b9127f993ee08e4521b45308c37de0
       /data/2024.pqt: 2605002e27a9ec3ceab57c3cc2a39a80
       /data/2025.pqt: 914f89321c7043d6750fe8cfb710245c
-      /data/2026.pqt: d960331af67f6dc967acf0e2f01bfc93
+      /data/2026.pqt: 12e6b53868da4dbd24ccca18722a2f79
     git_deps:
       /path_data/months.py: 5f7eef549725c9ccc10719320a6b474ea9abb2dd
