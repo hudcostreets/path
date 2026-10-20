@@ -2,4 +2,4 @@ meta:
   computation:
     cmd: path-data announce
     git_deps:
-      deploy.dvc: bc8739761e75fb4a54eae83a6740ac3a625dfdf6
+      deploy.dvc: c580157856b1c872036d4793ed0cb82d5e2f6115
