@@ -8,6 +8,7 @@ import {
 } from 'geo-sankey'
 import { useDark } from './plot-utils'
 import { BT_CROSSING_PATHS, BT_BBOX, BT_CROSSING_LABELS } from './bt-crossings-geo'
+import { TILE_DARK, TILE_LIGHT, TILE_MAX_ZOOM } from './tiles'
 
 type TrafficRow = { crossing: string, type: string, year: number, month: string, count: number }
 
@@ -38,8 +39,6 @@ const BASE_MAX_RIBBON_PX = 56
 // Vertical gap between vehicle-type ribbons within a crossing.
 const STACK_GAP_PX = 1.5
 
-const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 
 const ATTR = ''  // Rendered once in JSX below; suppress Leaflet's built-in box.
 
@@ -837,8 +836,7 @@ export default function BTFlowMap({
     if (tileRef.current) tileRef.current.remove()
     tileRef.current = L.tileLayer(dark ? TILE_DARK : TILE_LIGHT, {
       attribution: ATTR,
-      subdomains: 'abcd',
-      maxZoom: 19,
+      maxZoom: TILE_MAX_ZOOM,
     }).addTo(map)
   }, [dark])
 
@@ -952,7 +950,8 @@ export default function BTFlowMap({
       />
       <p className="bt-flow-map-attr">
         Maps: <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a> ·
-        Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> ·
+        Tiles © <a href="https://stadiamaps.com/" target="_blank" rel="noopener">Stadia Maps</a> ·
+        © <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> ·
         Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
       </p>
     </div>
@@ -1032,7 +1031,8 @@ export function BTFlowMapPanes({ rows }: Props) {
       </div>
       <p className="bt-flow-map-attr">
         Maps: <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a> ·
-        Tiles © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> ·
+        Tiles © <a href="https://stadiamaps.com/" target="_blank" rel="noopener">Stadia Maps</a> ·
+        © <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> ·
         Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
       </p>
     </div>
@@ -1114,8 +1114,7 @@ function BTFlowPane({ crossings, viewport, volumes, maxVol, dark, sharedZoom, on
     if (tileRef.current) tileRef.current.remove()
     tileRef.current = L.tileLayer(dark ? TILE_DARK : TILE_LIGHT, {
       attribution: ATTR,
-      subdomains: 'abcd',
-      maxZoom: 19,
+      maxZoom: TILE_MAX_ZOOM,
     }).addTo(map)
   }, [dark])
 

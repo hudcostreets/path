@@ -10,6 +10,7 @@ import { Param, codeParam, useUrlState } from 'use-prms'
 import { resolve as dvcResolve } from 'virtual:dvc-data'
 import { STATION_COORDS } from './stations-geo'
 import { PIE_MAP_GIF_URL, PIE_MAP_MP4_URL } from './static-urls'
+import { TILE_DARK, TILE_MAX_ZOOM, TILES_ATTR_HTML } from './tiles'
 import { YmInput } from './YmInput'
 
 const resolved = dvcResolve('hourly.pqt')
@@ -431,16 +432,15 @@ export default function StationsMap({
       keyboard: false,
       touchZoom: false,
     }
-    const tileOpts = { attribution: '', subdomains: 'abcd', maxZoom: 19 }
-    const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    const tileOpts = { attribution: '', maxZoom: TILE_MAX_ZOOM }
 
     const njMap = L.map(njContainerRef.current, { ...baseMapOpts, center: [40.736, -74.16], zoom: 14 })
-    L.tileLayer(tileUrl, tileOpts).addTo(njMap)
+    L.tileLayer(TILE_DARK, tileOpts).addTo(njMap)
     njMap.attributionControl.remove()
     njMapRef.current = njMap
 
     const coreMap = L.map(coreContainerRef.current, { ...baseMapOpts, center: [40.73, -74.02], zoom: 13 })
-    L.tileLayer(tileUrl, tileOpts).addTo(coreMap)
+    L.tileLayer(TILE_DARK, tileOpts).addTo(coreMap)
     coreMap.attributionControl.remove()
     coreMapRef.current = coreMap
 
@@ -449,7 +449,7 @@ export default function StationsMap({
       onAdd() {
         const c = L.DomUtil.create('div', 'leaflet-control map-attr-info')
         c.innerHTML = '<span class="info-icon" aria-label="Map attribution">ⓘ</span>'
-          + '<span class="info-text">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors · © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a></span>'
+          + `<span class="info-text">${TILES_ATTR_HTML}</span>`
         L.DomEvent.disableClickPropagation(c)
         return c
       },
