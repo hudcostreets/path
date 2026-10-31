@@ -350,6 +350,25 @@ def _failing_stage_output(dvx_output: str) -> str | None:
     return None
 
 
+def _failed_steps() -> list[str]:
+    """Names of this job's failed steps, from the GHA API (needs `GH_TOKEN` and
+    `actions: read`). Covers failures outside `dvx run`, e.g. a setup step, that
+    leave no stage output to show."""
+    repo = environ.get('GITHUB_REPOSITORY')
+    run_id = environ.get('GITHUB_RUN_ID')
+    if not (repo and run_id and environ.get('GH_TOKEN')):
+        return []
+    proc = subprocess.run(
+        ['gh', 'api', f'repos/{repo}/actions/runs/{run_id}/jobs', '--jq',
+         '[.jobs[].steps[] | select(.conclusion == "failure") | .name]'],
+        capture_output=True, text=True, check=False,
+    )
+    if proc.returncode:
+        err(f"Listing failed steps failed: {proc.stderr.strip()}")
+        return []
+    return json.loads(proc.stdout)
+
+
 def _unpushed_commits() -> list[str]:
     run('git', 'fetch', '--quiet')
     return lines('git', 'log', '--format=%h %s', '@{u}..HEAD', log=False)
@@ -402,6 +421,10 @@ def daily_report(base: str, logs: tuple[str, ...], dry_run: bool, status: str):
                 with open(log) as f:
                     dvx_output += f.read()
         problem = _latest_out_notebook_error() or _failing_stage_output(dvx_output)
+        failed = _failed_steps()
+        if failed:
+            steps = ', '.join(f'`{name}`' for name in failed)
+            problem = f"Failed step: {steps}" + (f"\n\n{problem}" if problem else '')
     _append_summary(f"## :rotating_light: Pipeline error\n\n{problem or 'See the run log.'}\n\n{md_link}\n")
     ts = _slack(
         f":rotating_light: *PATH pipeline failed*\n{slack_link}",

@@ -80,3 +80,51 @@ def test_ensure_year_pipeline(tmp_path, monkeypatch):
     ensure_year_pipeline(2027)
     ensure_bt_year(2027)
     assert added == []
+
+
+DVC = '''\
+deps:
+- path: https://example.com/x.pdf
+  checksum: W/"1-a"
+outs:
+- md5: {md5}
+  size: 1
+  hash: md5
+  path: x.pdf
+meta:
+  import:
+    fetched: '{fetched}'
+'''
+
+
+def fake_dvx_update(monkeypatch, md5: str) -> list[tuple[str, ...]]:
+    """Stub `refresh.run`: `dvx update` rewrites `data/x.pdf.dvc` (new
+    `fetched` date, and `md5`); other commands are recorded."""
+    calls = []
+
+    def run(*args):
+        if args[:2] == ('dvx', 'update'):
+            Path(args[2]).write_text(DVC.format(md5=md5, fetched='2026-10-31'))
+        else:
+            calls.append(args)
+
+    monkeypatch.setattr(refresh, 'run', run)
+    return calls
+
+
+def test_update_pdf_unchanged(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    Path('data/x.pdf.dvc').write_text(DVC.format(md5='aaa', fetched='2026-10-30'))
+    calls = fake_dvx_update(monkeypatch, md5='aaa')
+    assert refresh.update_pdf('x.pdf') is False
+    assert calls == [('git', 'checkout', '--', 'data/x.pdf.dvc')]
+
+
+def test_update_pdf_changed(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
+    Path('data/x.pdf.dvc').write_text(DVC.format(md5='aaa', fetched='2026-10-30'))
+    calls = fake_dvx_update(monkeypatch, md5='bbb')
+    assert refresh.update_pdf('x.pdf') is True
+    assert calls == [('git', 'add', 'data/x.pdf', 'data/x.pdf.dvc')]

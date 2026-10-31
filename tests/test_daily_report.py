@@ -88,3 +88,15 @@ def test_failure(repo):
         (':rotating_light: *PATH pipeline failed*\nGHA run', None),
         ('`data/2026.pqt` output (`tmp/dvx-run-2026.log`):\n\n```\n=== stderr ===\nValueError: bad page\n\n```', 'ts1'),
     ]
+
+
+def test_failure_outside_pipeline(repo, monkeypatch):
+    """A failed setup step leaves no stage output; name the step."""
+    _, base, posts = repo
+    monkeypatch.setattr(rp, '_failed_steps', lambda: ["Install Playwright (deploy's e2e tests)"])
+    result = report('-b', base, '-s', 'failure', '-l', 'tmp/daily-pipeline.log')
+    assert result.exit_code == 0, result.output
+    assert posts == [
+        (':rotating_light: *PATH pipeline failed*\nGHA run', None),
+        ("Failed step: `Install Playwright (deploy's e2e tests)`", 'ts1'),
+    ]

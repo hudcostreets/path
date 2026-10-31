@@ -40,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # `dvx run --commit --push each`, `path-data refresh -cc`
+      actions: read    # `path-data daily-report` names the failed step
     env:
       # Each stage that runs is committed + pushed (with its cache blobs) as it
       # completes, so a failure mid-pipeline keeps the finished stages, and the
@@ -62,7 +63,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y poppler-utils
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -94,6 +95,8 @@ jobs:
       # stage's output when available.
       - name: Report
         if: ${{ !cancelled() && steps.python-deps.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           path-data daily-report ${{ inputs.dry_run && '-n' || '' }} \
             -b ${{ steps.start.outputs.sha }} \

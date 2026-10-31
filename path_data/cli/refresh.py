@@ -60,6 +60,11 @@ def add_dep(dvc_path: str, deps: dict | None, pattern: re.Pattern, new_dep: str)
     return True
 
 
+def dvc_outs(dvc_path: str) -> list:
+    with open(dvc_path) as f:
+        return yaml.safe_load(f)['outs']
+
+
 def update_pdf(name: str, base_url: str = BASE_URL, data_dir: str = 'data') -> bool:
     """Update or import a PDF via DVX, return True if content changed."""
     dvc_path = f'{data_dir}/{name}.dvc'
@@ -68,7 +73,14 @@ def update_pdf(name: str, base_url: str = BASE_URL, data_dir: str = 'data') -> b
     err(f'\tchecking {name}')
     if exists(dvc_path):
         # Existing import — check for updates
+        outs = dvc_outs(dvc_path)
         run('dvx', 'update', dvc_path)
+        if dvc_outs(dvc_path) == outs:
+            # Same content; `dvx update` still bumps `meta.import.fetched` (and
+            # may record a new ETag), which isn't worth a commit.
+            err('\t  unchanged')
+            run('git', 'checkout', '--', dvc_path)
+            return False
         run('git', 'add', out_path, dvc_path)
         return True
     else:
