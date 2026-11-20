@@ -1,6 +1,6 @@
 outs:
-- md5: 892dcc57f6eb61364c5adb39b40d3ed0
-  size: 16273
+- md5: 2a496b3328f1aff47af45a25229d1cc0
+  size: 16393
   hash: md5
   path: avg_weekday_month_grouped.json
 meta:
@@ -21,6 +21,6 @@ meta:
       /data/2023.pqt: 31b9127f993ee08e4521b45308c37de0
       /data/2024.pqt: 2605002e27a9ec3ceab57c3cc2a39a80
       /data/2025.pqt: 914f89321c7043d6750fe8cfb710245c
-      /data/2026.pqt: 12e6b53868da4dbd24ccca18722a2f79
+      /data/2026.pqt: 33e0c51cd0f6b488b9cebcf7a624e372
     git_deps:
       /path_data/months.py: 5f7eef549725c9ccc10719320a6b474ea9abb2dd
